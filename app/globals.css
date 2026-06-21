@@ -1,0 +1,4 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+:root{--cream:#fbf6ea;--olive:#556b2f;--sage:#81966b;--clay:#b56b45;--ink:#2f2a22}*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font-family:Arial,Helvetica,sans-serif}.hero-pattern{background-image:radial-gradient(circle at 20% 20%,rgba(129,150,107,.18),transparent 28%),radial-gradient(circle at 80% 0%,rgba(181,107,69,.14),transparent 24%)}.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{scrollbar-width:none}

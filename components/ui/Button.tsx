@@ -1,0 +1,3 @@
+import type React from 'react';
+import Link from 'next/link';
+export function Button({children,href,variant='primary',className='',type='button'}:{children:React.ReactNode;href?:string;variant?:'primary'|'dark'|'ghost';className?:string;type?:'button'|'submit'}){const cls=`rounded-2xl px-5 py-3 font-bold transition ${variant==='primary'?'bg-[#556b2f] text-white shadow-lg shadow-olive-900/10':variant==='dark'?'bg-stone-900 text-white':'bg-[#f1eadb] text-stone-800'} ${className}`;return href?<Link className={cls} href={href}>{children}</Link>:<button type={type} className={cls}>{children}</button>}
