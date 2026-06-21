@@ -1,0 +1,5 @@
+[
+ {"id":"route-south","name":"דרום","nextDelivery":"2026-06-25","deadline":"2026-06-23 18:00","driver":"אורי","customerIds":["cust-001","cust-004"]},
+ {"id":"route-center","name":"מרכז","nextDelivery":"2026-06-24","deadline":"2026-06-22 18:00","driver":"דנה","customerIds":["cust-002"]},
+ {"id":"route-north","name":"צפון","nextDelivery":"2026-06-26","deadline":"2026-06-24 18:00","driver":"יואב","customerIds":["cust-003"]}
+]

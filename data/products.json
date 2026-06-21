@@ -1,0 +1,10 @@
+[
+  {"id":"prod-olive-spread","name":"ממרח זיתים ירוקים","category":"ממרחים","price":28,"unit":"צנצנת 220 גרם","image":"https://images.unsplash.com/photo-1604335399105-a0c585fd81a1?auto=format&fit=crop&w=700&q=80","recommended":true},
+  {"id":"prod-tomato-spread","name":"ממרח עגבניות מיובשות","category":"ממרחים","price":32,"unit":"צנצנת 220 גרם","image":"https://images.unsplash.com/photo-1515543904379-3d757afe72e4?auto=format&fit=crop&w=700&q=80","recommended":true},
+  {"id":"prod-fig-jam","name":"ריבת תאנים בוטיק","category":"ריבות","price":34,"unit":"צנצנת 250 גרם","image":"https://images.unsplash.com/photo-1606914469633-bd39206ea739?auto=format&fit=crop&w=700&q=80","recommended":false},
+  {"id":"prod-berry-jam","name":"ריבת פירות יער","category":"ריבות","price":36,"unit":"צנצנת 250 גרם","image":"https://images.unsplash.com/photo-1546548970-71785318a17b?auto=format&fit=crop&w=700&q=80","recommended":true},
+  {"id":"prod-chili-sauce","name":"רוטב צ'ילי שום עדין","category":"רטבים","price":30,"unit":"בקבוק 250 מל","image":"https://images.unsplash.com/photo-1506368249639-73a05d6f6488?auto=format&fit=crop&w=700&q=80","recommended":false},
+  {"id":"prod-herb-sauce","name":"רוטב עשבי תיבול ושמן זית","category":"רטבים","price":31,"unit":"בקבוק 250 מל","image":"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?auto=format&fit=crop&w=700&q=80","recommended":true},
+  {"id":"prod-tasting-kit","name":"מארז טעימות למעדניות","category":"מארזים","price":118,"unit":"6 יחידות מיקס","image":"https://images.unsplash.com/photo-1607344645866-009c320f5ab8?auto=format&fit=crop&w=700&q=80","recommended":true},
+  {"id":"prod-holiday-box","name":"מארז אירוח פרימיום","category":"מארזים","price":156,"unit":"קופסת מתנה","image":"https://images.unsplash.com/photo-1607349913338-fca6f7fc42d0?auto=format&fit=crop&w=700&q=80","recommended":false}
+]

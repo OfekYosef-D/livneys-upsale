@@ -1,0 +1,2 @@
+'use client';
+export function QuantityStepper({value,onChange}:{value:number;onChange:(v:number)=>void}){return <div className="flex items-center justify-between rounded-2xl bg-[#f6efdf] p-1"><button onClick={()=>onChange(Math.max(0,value-1))} className="h-9 w-9 rounded-xl bg-white font-black">−</button><span className="min-w-10 text-center font-black">{value}</span><button onClick={()=>onChange(value+1)} className="h-9 w-9 rounded-xl bg-[#556b2f] text-white font-black">+</button></div>}
