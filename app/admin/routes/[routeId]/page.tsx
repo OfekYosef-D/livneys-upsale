@@ -1,2 +1,14 @@
-import Link from 'next/link';import { PageShell } from '@/components/ui/PageShell';import { Card } from '@/components/ui/Card';import { StatusBadge } from '@/components/admin/StatusBadge';import { getRoute,customers,hebDate } from '@/lib/mock-data';
-export default function RoutePage({params}:{params:{routeId:string}}){const r=getRoute(params.routeId),cs=customers.filter(c=>c.routeId===r.id);return <PageShell title={`קו ${r.name}`} subtitle={`חלוקה: ${hebDate(r.nextDelivery)} · דדליין: ${r.deadline} · נהג: ${r.driver}`}><Card className="overflow-hidden"><div className="divide-y divide-[#eadfca]">{cs.map(c=><Link href={`/admin/customers/${c.id}`} key={c.id} className="grid gap-2 p-4 md:grid-cols-[1fr_1fr_auto] md:items-center hover:bg-[#fbf6ea]"><div><b>{c.name}</b><p className="text-sm text-stone-500">{c.contact} · {c.phone}</p></div><p className="text-sm text-stone-600">{c.notes}</p><StatusBadge status={c.status}/></Link>)}</div></Card></PageShell>}
+import { AdminShell } from '@/components/admin/AdminShell';
+import { CrmRouteDetailClient } from '@/components/admin/CrmRouteDetailClient';
+import { requireAdmin } from '@/lib/admin-guard';
+import { customers, orders, products, routes } from '@/lib/mock-data';
+
+export default function RoutePage({ params }: { params: { routeId: string } }) {
+  requireAdmin(`/admin/routes/${params.routeId}`);
+
+  return (
+    <AdminShell title="מוכנות קו" subtitle="רשימת עבודה צפופה וברורה ליום החלוקה.">
+      <CrmRouteDetailClient routeId={params.routeId} customers={customers} orders={orders} routes={routes} products={products} />
+    </AdminShell>
+  );
+}

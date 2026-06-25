@@ -1,2 +1,5 @@
-import Link from 'next/link';
-export default function Home(){return <main className="min-h-screen hero-pattern p-6 flex items-center justify-center"><section className="max-w-md rounded-[2rem] bg-white/80 p-7 shadow-xl border border-white"><p className="text-sm text-[#556b2f] font-bold">Livneys B2B</p><h1 className="text-3xl font-black mt-2">מערכת הזמנות חוזרות לפי קווי חלוקה</h1><p className="mt-3 text-stone-600">אב-טיפוס RTL למנהלי Livneys ולקוחות מוסדיים קיימים.</p><div className="grid gap-3 mt-6"><Link className="rounded-2xl bg-[#556b2f] text-white text-center py-4 font-bold" href="/customer/cust-001">כניסה כלקוח לדמו</Link><Link className="rounded-2xl bg-stone-900 text-white text-center py-4 font-bold" href="/admin">כניסה לניהול</Link></div></section></main>}
+import { redirect } from 'next/navigation';
+
+export default function Home() {
+  redirect('/login');
+}

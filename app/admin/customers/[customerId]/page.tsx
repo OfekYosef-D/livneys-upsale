@@ -1,2 +1,14 @@
-import { PageShell } from '@/components/ui/PageShell';import { Card } from '@/components/ui/Card';import { Button } from '@/components/ui/Button';import { getCustomer,orders,productById,total,money } from '@/lib/mock-data';import { StatusBadge } from '@/components/admin/StatusBadge';
-export default function CustomerProfile({params}:{params:{customerId:string}}){const c=getCustomer(params.customerId),os=orders.filter(o=>o.customerId===c.id);return <PageShell title={c.name} subtitle={`${c.contact} · ${c.phone} · ${c.address}`} actions={<Button href="/admin/manual-order">הזמנה ידנית</Button>}><div className="grid gap-4 lg:grid-cols-[.8fr_1.2fr]"><Card className="p-5"><StatusBadge status={c.status}/><p className="mt-4 text-stone-600">{c.notes}</p><p className="mt-4 font-bold">אזור: {c.region}</p></Card><Card className="p-5"><h2 className="text-xl font-black">היסטוריית הזמנות</h2>{os.map(o=><div key={o.id} className="mt-4 rounded-2xl bg-[#fbf6ea] p-4"><div className="flex justify-between"><b>{o.date}</b><span>{o.status}</span></div>{o.items.map(i=><p key={i.productId} className="text-sm text-stone-600">{productById(i.productId).name} × {i.qty}</p>)}<b>{money(total(o.items))}</b></div>)}</Card></div></PageShell>}
+import { AdminShell } from '@/components/admin/AdminShell';
+import { CrmCustomerProfileClient } from '@/components/admin/CrmCustomerProfileClient';
+import { requireAdmin } from '@/lib/admin-guard';
+import { customers, orders, products, promotions, routes } from '@/lib/mock-data';
+
+export default function CustomerProfile({ params }: { params: { customerId: string } }) {
+  requireAdmin(`/admin/customers/${params.customerId}`);
+
+  return (
+    <AdminShell title="פרופיל לקוח" subtitle="כל מה שצריך כדי להחליט אם להתקשר, לאשר הזמנה או להציע מוצר נוסף.">
+      <CrmCustomerProfileClient customerId={params.customerId} customers={customers} orders={orders} routes={routes} products={products} promotions={promotions} />
+    </AdminShell>
+  );
+}

@@ -1,5 +1,23 @@
 [
- {"id":"promo-week","title":"מבצע השבוע","tag":"חסכון למסעדות","description":"קחו 12 רטבי עשבי תיבול וקבלו 2 יחידות ללא חיוב בדמו.","productId":"prod-herb-sauce"},
- {"id":"promo-new","title":"מוצר חדש","tag":"חדש במדף","description":"ריבת פירות יער באריזה בוטיקית שמתאימה לקפה ומעדנייה.","productId":"prod-berry-jam"},
- {"id":"promo-tasting","title":"מארז טעימות","tag":"אפס חיכוך","description":"מארז מגוון ללקוחות שרוצים לבדוק מכירה לפני התחייבות גדולה.","productId":"prod-tasting-kit"}
+  {
+    "id": "promo-week",
+    "title": "מבצע השבוע",
+    "tag": "חיסכון למסעדות",
+    "description": "קחו 12 רוטבי עשבי תיבול וקבלו 2 יחידות ללא חיוב בדמו.",
+    "productId": "prod-herb"
+  },
+  {
+    "id": "promo-new",
+    "title": "חדש במדף",
+    "tag": "מעדניות ובתי קפה",
+    "description": "קרם ארטישוק באריזה בוטיקית שמתאימה למדף פרימיום.",
+    "productId": "prod-artichoke"
+  },
+  {
+    "id": "promo-tasting",
+    "title": "מארז טעימות",
+    "tag": "כניסה ללא חיכוך",
+    "description": "מארז מגוון ללקוחות שרוצים לבדוק מכירה לפני התחייבות גדולה.",
+    "productId": "prod-tasting-kit"
+  }
 ]

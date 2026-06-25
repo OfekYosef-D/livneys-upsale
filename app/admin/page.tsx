@@ -1,2 +1,14 @@
-import Link from 'next/link';import { PageShell } from '@/components/ui/PageShell';import { Card } from '@/components/ui/Card';import { Button } from '@/components/ui/Button';import { StatusBadge } from '@/components/admin/StatusBadge';import { routes,customers,hebDate } from '@/lib/mock-data';
-export default function Admin(){const statuses=customers.reduce<Record<string,number>>((a,c)=>({...a,[c.status]:(a[c.status]??0)+1}),{});return <PageShell title="לוח ניהול קווי חלוקה" subtitle="תמונה תפעולית מהירה: תזכורות, הזמנות, אפסייד ומעקב" actions={<Button href="/admin/manual-order">יצירת הזמנה ידנית</Button>}><div className="grid gap-3 md:grid-cols-4">{Object.entries(statuses).map(([s,n])=><Card key={s} className="p-4"><StatusBadge status={s}/><p className="mt-3 text-3xl font-black">{n}</p></Card>)}</div><h2 className="mb-3 mt-7 text-2xl font-black">קווים קרובים</h2><div className="grid gap-4 md:grid-cols-3">{routes.map(r=><Link key={r.id} href={`/admin/routes/${r.id}`}><Card className="p-5 hover:shadow-lg"><p className="text-sm font-bold text-[#556b2f]">קו {r.name}</p><h3 className="text-xl font-black">{hebDate(r.nextDelivery)}</h3><p className="text-stone-600">דדליין: {r.deadline}</p><p className="mt-3 font-bold">{r.customerIds.length} לקוחות במסלול</p></Card></Link>)}</div></PageShell>}
+import { AdminShell } from '@/components/admin/AdminShell';
+import { CrmDashboardClient } from '@/components/admin/CrmDashboardClient';
+import { requireAdmin } from '@/lib/admin-guard';
+import { customers, orders, products, promotions, routes } from '@/lib/mock-data';
+
+export default function Admin() {
+  requireAdmin('/admin');
+
+  return (
+    <AdminShell title="דשבורד CRM" subtitle="שליטה בהזמנות, מעקב לקוחות והזדמנויות מכירה לשיחה של 30 שניות.">
+      <CrmDashboardClient customers={customers} orders={orders} routes={routes} products={products} promotions={promotions} />
+    </AdminShell>
+  );
+}

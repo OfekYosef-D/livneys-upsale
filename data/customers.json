@@ -1,6 +1,46 @@
 [
- {"id":"cust-001","name":"יקב הרים","contact":"נועם","phone":"050-111-2233","region":"דרום","routeId":"route-south","status":"פתח לינק","address":"מצפה רמון","notes":"מעדיף הזמנה קצרה לפני יום החלוקה."},
- {"id":"cust-002","name":"מינימרקט כהן","contact":"רונית","phone":"050-222-3344","region":"מרכז","routeId":"route-center","status":"הזמין","address":"גבעתיים","notes":"רגיש למחיר, מגיב טוב למבצעי שבוע."},
- {"id":"cust-003","name":"מעדניית השוק","contact":"אלי","phone":"050-333-4455","region":"צפון","routeId":"route-north","status":"צריך מעקב","address":"זכרון יעקב","notes":"מבקש שירות אישי בווטסאפ."},
- {"id":"cust-004","name":"קפה הדרום","contact":"מיכל","phone":"050-444-5566","region":"דרום","routeId":"route-south","status":"הוסיף מוצר במבצע","address":"באר שבע","notes":"מוסיף מארזים כשיש המלצה ברורה."}
+  {
+    "id": "cust-001",
+    "name": "יקב הרים",
+    "contact": "נועם",
+    "phone": "050-111-2233",
+    "region": "דרום",
+    "routeId": "route-south",
+    "status": "פתח לינק",
+    "address": "מצפה רמון",
+    "notes": "מעדיף הזמנה קצרה לפני יום החלוקה."
+  },
+  {
+    "id": "cust-002",
+    "name": "מינימרקט כהן",
+    "contact": "רונית",
+    "phone": "050-222-3344",
+    "region": "מרכז",
+    "routeId": "route-center",
+    "status": "הזמין",
+    "address": "גבעתיים",
+    "notes": "רגישה למחיר ומגיבה טוב למבצעי שבוע."
+  },
+  {
+    "id": "cust-003",
+    "name": "מעדניית השוק",
+    "contact": "אלי",
+    "phone": "050-333-4455",
+    "region": "צפון",
+    "routeId": "route-north",
+    "status": "צריך מעקב",
+    "address": "זכרון יעקב",
+    "notes": "מבקש שירות אישי בוואטסאפ."
+  },
+  {
+    "id": "cust-004",
+    "name": "קפה הדרום",
+    "contact": "מיכל",
+    "phone": "050-444-5566",
+    "region": "דרום",
+    "routeId": "route-south",
+    "status": "הוסיף מוצר במבצע",
+    "address": "באר שבע",
+    "notes": "מוסיף מארזים כשיש המלצה ברורה."
+  }
 ]
