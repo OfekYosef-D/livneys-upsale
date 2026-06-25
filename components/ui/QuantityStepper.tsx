@@ -1,2 +1,37 @@
 'use client';
-export function QuantityStepper({value,onChange}:{value:number;onChange:(v:number)=>void}){return <div className="flex items-center justify-between rounded-2xl bg-[#f6efdf] p-1"><button onClick={()=>onChange(Math.max(0,value-1))} className="h-9 w-9 rounded-xl bg-white font-black">−</button><span className="min-w-10 text-center font-black">{value}</span><button onClick={()=>onChange(value+1)} className="h-9 w-9 rounded-xl bg-[#556b2f] text-white font-black">+</button></div>}
+import { Minus, Plus } from 'lucide-react';
+
+export function QuantityStepper({
+  value,
+  onChange,
+  step = 1,
+  min = 0,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  step?: number;
+  min?: number;
+}) {
+  const decrement = Math.max(0, value - step);
+  const increment = value === 0 ? Math.max(min, step) : value + step;
+
+  return (
+    <div className="grid h-10 grid-cols-[2.5rem_1fr_2.5rem] items-center overflow-hidden rounded-full border border-black/10 bg-[#e6e1d8]">
+      <button
+        aria-label="הפחת כמות"
+        onClick={() => onChange(decrement)}
+        className="grid h-full place-items-center bg-white text-black transition hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-black/25"
+      >
+        <Minus size={16} strokeWidth={2.4} />
+      </button>
+      <span className="min-w-10 text-center text-sm font-black tabular-nums">{value}</span>
+      <button
+        aria-label="הוסף כמות"
+        onClick={() => onChange(increment)}
+        className="grid h-full place-items-center bg-black text-white transition hover:bg-black/85 focus-visible:ring-2 focus-visible:ring-black/25"
+      >
+        <Plus size={16} strokeWidth={2.4} />
+      </button>
+    </div>
+  );
+}

@@ -1,1 +1,10 @@
-import { PageShell } from '@/components/ui/PageShell';import { Card } from '@/components/ui/Card';import { Button } from '@/components/ui/Button';export default function Confirmation(){return <PageShell title="ההזמנה התקבלה"><Card className="mx-auto max-w-lg p-8 text-center"><div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-[#556b2f] text-3xl text-white">✓</div><h2 className="text-2xl font-black">ההזמנה התקבלה ותיבדק על ידי Livneys</h2><p className="mt-3 text-stone-600">ניצור קשר אם יהיו שאלות או התאמות לפני החלוקה.</p><Button href="/customer/cust-001" className="mt-6 inline-block">חזרה לדמו</Button></Card></PageShell>}
+import { ConfirmationClient } from '@/components/customer/ConfirmationClient';
+import { getCustomer, getLastOrder, getRoute, products } from '@/lib/mock-data';
+
+export default function Confirmation({ params }: { params: { customerId: string } }) {
+  const customer = getCustomer(params.customerId);
+  const route = getRoute(customer.routeId);
+  const lastOrder = getLastOrder(customer.id);
+
+  return <ConfirmationClient customer={customer} route={route} products={products} lastOrder={lastOrder} />;
+}

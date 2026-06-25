@@ -1,6 +1,43 @@
 [
- {"id":"ord-1001","customerId":"cust-001","date":"2026-06-11","status":"סופק","items":[{"productId":"prod-olive-spread","qty":12},{"productId":"prod-fig-jam","qty":8},{"productId":"prod-herb-sauce","qty":6}]},
- {"id":"ord-1002","customerId":"cust-002","date":"2026-06-10","status":"התקבל","items":[{"productId":"prod-tomato-spread","qty":10},{"productId":"prod-chili-sauce","qty":12}]},
- {"id":"ord-1003","customerId":"cust-003","date":"2026-06-09","status":"סופק","items":[{"productId":"prod-berry-jam","qty":6},{"productId":"prod-tasting-kit","qty":4}]},
- {"id":"ord-1004","customerId":"cust-004","date":"2026-06-12","status":"טיוטה","items":[{"productId":"prod-herb-sauce","qty":8},{"productId":"prod-holiday-box","qty":3}]}
+  {
+    "id": "ord-1001",
+    "customerId": "cust-001",
+    "date": "2026-06-11",
+    "status": "סופק",
+    "items": [
+      { "productId": "prod-eggplant", "qty": 12 },
+      { "productId": "prod-pesto", "qty": 8 },
+      { "productId": "prod-chili", "qty": 6 }
+    ]
+  },
+  {
+    "id": "ord-1002",
+    "customerId": "cust-002",
+    "date": "2026-06-10",
+    "status": "התקבל",
+    "items": [
+      { "productId": "prod-artichoke", "qty": 10 },
+      { "productId": "prod-herb", "qty": 12 }
+    ]
+  },
+  {
+    "id": "ord-1003",
+    "customerId": "cust-003",
+    "date": "2026-06-09",
+    "status": "סופק",
+    "items": [
+      { "productId": "prod-berry-jam", "qty": 6 },
+      { "productId": "prod-tasting-kit", "qty": 4 }
+    ]
+  },
+  {
+    "id": "ord-1004",
+    "customerId": "cust-004",
+    "date": "2026-06-12",
+    "status": "טיוטה",
+    "items": [
+      { "productId": "prod-herb", "qty": 8 },
+      { "productId": "prod-hosting-box", "qty": 3 }
+    ]
+  }
 ]

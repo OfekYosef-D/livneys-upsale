@@ -1,1 +1,12 @@
-const map:Record<string,string>={'הזמין':'bg-green-100 text-green-800','לא הזמין':'bg-stone-200 text-stone-700','נשלחה תזכורת':'bg-blue-100 text-blue-800','פתח לינק':'bg-amber-100 text-amber-800','צריך מעקב':'bg-red-100 text-red-800','הוסיף מוצר במבצע':'bg-emerald-100 text-emerald-800'};export function StatusBadge({status}:{status:string}){return <span className={`rounded-full px-3 py-1 text-xs font-bold ${map[status]??'bg-stone-100'}`}>{status}</span>}
+const map: Record<string, string> = {
+  הזמין: 'bg-black text-white',
+  'לא הזמין': 'bg-[#e6e1d8] text-black',
+  'נשלחה תזכורת': 'bg-white text-black ring-1 ring-black/15',
+  'פתח לינק': 'bg-[#e6e1d8] text-black',
+  'צריך מעקב': 'bg-black text-white',
+  'הוסיף מוצר במבצע': 'bg-white text-black ring-1 ring-black/15',
+};
+
+export function StatusBadge({ status }: { status: string }) {
+  return <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${map[status] ?? 'bg-[#e6e1d8] text-black'}`}>{status}</span>;
+}

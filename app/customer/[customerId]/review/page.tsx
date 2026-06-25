@@ -1,2 +1,10 @@
-import { PageShell } from '@/components/ui/PageShell';import { Card } from '@/components/ui/Card';import { Button } from '@/components/ui/Button';import { getCustomer,getLastOrder,productById,total,money } from '@/lib/mock-data';
-export default function Review({params}:{params:{customerId:string}}){const c=getCustomer(params.customerId),o=getLastOrder(c.id);return <PageShell title="בדיקת הזמנה" subtitle="זהו דמו: ההזמנה לא נשלחת למערכת אמיתית"><Card className="p-5 max-w-2xl"><div className="space-y-3">{o.items.map(i=><div key={i.productId} className="flex justify-between border-b border-[#eadfca] pb-3"><span>{productById(i.productId).name}</span><b>{i.qty} × {money(productById(i.productId).price)}</b></div>)}</div><div className="mt-5 flex items-center justify-between text-xl font-black"><span>סה״כ משוער</span><span>{money(total(o.items))}</span></div><Button href={`/customer/${c.id}/confirmation`} className="mt-6 block text-center">שלח הזמנה לבדיקה</Button></Card></PageShell>}
+import { ReviewOrderClient } from '@/components/customer/ReviewOrderClient';
+import { getCustomer, getLastOrder, getRoute, products } from '@/lib/mock-data';
+
+export default function Review({ params }: { params: { customerId: string } }) {
+  const customer = getCustomer(params.customerId);
+  const route = getRoute(customer.routeId);
+  const lastOrder = getLastOrder(customer.id);
+
+  return <ReviewOrderClient customer={customer} route={route} products={products} lastOrder={lastOrder} />;
+}
