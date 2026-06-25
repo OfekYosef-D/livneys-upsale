@@ -1,0 +1,329 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  CUSTOMER
+}
+
+enum OrderStatus {
+  DRAFT
+  SUBMITTED
+  SPECIAL_REQUEST
+  APPROVED
+  PACKED
+  DELIVERED
+  CANCELLED
+}
+
+enum OrderSource {
+  CUSTOMER
+  ADMIN
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+}
+
+enum ReminderStatus {
+  PENDING
+  EMAIL_SENT
+  WHATSAPP_QUEUED
+  WHATSAPP_SENT
+  SKIPPED_ORDER_EXISTS
+  FAILED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         UserRole
+  customerId   String?   @unique
+  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  contactLogs  CustomerContactLog[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([role])
+}
+
+model Customer {
+  id                      String                          @id
+  name                    String
+  contact                 String
+  email                   String?
+  phone                   String
+  region                  String
+  address                 String
+  notes                   String?
+  statusLabel             String?
+  isActive                Boolean                         @default(true)
+  routeId                 String
+  priceListId             String
+  route                   Route                           @relation(fields: [routeId], references: [id])
+  priceList               PriceList                       @relation(fields: [priceListId], references: [id])
+  user                    User?
+  orders                  Order[]
+  recommendations         CustomerProductRecommendation[]
+  reminderJobs            ReminderJob[]
+  notificationPreference  NotificationPreference?
+  notificationEvents      NotificationEvent[]
+  contactLogs             CustomerContactLog[]
+  createdAt               DateTime                        @default(now())
+  updatedAt               DateTime                        @updatedAt
+
+  @@index([routeId])
+  @@index([priceListId])
+  @@index([isActive])
+}
+
+model Product {
+  id              String                          @id
+  sku             String                          @unique
+  name            String
+  category        String
+  basePrice       Decimal                         @db.Decimal(10, 2)
+  unit            String
+  caseSize        String
+  minQty          Int                             @default(1)
+  imageUrl        String?
+  assetImage      String?
+  stockLabel      String?
+  description     String?
+  isActive        Boolean                         @default(true)
+  priceListItems  PriceListItem[]
+  orderLines      OrderLine[]
+  promotions      Promotion[]
+  recommendations CustomerProductRecommendation[]
+  createdAt       DateTime                        @default(now())
+  updatedAt       DateTime                        @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+}
+
+model PriceList {
+  id          String          @id
+  name        String
+  description String?
+  isDefault   Boolean         @default(false)
+  items       PriceListItem[]
+  customers   Customer[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([isDefault])
+}
+
+model PriceListItem {
+  id          String    @id @default(cuid())
+  priceListId String
+  productId   String
+  price       Decimal   @db.Decimal(10, 2)
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([priceListId, productId])
+  @@index([productId])
+}
+
+model Route {
+  id              String         @id
+  name            String
+  region          String
+  driver          String?
+  opsContactName  String?
+  opsContactPhone String?
+  deliveryWeekday Int
+  cutoffWeekday   Int
+  cutoffTime      String
+  nextDeliveryAt  DateTime
+  nextCutoffAt    DateTime
+  isActive        Boolean        @default(true)
+  customers       Customer[]
+  orders          Order[]
+  reminderRules   ReminderRule[]
+  reminderJobs    ReminderJob[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([isActive])
+  @@index([deliveryWeekday])
+}
+
+model Order {
+  id                  String      @id @default(cuid())
+  customerId          String
+  routeId             String?
+  status              OrderStatus
+  source              OrderSource @default(CUSTOMER)
+  deliveryWindowStart DateTime
+  deliveryWindowEnd   DateTime?
+  deadlineAt          DateTime
+  submittedAt         DateTime?
+  notes               String?
+  internalNote        String?
+  total               Decimal     @db.Decimal(10, 2)
+  customer            Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  route               Route?      @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  lines               OrderLine[]
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@index([customerId, status])
+  @@index([routeId, status])
+  @@index([deliveryWindowStart])
+  @@index([submittedAt])
+}
+
+model OrderLine {
+  id          String   @id @default(cuid())
+  orderId     String
+  productId   String?
+  productName String
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  quantity    Int
+  lineTotal   Decimal  @db.Decimal(10, 2)
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Promotion {
+  id          String    @id
+  title       String
+  tag         String
+  description String
+  productId   String
+  startsAt    DateTime?
+  endsAt      DateTime?
+  isActive    Boolean   @default(true)
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([productId])
+  @@index([isActive])
+}
+
+model CustomerProductRecommendation {
+  id         String   @id @default(cuid())
+  customerId String
+  productId  String
+  reason     String?
+  isActive   Boolean  @default(true)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([customerId, productId])
+  @@index([productId])
+  @@index([isActive])
+}
+
+model ReminderRule {
+  id                  String              @id @default(cuid())
+  routeId             String?
+  name                String
+  hoursBeforeDelivery Int                 @default(48)
+  channel             NotificationChannel
+  isActive            Boolean             @default(true)
+  route               Route?              @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  reminderJobs        ReminderJob[]
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@index([routeId])
+  @@index([isActive])
+}
+
+model ReminderJob {
+  id                  String              @id @default(cuid())
+  reminderRuleId      String
+  customerId          String
+  routeId             String
+  deliveryWindowStart DateTime
+  channel             NotificationChannel
+  status              ReminderStatus      @default(PENDING)
+  scheduledAt         DateTime
+  sentAt              DateTime?
+  errorMessage        String?
+  whatsappUrl         String?
+  reminderRule        ReminderRule        @relation(fields: [reminderRuleId], references: [id], onDelete: Cascade)
+  customer            Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  route               Route               @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  notificationEvents  NotificationEvent[]
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@unique([customerId, routeId, deliveryWindowStart, channel, reminderRuleId])
+  @@index([status, scheduledAt])
+  @@index([routeId, deliveryWindowStart])
+}
+
+model NotificationPreference {
+  id              String   @id @default(cuid())
+  customerId      String   @unique
+  emailEnabled    Boolean  @default(true)
+  whatsappEnabled Boolean  @default(false)
+  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model NotificationEvent {
+  id            String              @id @default(cuid())
+  customerId    String
+  reminderJobId String?
+  channel       NotificationChannel
+  type          String
+  status        NotificationStatus
+  subject       String?
+  message       String
+  errorMessage  String?
+  customer      Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  reminderJob   ReminderJob?        @relation(fields: [reminderJobId], references: [id], onDelete: SetNull)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([customerId])
+  @@index([reminderJobId])
+  @@index([status])
+}
+
+model CustomerContactLog {
+  id         String              @id @default(cuid())
+  customerId String
+  userId     String?
+  channel    NotificationChannel
+  summary    String
+  customer   Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user       User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@index([customerId])
+  @@index([userId])
+}

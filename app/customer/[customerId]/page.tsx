@@ -1,17 +1,19 @@
 import { CustomerCatalogApp } from '@/components/customer/CustomerCatalogApp';
-import { getCustomer, getLastOrder, getRoute, products } from '@/lib/mock-data';
+import { getCustomerPortalData } from '@/features/customer-portal/queries';
+import { requireCustomerPage } from '@/lib/authorization';
 
-export default function CustomerHome({ params }: { params: { customerId: string } }) {
-  const customer = getCustomer(params.customerId);
-  const route = getRoute(customer.routeId);
-  const lastOrder = getLastOrder(customer.id);
+export const dynamic = 'force-dynamic';
+
+export default async function CustomerHome({ params }: { params: { customerId: string } }) {
+  await requireCustomerPage(params.customerId);
+  const data = await getCustomerPortalData(params.customerId);
 
   return (
     <CustomerCatalogApp
-      customer={customer}
-      route={route}
-      products={products}
-      lastOrder={lastOrder}
+      customer={data.customer}
+      route={data.route}
+      products={data.products}
+      lastOrder={data.lastOrder}
     />
   );
 }

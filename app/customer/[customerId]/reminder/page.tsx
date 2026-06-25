@@ -1,29 +1,30 @@
-import { PageShell } from '@/components/ui/PageShell';
-import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { getCustomer, getRoute, hebDate } from '@/lib/mock-data';
+import { getCustomerPortalData } from '@/features/customer-portal/queries';
+import { hebDate } from '@/lib/format';
+import { requireCustomerPage } from '@/lib/authorization';
 
-export default function Reminder({ params }: { params: { customerId: string } }) {
-  const customer = getCustomer(params.customerId);
-  const route = getRoute(customer.routeId);
+export const dynamic = 'force-dynamic';
+
+export default async function Reminder({ params }: { params: { customerId: string } }) {
+  await requireCustomerPage(params.customerId);
+  const data = await getCustomerPortalData(params.customerId);
 
   return (
-    <PageShell title="תצוגת תזכורת ללקוח" subtitle="דמו להודעת SMS/Email — ללא אינטגרציה אמיתית">
-      <Card className="mx-auto max-w-md p-5">
-        <p className="text-sm text-black/50">הודעה ל{customer.contact}</p>
-        <div className="mt-3 rounded-2xl bg-[#e6e1d8] p-4 leading-8">
-          <b>{customer.name}, קו {customer.region} מתקרב.</b>
+    <main className="app-surface min-h-screen px-4 py-6 text-black">
+      <section className="mx-auto max-w-md rounded-2xl border border-black/10 bg-white p-5 shadow-[0_18px_55px_rgba(0,0,0,0.08)]">
+        <p className="text-sm text-black/50">הודעה ל{data.customer.contact}</p>
+        <h1 className="mt-2 text-2xl font-black">
+          <b>{data.customer.name}, קו {data.customer.region} מתקרב.</b>
+        </h1>
+        <p className="mt-4 text-base leading-7">
+          החלוקה הקרובה: {hebDate(data.route.nextDelivery)}.
           <br />
-          החלוקה הקרובה: {hebDate(route.nextDelivery)}.
-          <br />
-          נא להשלים הזמנה עד {route.deadline}.
-          <br />
-          הקישור האישי שלך מוכן להזמנה חוזרת מהירה.
-        </div>
-        <Button href={`/customer/${customer.id}`} className="mt-5 w-full">
-          פתח קישור אישי
+          נא להשלים הזמנה עד {data.route.deadline}.
+        </p>
+        <Button href={`/customer/${data.customer.id}`} className="mt-5 w-full">
+          לפתיחת הזמנה חוזרת
         </Button>
-      </Card>
-    </PageShell>
+      </section>
+    </main>
   );
 }

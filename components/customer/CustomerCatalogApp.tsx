@@ -3,10 +3,10 @@
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Search, ShoppingBag, Truck } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { fallbackProductImage, productImages, brandLogo } from '@/lib/product-assets';
-import { money, type Customer, type Order, type Product, type Route } from '@/lib/mock-data';
+import { money } from '@/lib/format';
 import {
   buildCartFromOrder,
   filterCatalogProducts,
@@ -15,7 +15,8 @@ import {
   setCartQuantity,
   type Cart,
 } from '@/lib/order-utils';
-import { readStoredCart, writeStoredCart } from '@/lib/cart-storage';
+import { saveDraftOrderAction } from '@/features/customer-portal/actions';
+import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
 
 export function CustomerCatalogApp({
   customer,
@@ -23,27 +24,18 @@ export function CustomerCatalogApp({
   products,
   lastOrder,
 }: {
-  customer: Customer;
-  route: Route;
-  products: Product[];
-  lastOrder: Order;
+  customer: PortalCustomer;
+  route: PortalRoute;
+  products: PortalProduct[];
+  lastOrder: PortalOrder;
 }) {
   const router = useRouter();
   const initialCart = useMemo(() => buildCartFromOrder(lastOrder.items), [lastOrder.items]);
   const [cart, setCart] = useState<Cart>(initialCart);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
-
-  useEffect(() => {
-    const stored = readStoredCart(customer.id);
-    if (stored) {
-      setCart(stored);
-    }
-  }, [customer.id]);
-
-  useEffect(() => {
-    writeStoredCart(customer.id, cart);
-  }, [cart, customer.id]);
+  const [error, setError] = useState('');
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   const categories = useMemo(() => ['all', ...Array.from(new Set(products.map((product) => product.category)))], [products]);
   const visibleProducts = useMemo(
@@ -55,8 +47,17 @@ export function CustomerCatalogApp({
   const itemCount = cartItems.reduce((sum, item) => sum + item.qty, 0);
   const deliveryDate = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'long' }).format(new Date(route.nextDelivery));
 
-  function reviewOrder() {
-    writeStoredCart(customer.id, cart);
+  async function reviewOrder() {
+    setError('');
+    setIsSavingDraft(true);
+    const result = await saveDraftOrderAction({ customerId: customer.id, items: cartItems });
+    setIsSavingDraft(false);
+
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
     router.push(`/customer/${customer.id}/review`);
   }
 
@@ -129,20 +130,21 @@ export function CustomerCatalogApp({
               <p className="mt-2 text-black/55">נסו להסיר סינון או לחפש לפי שם אחר.</p>
             </div>
           )}
+          {error && <p className="rounded-xl bg-white p-3 text-sm font-black text-red-700 ring-1 ring-red-200">{error}</p>}
         </section>
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/96 p-2.5 backdrop-blur">
         <div className="mx-auto max-w-5xl">
-          <CartSummary itemCount={itemCount} cartTotal={cartTotal} cartItems={cartItems} onReview={reviewOrder} />
+          <CartSummary itemCount={itemCount} cartTotal={cartTotal} cartItems={cartItems} onReview={reviewOrder} isSaving={isSavingDraft} />
         </div>
       </div>
     </main>
   );
 }
 
-function ProductOrderCard({ product, qty, onQty }: { product: Product; qty: number; onQty: (qty: number) => void }) {
-  const image = productImages[product.assetImage] ?? fallbackProductImage;
+function ProductOrderCard({ product, qty, onQty }: { product: PortalProduct; qty: number; onQty: (qty: number) => void }) {
+  const image = productImages[product.assetImage ?? ''] ?? fallbackProductImage;
   const step = product.minQty ?? 1;
 
   return (
@@ -187,11 +189,13 @@ function CartSummary({
   cartTotal,
   cartItems,
   onReview,
+  isSaving,
 }: {
   itemCount: number;
   cartTotal: number;
   cartItems: { productId: string; qty: number }[];
   onReview: () => void;
+  isSaving: boolean;
 }) {
   return (
     <div className="rounded-2xl border border-black/10 bg-white p-2.5 shadow-[0_-10px_32px_rgba(0,0,0,0.08)]">
@@ -205,11 +209,11 @@ function CartSummary({
         </div>
         <button
           onClick={onReview}
-          disabled={cartItems.length === 0}
+          disabled={cartItems.length === 0 || isSaving}
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-not-allowed disabled:bg-black/30"
         >
           <ShoppingBag size={16} />
-          סקירה
+          {isSaving ? 'שומר...' : 'סקירה'}
         </button>
       </div>
     </div>

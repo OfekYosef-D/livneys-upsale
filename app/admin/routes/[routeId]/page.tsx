@@ -1,14 +1,22 @@
+import { notFound } from 'next/navigation';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { CrmRouteDetailClient } from '@/components/admin/CrmRouteDetailClient';
+import { AdminRouteDetail } from '@/features/admin/components/AdminRouteDetail';
+import { getAdminRouteDetail } from '@/features/admin/queries';
 import { requireAdmin } from '@/lib/admin-guard';
-import { customers, orders, products, routes } from '@/lib/mock-data';
 
-export default function RoutePage({ params }: { params: { routeId: string } }) {
-  requireAdmin(`/admin/routes/${params.routeId}`);
+export const dynamic = 'force-dynamic';
+
+export default async function RoutePage({ params }: { params: { routeId: string } }) {
+  await requireAdmin(`/admin/routes/${params.routeId}`);
+  const route = await getAdminRouteDetail(params.routeId);
+
+  if (!route) {
+    notFound();
+  }
 
   return (
-    <AdminShell title="מוכנות קו" subtitle="רשימת עבודה צפופה וברורה ליום החלוקה.">
-      <CrmRouteDetailClient routeId={params.routeId} customers={customers} orders={orders} routes={routes} products={products} />
+    <AdminShell title={`קו ${route.name}`} subtitle="מבט לפי קו: מי הזמין, מי חסר ומה מוכן לחלוקה.">
+      <AdminRouteDetail route={route} />
     </AdminShell>
   );
 }

@@ -1,14 +1,22 @@
+import { notFound } from 'next/navigation';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { CrmCustomerProfileClient } from '@/components/admin/CrmCustomerProfileClient';
+import { AdminCustomerDetail } from '@/features/admin/components/AdminCustomerDetail';
+import { getAdminCustomerDetail } from '@/features/admin/queries';
 import { requireAdmin } from '@/lib/admin-guard';
-import { customers, orders, products, promotions, routes } from '@/lib/mock-data';
 
-export default function CustomerProfile({ params }: { params: { customerId: string } }) {
-  requireAdmin(`/admin/customers/${params.customerId}`);
+export const dynamic = 'force-dynamic';
+
+export default async function CustomerProfile({ params }: { params: { customerId: string } }) {
+  await requireAdmin(`/admin/customers/${params.customerId}`);
+  const customer = await getAdminCustomerDetail(params.customerId);
+
+  if (!customer) {
+    notFound();
+  }
 
   return (
-    <AdminShell title="פרופיל לקוח" subtitle="כל מה שצריך כדי להחליט אם להתקשר, לאשר הזמנה או להציע מוצר נוסף.">
-      <CrmCustomerProfileClient customerId={params.customerId} customers={customers} orders={orders} routes={routes} products={products} promotions={promotions} />
+    <AdminShell title={customer.name} subtitle="פרופיל לקוח, היסטוריית הזמנות והמלצות אפסייל.">
+      <AdminCustomerDetail customer={customer} />
     </AdminShell>
   );
 }

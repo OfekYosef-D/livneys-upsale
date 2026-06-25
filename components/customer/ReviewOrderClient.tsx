@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Truck } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
-import { money, productById, type Customer, type Order, type Product, type Route } from '@/lib/mock-data';
+import { submitCustomerOrderAction } from '@/features/customer-portal/actions';
+import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
+import { money } from '@/lib/format';
 import { buildCartFromOrder, getCartItems, getCartTotal, setCartQuantity, type Cart } from '@/lib/order-utils';
-import { readStoredCart, writeStoredCart } from '@/lib/cart-storage';
 
 export function ReviewOrderClient({
   customer,
@@ -15,32 +16,32 @@ export function ReviewOrderClient({
   products,
   lastOrder,
 }: {
-  customer: Customer;
-  route: Route;
-  products: Product[];
-  lastOrder: Order;
+  customer: PortalCustomer;
+  route: PortalRoute;
+  products: PortalProduct[];
+  lastOrder: PortalOrder;
 }) {
   const router = useRouter();
   const [cart, setCart] = useState<Cart>(() => buildCartFromOrder(lastOrder.items));
   const [notes, setNotes] = useState('');
-
-  useEffect(() => {
-    const stored = readStoredCart(customer.id);
-    if (stored) {
-      setCart(stored);
-    }
-  }, [customer.id]);
-
-  useEffect(() => {
-    writeStoredCart(customer.id, cart);
-  }, [cart, customer.id]);
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const cartItems = useMemo(() => getCartItems(cart), [cart]);
   const cartTotal = useMemo(() => getCartTotal(cart, products), [cart, products]);
 
-  function submitOrder() {
-    writeStoredCart(customer.id, cart);
-    router.push(`/customer/${customer.id}/confirmation`);
+  async function submitOrder() {
+    setError('');
+    setIsSubmitting(true);
+    const result = await submitCustomerOrderAction({ customerId: customer.id, items: cartItems, notes });
+    setIsSubmitting(false);
+
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
+    router.push(`/customer/${customer.id}/confirmation?orderId=${result.data.orderId}`);
   }
 
   return (
@@ -73,7 +74,7 @@ export function ReviewOrderClient({
                 </div>
                 <div className="divide-y divide-black/10">
                   {cartItems.map((item) => {
-                    const product = productById(item.productId);
+                    const product = products.find((candidate) => candidate.id === item.productId) ?? products[0];
 
                     return (
                       <article key={item.productId} className="grid gap-2 px-3 py-2.5 md:grid-cols-[1fr_8.75rem_6.5rem] md:items-center md:gap-3">
@@ -133,12 +134,13 @@ export function ReviewOrderClient({
               </div>
               <button
                 onClick={submitOrder}
-                disabled={cartItems.length === 0}
+                disabled={cartItems.length === 0 || isSubmitting}
                 className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-not-allowed disabled:bg-black/30"
               >
-                שלח הזמנה לאישור
+                {isSubmitting ? 'שולח...' : 'שלח הזמנה לאישור'}
                 <ArrowLeft size={16} />
               </button>
+              {error && <p className="mt-3 rounded-xl bg-[#e6e1d8] p-2.5 text-xs font-black text-red-700">{error}</p>}
             </div>
 
             <div className="rounded-2xl bg-[#e6e1d8] p-3">
