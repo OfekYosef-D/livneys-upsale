@@ -1,14 +1,17 @@
 import { AdminShell } from '@/components/admin/AdminShell';
-import { CrmDashboardClient } from '@/components/admin/CrmDashboardClient';
+import { AdminDashboard } from '@/features/admin/components/AdminDashboard';
+import { getAdminDashboardData } from '@/features/admin/queries';
 import { requireAdmin } from '@/lib/admin-guard';
-import { customers, orders, products, promotions, routes } from '@/lib/mock-data';
 
-export default function Admin() {
-  requireAdmin('/admin');
+export const dynamic = 'force-dynamic';
+
+export default async function Admin() {
+  await requireAdmin('/admin');
+  const data = await getAdminDashboardData();
 
   return (
-    <AdminShell title="דשבורד CRM" subtitle="שליטה בהזמנות, מעקב לקוחות והזדמנויות מכירה לשיחה של 30 שניות.">
-      <CrmDashboardClient customers={customers} orders={orders} routes={routes} products={products} promotions={promotions} />
+    <AdminShell title="דשבורד CRM" subtitle="שליטה בהזמנות, קווים, תזכורות ואפסייל ללקוחות מוסדיים.">
+      <AdminDashboard data={data} />
     </AdminShell>
   );
 }

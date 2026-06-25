@@ -1,14 +1,22 @@
+import { notFound } from 'next/navigation';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { CrmOrderDetailClient } from '@/components/admin/CrmOrderDetailClient';
+import { AdminOrderDetail } from '@/features/admin/components/AdminOrderDetail';
+import { getAdminOrderDetail } from '@/features/admin/queries';
 import { requireAdmin } from '@/lib/admin-guard';
-import { customers, orders, products, routes } from '@/lib/mock-data';
 
-export default function AdminOrderPage({ params }: { params: { orderId: string } }) {
-  requireAdmin(`/admin/orders/${params.orderId}`);
+export const dynamic = 'force-dynamic';
+
+export default async function AdminOrderPage({ params }: { params: { orderId: string } }) {
+  await requireAdmin(`/admin/orders/${params.orderId}`);
+  const order = await getAdminOrderDetail(params.orderId);
+
+  if (!order) {
+    notFound();
+  }
 
   return (
-    <AdminShell title="טיפול בהזמנה" subtitle="קבלה תפעולית קצרה: פריטים, לקוח, קו ופעולות סטטוס.">
-      <CrmOrderDetailClient orderId={params.orderId} customers={customers} orders={orders} routes={routes} products={products} />
+    <AdminShell title={`הזמנה ${order.id}`} subtitle="שורות ההזמנה נשמרות עם Snapshot של שם ומחיר בזמן השליחה.">
+      <AdminOrderDetail order={order} />
     </AdminShell>
   );
 }

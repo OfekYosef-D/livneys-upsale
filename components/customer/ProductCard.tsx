@@ -1,11 +1,12 @@
 'use client';
 import Image from 'next/image';
-import { Product, money } from '@/lib/mock-data';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
+import type { PortalProduct } from '@/features/customer-portal/types';
+import { money } from '@/lib/format';
 import { fallbackProductImage, productImages } from '@/lib/product-assets';
 
-export function ProductCard({ product, qty, onQty }: { product: Product; qty: number; onQty: (v: number) => void }) {
-  const image = productImages[product.assetImage] ?? fallbackProductImage;
+export function ProductCard({ product, qty, onQty }: { product: PortalProduct; qty: number; onQty: (v: number) => void }) {
+  const image = productImages[product.assetImage ?? ''] ?? fallbackProductImage;
 
   return (
     <article className="overflow-hidden rounded-2xl border border-black/10 bg-white">

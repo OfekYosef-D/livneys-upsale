@@ -3,12 +3,12 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { CheckCircle2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Button } from '@/components/ui/Button';
+import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
+import { money } from '@/lib/format';
 import { brandLogo } from '@/lib/product-assets';
-import { money, productById, type Customer, type Order, type Product, type Route } from '@/lib/mock-data';
 import { buildCartFromOrder, getCartItems, getCartTotal, type Cart } from '@/lib/order-utils';
-import { readStoredCart } from '@/lib/cart-storage';
 
 export function ConfirmationClient({
   customer,
@@ -16,19 +16,12 @@ export function ConfirmationClient({
   products,
   lastOrder,
 }: {
-  customer: Customer;
-  route: Route;
-  products: Product[];
-  lastOrder: Order;
+  customer: PortalCustomer;
+  route: PortalRoute;
+  products: PortalProduct[];
+  lastOrder: PortalOrder;
 }) {
-  const [cart, setCart] = useState<Cart>(() => buildCartFromOrder(lastOrder.items));
-
-  useEffect(() => {
-    const stored = readStoredCart(customer.id);
-    if (stored) {
-      setCart(stored);
-    }
-  }, [customer.id]);
+  const cart = useMemo<Cart>(() => buildCartFromOrder(lastOrder.items), [lastOrder.items]);
 
   const cartItems = useMemo(() => getCartItems(cart), [cart]);
   const cartTotal = useMemo(() => getCartTotal(cart, products), [cart, products]);
@@ -57,7 +50,7 @@ export function ConfirmationClient({
               <div className="mt-2 divide-y divide-black/10">
                 {cartItems.map((item) => (
                   <div key={item.productId} className="flex justify-between gap-3 py-1.5 text-xs">
-                    <span className="font-bold">{productById(item.productId).name}</span>
+                    <span className="font-bold">{products.find((product) => product.id === item.productId)?.name ?? item.productId}</span>
                     <b>{item.qty}</b>
                   </div>
                 ))}

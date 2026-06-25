@@ -1,10 +1,25 @@
 import { ConfirmationClient } from '@/components/customer/ConfirmationClient';
-import { getCustomer, getLastOrder, getRoute, products } from '@/lib/mock-data';
+import { getCustomerConfirmationData } from '@/features/customer-portal/queries';
+import { requireCustomerPage } from '@/lib/authorization';
 
-export default function Confirmation({ params }: { params: { customerId: string } }) {
-  const customer = getCustomer(params.customerId);
-  const route = getRoute(customer.routeId);
-  const lastOrder = getLastOrder(customer.id);
+export const dynamic = 'force-dynamic';
 
-  return <ConfirmationClient customer={customer} route={route} products={products} lastOrder={lastOrder} />;
+export default async function Confirmation({
+  params,
+  searchParams,
+}: {
+  params: { customerId: string };
+  searchParams: { orderId?: string };
+}) {
+  await requireCustomerPage(params.customerId);
+  const data = await getCustomerConfirmationData(params.customerId, searchParams.orderId);
+
+  return (
+    <ConfirmationClient
+      customer={data.customer}
+      route={data.route}
+      products={data.products}
+      lastOrder={data.lastOrder}
+    />
+  );
 }
