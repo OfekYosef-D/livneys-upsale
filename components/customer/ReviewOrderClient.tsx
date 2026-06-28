@@ -75,7 +75,7 @@ export function ReviewOrderClient({
                 <div className="divide-y divide-black/10">
                   {cartItems.map((item) => {
                     const product = products.find((candidate) => candidate.id === item.productId) ?? products[0];
-                    const linePricing = getCartPricingSummary({ [item.productId]: item.qty }, products);
+                    const linePricing = getCartPricingSummary({ [item.productId]: item.qty }, [product]);
 
                     return (
                       <article key={item.productId} className="grid gap-2 px-3 py-2.5 md:grid-cols-[1fr_8.75rem_6.5rem] md:items-center md:gap-3">
