@@ -26,27 +26,6 @@ vi.mock('@/features/orders/service', () => ({
   createSubmittedOrder: vi.fn(),
 }));
 
-vi.mock('@/features/orders/utils', () => {
-  const allowedTransitions = {
-    DRAFT: ['SUBMITTED', 'SPECIAL_REQUEST', 'CANCELLED'],
-    SUBMITTED: ['APPROVED', 'CANCELLED'],
-    SPECIAL_REQUEST: ['APPROVED', 'CANCELLED'],
-    APPROVED: ['PACKED', 'CANCELLED'],
-    PACKED: ['DELIVERED'],
-    DELIVERED: [],
-    CANCELLED: [],
-  } as const;
-
-  return {
-    assertOrderStatusTransition: (current: keyof typeof allowedTransitions, next: string) => {
-      if (!(allowedTransitions[current] as readonly string[]).includes(next)) {
-        throw new Error(`Invalid order status transition: ${current} -> ${next}`);
-      }
-
-      return next;
-    },
-  };
-});
 
 vi.mock('@/features/orders/write', () => ({
   formatManualOrderInternalNote: vi.fn(({ intakeChannel, note }: { intakeChannel: string; note?: string | null }) =>
