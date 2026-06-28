@@ -8,7 +8,7 @@ import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { submitCustomerOrderAction } from '@/features/customer-portal/actions';
 import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
 import { money } from '@/lib/format';
-import { buildCartFromOrder, getCartItems, getCartTotal, setCartQuantity, type Cart } from '@/lib/order-utils';
+import { buildCartFromOrder, getCartItems, getCartPricingSummary, setCartQuantity, type Cart } from '@/lib/order-utils';
 
 export function ReviewOrderClient({
   customer,
@@ -28,7 +28,7 @@ export function ReviewOrderClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const cartItems = useMemo(() => getCartItems(cart), [cart]);
-  const cartTotal = useMemo(() => getCartTotal(cart, products), [cart, products]);
+  const cartPricing = useMemo(() => getCartPricingSummary(cart, products), [cart, products]);
 
   async function submitOrder() {
     setError('');
@@ -75,6 +75,7 @@ export function ReviewOrderClient({
                 <div className="divide-y divide-black/10">
                   {cartItems.map((item) => {
                     const product = products.find((candidate) => candidate.id === item.productId) ?? products[0];
+                    const linePricing = getCartPricingSummary({ [item.productId]: item.qty }, products);
 
                     return (
                       <article key={item.productId} className="grid gap-2 px-3 py-2.5 md:grid-cols-[1fr_8.75rem_6.5rem] md:items-center md:gap-3">
@@ -100,7 +101,8 @@ export function ReviewOrderClient({
                         </div>
                         <div className="flex items-center justify-between text-sm font-black md:block md:text-left">
                           <span className="text-xs text-black/45 md:hidden">סה״כ שורה</span>
-                          <span>{money(product.price * item.qty)}</span>
+                          <span>{money(linePricing.total)}</span>
+                          {linePricing.discountTotal > 0 && <p className="text-[11px] font-bold text-emerald-700">-{money(linePricing.discountTotal)}</p>}
                         </div>
                       </article>
                     );
@@ -126,10 +128,20 @@ export function ReviewOrderClient({
                   className="min-h-20 w-full rounded-xl border border-black/12 bg-white p-2.5 text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-black/25"
                 />
               </label>
-              <div className="mt-3 border-t border-black/10 pt-3">
-                <div className="flex items-center justify-between text-base font-black">
+              <div className="mt-3 space-y-1 border-t border-black/10 pt-3 text-sm font-bold">
+                <div className="flex items-center justify-between">
+                  <span>סכום ביניים</span>
+                  <span className="tabular-nums">{money(cartPricing.subtotal)}</span>
+                </div>
+                {cartPricing.discountTotal > 0 && (
+                  <div className="flex items-center justify-between text-emerald-700">
+                    <span>הנחות</span>
+                    <span className="tabular-nums">-{money(cartPricing.discountTotal)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between pt-1 text-base font-black">
                   <span>סה״כ משוער</span>
-                  <span>{money(cartTotal)}</span>
+                  <span className="tabular-nums">{money(cartPricing.total)}</span>
                 </div>
               </div>
               <button

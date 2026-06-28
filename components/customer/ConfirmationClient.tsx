@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
 import { money } from '@/lib/format';
 import { brandLogo } from '@/lib/product-assets';
-import { buildCartFromOrder, getCartItems, getCartTotal, type Cart } from '@/lib/order-utils';
+import { buildCartFromOrder, getCartItems, getCartPricingSummary, type Cart } from '@/lib/order-utils';
 
 export function ConfirmationClient({
   customer,
@@ -24,7 +24,11 @@ export function ConfirmationClient({
   const cart = useMemo<Cart>(() => buildCartFromOrder(lastOrder.items), [lastOrder.items]);
 
   const cartItems = useMemo(() => getCartItems(cart), [cart]);
-  const cartTotal = useMemo(() => getCartTotal(cart, products), [cart, products]);
+  const fallbackPricing = useMemo(() => getCartPricingSummary(cart, products), [cart, products]);
+  const orderItems: PortalOrder['items'] = lastOrder.items.length > 0 ? lastOrder.items : cartItems;
+  const orderSubtotal = lastOrder.items.length > 0 ? lastOrder.subtotal : fallbackPricing.subtotal;
+  const orderDiscountTotal = lastOrder.items.length > 0 ? lastOrder.discountTotal : fallbackPricing.discountTotal;
+  const orderTotal = lastOrder.items.length > 0 ? lastOrder.total : fallbackPricing.total;
 
   return (
     <main className="app-surface min-h-screen px-3 py-4 text-black md:px-6">
@@ -48,16 +52,42 @@ export function ConfirmationClient({
                 <p className="text-xs font-bold text-black/55">חלוקה {new Intl.DateTimeFormat('he-IL').format(new Date(route.nextDelivery))}</p>
               </div>
               <div className="mt-2 divide-y divide-black/10">
-                {cartItems.map((item) => (
-                  <div key={item.productId} className="flex justify-between gap-3 py-1.5 text-xs">
-                    <span className="font-bold">{products.find((product) => product.id === item.productId)?.name ?? item.productId}</span>
-                    <b>{item.qty}</b>
-                  </div>
-                ))}
+                {orderItems.map((item) => {
+                  const product = products.find((candidate) => candidate.id === item.productId);
+                  const unitPrice = item.unitPrice ?? product?.price ?? 0;
+                  const listUnitPrice = item.listUnitPrice ?? product?.listPrice ?? unitPrice;
+                  const lineTotal = item.lineTotal ?? unitPrice * item.qty;
+
+                  return (
+                    <div key={item.productId} className="flex justify-between gap-3 py-1.5 text-xs">
+                      <span className="min-w-0">
+                        <span className="block truncate font-bold">{item.productName ?? product?.name ?? item.productId}</span>
+                        <span className="mt-0.5 block text-[11px] font-bold text-black/45">
+                          {item.qty} × {money(unitPrice)}
+                          {listUnitPrice > unitPrice ? ` · ${money(listUnitPrice)}` : ''}
+                          {item.promotionLabel ? ` · ${item.promotionLabel}` : ''}
+                        </span>
+                      </span>
+                      <b className="shrink-0 tabular-nums">{money(lineTotal)}</b>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="mt-3 flex items-center justify-between border-t border-black/10 pt-3 text-base font-black">
-                <span>סה״כ משוער</span>
-                <span>{money(cartTotal)}</span>
+              <div className="mt-3 space-y-1 border-t border-black/10 pt-3 text-sm font-bold">
+                <div className="flex items-center justify-between">
+                  <span>סכום ביניים</span>
+                  <span className="tabular-nums">{money(orderSubtotal)}</span>
+                </div>
+                {orderDiscountTotal > 0 && (
+                  <div className="flex items-center justify-between text-emerald-700">
+                    <span>הנחות</span>
+                    <span className="tabular-nums">-{money(orderDiscountTotal)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between pt-1 text-base font-black">
+                  <span>סה״כ</span>
+                  <span className="tabular-nums">{money(orderTotal)}</span>
+                </div>
               </div>
             </div>
           </div>

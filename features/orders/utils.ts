@@ -23,6 +23,7 @@ export type SnapshotProduct = {
   id: string;
   name: string;
   price: number;
+  minQty?: number;
 };
 
 export type SnapshotItem = {
@@ -34,8 +35,19 @@ export type OrderSnapshotLine = {
   productId: string;
   productName: string;
   quantity: number;
+  listUnitPrice: number;
   unitPrice: number;
+  lineSubtotal: number;
+  discountTotal: number;
   lineTotal: number;
+  promotionId: string | null;
+  promotionSnapshot: {
+    id: string;
+    title: string;
+    tag: string;
+    description: string;
+    effectType: string;
+  } | null;
 };
 
 export function createOrderSnapshotLines({
@@ -55,14 +67,25 @@ export function createOrderSnapshotLines({
       }
 
       const quantity = Math.floor(item.quantity);
+      const minQty = product.minQty ?? 1;
+
+      if (quantity < minQty) {
+        throw new Error(`Minimum quantity for ${product.name} is ${minQty}`);
+      }
+
       const unitPrice = product.price;
 
       return {
         productId: product.id,
         productName: product.name,
         quantity,
+        listUnitPrice: unitPrice,
         unitPrice,
+        lineSubtotal: unitPrice * quantity,
+        discountTotal: 0,
         lineTotal: unitPrice * quantity,
+        promotionId: null,
+        promotionSnapshot: null,
       };
     });
 }

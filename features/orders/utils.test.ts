@@ -23,17 +23,38 @@ describe('order domain utilities', () => {
         productId: 'prod-eggplant',
         productName: 'ממרח חציל',
         quantity: 3,
+        listUnitPrice: 28,
         unitPrice: 28,
+        lineSubtotal: 84,
+        discountTotal: 0,
         lineTotal: 84,
+        promotionId: null,
+        promotionSnapshot: null,
       },
       {
         productId: 'prod-herb',
         productName: 'רוטב עשבים',
         quantity: 2,
+        listUnitPrice: 31,
         unitPrice: 31,
+        lineSubtotal: 62,
+        discountTotal: 0,
         lineTotal: 62,
+        promotionId: null,
+        promotionSnapshot: null,
       },
     ]);
+  });
+
+  it('rejects quantities below the product minimum quantity', () => {
+    const products = [{ id: 'prod-case', name: 'מארז מסעדה', price: 42, minQty: 6 }];
+
+    expect(() =>
+      createOrderSnapshotLines({
+        items: [{ productId: 'prod-case', quantity: 2 }],
+        products,
+      }),
+    ).toThrow('Minimum quantity');
   });
 
   it('marks submissions after the cutoff as special requests', () => {

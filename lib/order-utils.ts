@@ -10,11 +10,18 @@ export type CatalogProductLike = {
   name: string;
   category: string;
   price: number;
+  listPrice?: number;
   sku?: string;
   recommended?: boolean;
   isRecommended?: boolean;
   isPreviousOrder?: boolean;
   promoLabel?: string;
+  promotion?: {
+    effectType: 'DISPLAY_ONLY' | 'PERCENT_OFF' | 'FIXED_AMOUNT_OFF' | 'FIXED_UNIT_PRICE' | 'BUY_X_GET_Y';
+    discountValue: number | null;
+    buyQuantity: number | null;
+    freeQuantity: number | null;
+  } | null;
 };
 
 export type CatalogSegment = 'all' | 'previous' | 'recommended' | 'promotions';
@@ -49,10 +56,24 @@ export function getCartItems(cart: Cart): OrderLine[] {
 }
 
 export function getCartTotal<T extends CatalogProductLike>(cart: Cart, products: T[]): number {
-  return getCartItems(cart).reduce((sum, item) => {
+  return getCartPricingSummary(cart, products).total;
+}
+
+export function getCartPricingSummary<T extends CatalogProductLike>(cart: Cart, products: T[]): { subtotal: number; discountTotal: number; total: number } {
+  return getCartItems(cart).reduce((summary, item) => {
     const product = products.find((candidate) => candidate.id === item.productId);
-    return sum + (product ? product.price * item.qty : 0);
-  }, 0);
+    if (!product) return summary;
+
+    const listPrice = product.listPrice ?? product.price;
+    const lineSubtotal = listPrice * item.qty;
+    const lineTotal = getDiscountedLineTotal(product, item.qty, listPrice);
+
+    return {
+      subtotal: roundCurrency(summary.subtotal + lineSubtotal),
+      discountTotal: roundCurrency(summary.discountTotal + Math.max(0, lineSubtotal - lineTotal)),
+      total: roundCurrency(summary.total + lineTotal),
+    };
+  }, { subtotal: 0, discountTotal: 0, total: 0 });
 }
 
 export function filterCatalogProducts<T extends CatalogProductLike>(products: T[], filters: CatalogFilters): T[] {
@@ -76,4 +97,26 @@ export function filterCatalogProducts<T extends CatalogProductLike>(products: T[
 
 function normalize(value: string): string {
   return value.trim().toLocaleLowerCase('he-IL');
+}
+
+function getDiscountedLineTotal(product: CatalogProductLike, quantity: number, listPrice: number): number {
+  const promotion = product.promotion;
+  if (!promotion || promotion.effectType === 'DISPLAY_ONLY') {
+    return product.price * quantity;
+  }
+
+  if (promotion.effectType === 'BUY_X_GET_Y') {
+    const buyQuantity = promotion.buyQuantity ?? 0;
+    const freeQuantity = promotion.freeQuantity ?? 0;
+    if (buyQuantity <= 0 || freeQuantity <= 0) return listPrice * quantity;
+
+    const freeUnits = Math.floor(quantity / (buyQuantity + freeQuantity)) * freeQuantity;
+    return roundCurrency((quantity - freeUnits) * listPrice);
+  }
+
+  return roundCurrency(product.price * quantity);
+}
+
+function roundCurrency(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }

@@ -3,6 +3,7 @@ import {
   buildCartFromOrder,
   filterCatalogProducts,
   getCartItems,
+  getCartPricingSummary,
   getCartTotal,
   setCartQuantity,
 } from './order-utils';
@@ -62,6 +63,56 @@ describe('order utilities', () => {
 
     expect(getCartItems(cart)).toEqual([]);
     expect(getCartTotal(updated, products)).toBe(354);
+  });
+
+  it('calculates cart subtotal, discount total, and final total from promotion metadata', () => {
+    const cart = {
+      percent: 4,
+      bundle: 14,
+    };
+
+    const pricedProducts = [
+      {
+        id: 'percent',
+        name: 'Percent',
+        category: 'A',
+        listPrice: 100,
+        price: 90,
+        promotion: {
+          id: 'promo-percent',
+          title: 'Percent',
+          tag: '10%',
+          description: '10% off',
+          effectType: 'PERCENT_OFF' as const,
+          discountValue: 10,
+          buyQuantity: null,
+          freeQuantity: null,
+        },
+      },
+      {
+        id: 'bundle',
+        name: 'Bundle',
+        category: 'A',
+        listPrice: 30,
+        price: 30,
+        promotion: {
+          id: 'promo-bundle',
+          title: 'Bundle',
+          tag: '12+2',
+          description: 'Buy 12 get 2',
+          effectType: 'BUY_X_GET_Y' as const,
+          discountValue: null,
+          buyQuantity: 12,
+          freeQuantity: 2,
+        },
+      },
+    ];
+
+    expect(getCartPricingSummary(cart, pricedProducts)).toEqual({
+      subtotal: 820,
+      discountTotal: 100,
+      total: 720,
+    });
   });
 
   it('filters products by category, search text, previous order, recommended, and promotions', () => {

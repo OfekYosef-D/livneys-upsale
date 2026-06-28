@@ -1,8 +1,10 @@
 import { notFound } from 'next/navigation';
 import type { OrderStatus } from '@prisma/client';
+import { resolveCatalogPricing } from '@/features/pricing/engine';
 import { formatRouteDeadline } from '@/features/routes/utils';
 import { prisma } from '@/lib/db';
-import type { CustomerPortalData, PortalOrder, PortalProduct } from './types';
+import { mapPortalOrder } from './order-mapping';
+import type { CustomerPortalData, PortalProduct } from './types';
 
 const submittedStatuses: OrderStatus[] = [
   'SUBMITTED',
@@ -56,24 +58,72 @@ export async function getCustomerPortalData(customerId: string): Promise<Custome
     }),
     prisma.promotion.findMany({
       where: { isActive: true },
-      include: { product: true },
+      include: {
+        productTargets: true,
+        categoryTargets: true,
+        customerTargets: true,
+        routeTargets: true,
+        priceListTargets: true,
+      },
     }),
   ]);
 
   const recommendationIds = new Set(customer.recommendations.map((item) => item.productId));
   const previousProductIds = new Set(lastSubmittedOrder?.lines.map((line) => line.productId).filter(Boolean) ?? []);
-  const promotionsByProductId = new Map(activePromotions.map((promotion) => [promotion.productId, promotion]));
+  const pricedCatalog = resolveCatalogPricing({
+    customer: {
+      id: customer.id,
+      routeId: customer.routeId,
+      priceListId: customer.priceListId,
+    },
+    route: {
+      id: customer.route.id,
+    },
+    products: customer.priceList.items.map((item) => ({
+      id: item.product.id,
+      name: item.product.name,
+      category: item.product.category,
+      basePrice: Number(item.product.basePrice),
+      isActive: item.product.isActive,
+      minQty: item.product.minQty,
+    })),
+    priceListItems: customer.priceList.items.map((item) => ({
+      productId: item.productId,
+      price: Number(item.price),
+    })),
+    promotions: activePromotions.map((promotion) => ({
+      id: promotion.id,
+      title: promotion.title,
+      tag: promotion.tag,
+      description: promotion.description,
+      effectType: promotion.effectType,
+      discountValue: promotion.discountValue === null ? null : Number(promotion.discountValue),
+      buyQuantity: promotion.buyQuantity,
+      freeQuantity: promotion.freeQuantity,
+      priority: promotion.priority,
+      startsAt: promotion.startsAt,
+      endsAt: promotion.endsAt,
+      isActive: promotion.isActive,
+      productIds: [...new Set([promotion.productId, ...promotion.productTargets.map((target) => target.productId)].filter(Boolean) as string[])],
+      categories: promotion.categoryTargets.map((target) => target.category),
+      customerIds: promotion.customerTargets.map((target) => target.customerId),
+      routeIds: promotion.routeTargets.map((target) => target.routeId),
+      priceListIds: promotion.priceListTargets.map((target) => target.priceListId),
+    })),
+  });
+  const pricedProductsById = new Map(pricedCatalog.products.map((product) => [product.id, product]));
   const products: PortalProduct[] = customer.priceList.items
     .filter((item) => item.product.isActive)
     .map((item) => {
-      const promotion = promotionsByProductId.get(item.productId);
+      const priced = pricedProductsById.get(item.productId);
 
       return {
         id: item.product.id,
         sku: item.product.sku,
         name: item.product.name,
         category: item.product.category,
-        price: Number(item.price),
+        listPrice: priced?.listPrice ?? Number(item.price),
+        price: priced?.price ?? Number(item.price),
         unit: item.product.unit,
         caseSize: item.product.caseSize,
         minQty: item.product.minQty,
@@ -84,7 +134,8 @@ export async function getCustomerPortalData(customerId: string): Promise<Custome
         recommended: recommendationIds.has(item.productId),
         isRecommended: recommendationIds.has(item.productId),
         isPreviousOrder: previousProductIds.has(item.productId),
-        promoLabel: promotion?.tag,
+        promoLabel: priced?.promoLabel,
+        promotion: priced?.promotion ?? null,
       };
     });
 
@@ -164,33 +215,5 @@ export async function getCustomerConfirmationData(customerId: string, orderId?: 
   return {
     ...portalData,
     lastOrder: mapPortalOrder(order, customerId),
-  };
-}
-
-function mapPortalOrder(
-  order: { id: string; customerId: string; submittedAt: Date | null; createdAt: Date; status: OrderStatus; lines: { productId: string | null; quantity: number }[] } | null,
-  customerId: string,
-): PortalOrder {
-  if (!order) {
-    return {
-      id: 'empty',
-      customerId,
-      date: new Date().toISOString(),
-      status: 'DRAFT',
-      items: [],
-    };
-  }
-
-  return {
-    id: order.id,
-    customerId: order.customerId,
-    date: (order.submittedAt ?? order.createdAt).toISOString(),
-    status: order.status,
-    items: order.lines
-      .filter((line) => line.productId)
-      .map((line) => ({
-        productId: line.productId ?? '',
-        qty: line.quantity,
-      })),
   };
 }

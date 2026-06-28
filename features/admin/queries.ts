@@ -1,4 +1,4 @@
-import type { OrderStatus } from '@prisma/client';
+import type { OrderSource, OrderStatus } from '@prisma/client';
 import { activeOrderStatuses } from '@/features/orders/utils';
 import { prisma } from '@/lib/db';
 import type { AdminOrderSummary, AdminRouteSummary } from './types';
@@ -186,8 +186,12 @@ export async function getAdminOrderDetail(orderId: string) {
       id: line.id,
       productName: line.productName,
       quantity: line.quantity,
+      listUnitPrice: Number(line.listUnitPrice),
       unitPrice: Number(line.unitPrice),
+      lineSubtotal: Number(line.lineSubtotal),
+      discountTotal: Number(line.discountTotal),
       lineTotal: Number(line.lineTotal),
+      promotionLabel: getPromotionLabel(line.promotionSnapshot),
     })),
   };
 }
@@ -196,8 +200,11 @@ function mapOrderSummary(order: {
   id: string;
   customerId: string;
   status: OrderStatus;
+  source: OrderSource;
   submittedAt: Date | null;
   deliveryWindowStart: Date;
+  subtotal: unknown;
+  discountTotal: unknown;
   total: unknown;
   customer: { id: string; name: string };
   route: { id: string; name: string } | null;
@@ -210,10 +217,22 @@ function mapOrderSummary(order: {
     routeId: order.route?.id ?? null,
     routeName: order.route?.name ?? 'ללא קו',
     status: order.status,
+    source: order.source,
     submittedAt: order.submittedAt?.toISOString() ?? null,
     deliveryWindowStart: order.deliveryWindowStart.toISOString(),
+    subtotal: Number(order.subtotal),
+    discountTotal: Number(order.discountTotal),
     total: Number(order.total),
     lineCount: order.lines.length,
     hasUpsell: order.lines.length >= 3,
   };
+}
+
+function getPromotionLabel(snapshot: unknown): string | undefined {
+  if (!snapshot || typeof snapshot !== 'object' || !('tag' in snapshot)) {
+    return undefined;
+  }
+
+  const tag = (snapshot as { tag?: unknown }).tag;
+  return typeof tag === 'string' && tag.trim().length > 0 ? tag : undefined;
 }

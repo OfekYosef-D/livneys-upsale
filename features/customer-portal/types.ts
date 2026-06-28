@@ -22,6 +22,7 @@ export type PortalProduct = {
   sku: string;
   name: string;
   category: string;
+  listPrice: number;
   price: number;
   unit: string;
   caseSize: string;
@@ -34,6 +35,16 @@ export type PortalProduct = {
   isRecommended?: boolean;
   isPreviousOrder?: boolean;
   promoLabel?: string;
+  promotion?: {
+    id: string;
+    title: string;
+    tag: string;
+    description: string;
+    effectType: 'DISPLAY_ONLY' | 'PERCENT_OFF' | 'FIXED_AMOUNT_OFF' | 'FIXED_UNIT_PRICE' | 'BUY_X_GET_Y';
+    discountValue: number | null;
+    buyQuantity: number | null;
+    freeQuantity: number | null;
+  } | null;
 };
 
 export type PortalOrder = {
@@ -41,7 +52,20 @@ export type PortalOrder = {
   customerId: string;
   date: string;
   status: string;
-  items: { productId: string; qty: number }[];
+  subtotal: number;
+  discountTotal: number;
+  total: number;
+  items: {
+    productId: string;
+    productName?: string;
+    qty: number;
+    listUnitPrice?: number;
+    unitPrice?: number;
+    lineSubtotal?: number;
+    discountTotal?: number;
+    lineTotal?: number;
+    promotionLabel?: string;
+  }[];
 };
 
 export type CustomerPortalData = {

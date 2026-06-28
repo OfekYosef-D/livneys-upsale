@@ -1,4 +1,4 @@
-import { PrismaClient, type NotificationChannel, type OrderStatus } from '@prisma/client';
+import { PrismaClient, type NotificationChannel, type OrderStatus, type PromotionEffectType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import customers from '../data/customers.json';
 import orders from '../data/orders.json';
@@ -68,6 +68,36 @@ function normalizeOrderStatus(status: string, orderId: string): OrderStatus {
   if (status.includes('טיוט') || orderId === 'ord-1004') return 'DRAFT';
   if (status.includes('סופק') || orderId === 'ord-1001' || orderId === 'ord-1003') return 'DELIVERED';
   return 'SUBMITTED';
+}
+
+function getSeedPromotionEffect(promotionId: string): {
+  effectType: PromotionEffectType;
+  discountValue?: number;
+  buyQuantity?: number;
+  freeQuantity?: number;
+  priority: number;
+} {
+  if (promotionId === 'promo-week') {
+    return {
+      effectType: 'BUY_X_GET_Y',
+      buyQuantity: 12,
+      freeQuantity: 2,
+      priority: 20,
+    };
+  }
+
+  if (promotionId === 'promo-tasting') {
+    return {
+      effectType: 'FIXED_UNIT_PRICE',
+      discountValue: 99,
+      priority: 10,
+    };
+  }
+
+  return {
+    effectType: 'DISPLAY_ONLY',
+    priority: 0,
+  };
 }
 
 async function seedProductsAndPricing() {
@@ -197,6 +227,8 @@ async function seedRoutesCustomersAndUsers() {
 
 async function seedPromotionsRecommendationsAndOrders() {
   for (const promotion of promotions) {
+    const effect = getSeedPromotionEffect(promotion.id);
+
     await prisma.promotion.create({
       data: {
         id: promotion.id,
@@ -204,7 +236,13 @@ async function seedPromotionsRecommendationsAndOrders() {
         tag: promotion.tag,
         description: promotion.description,
         productId: promotion.productId,
+        ...effect,
         isActive: true,
+        productTargets: {
+          create: {
+            productId: promotion.productId,
+          },
+        },
       },
     });
   }
@@ -235,6 +273,7 @@ async function seedPromotionsRecommendationsAndOrders() {
         id: product.id,
         name: product.name,
         price: product.price,
+        minQty: product.minQty ?? 1,
       })),
     });
     const total = snapshotLines.reduce((sum, line) => sum + line.lineTotal, 0);
@@ -251,14 +290,21 @@ async function seedPromotionsRecommendationsAndOrders() {
         deliveryWindowStart: status === 'DRAFT' ? routeWindow.delivery : orderDate,
         deadlineAt: routeWindow.cutoff,
         submittedAt: status === 'DRAFT' ? null : orderDate,
+        subtotal: total,
+        discountTotal: 0,
         total,
         lines: {
           create: snapshotLines.map((line) => ({
             productId: line.productId,
             productName: line.productName,
             quantity: line.quantity,
+            listUnitPrice: line.listUnitPrice,
             unitPrice: line.unitPrice,
+            lineSubtotal: line.lineSubtotal,
+            discountTotal: line.discountTotal,
             lineTotal: line.lineTotal,
+            promotionId: line.promotionId ?? undefined,
+            promotionSnapshot: line.promotionSnapshot ?? undefined,
           })),
         },
       },

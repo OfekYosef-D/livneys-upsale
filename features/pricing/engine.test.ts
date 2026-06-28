@@ -1,0 +1,154 @@
+import { describe, expect, it } from 'vitest';
+import { calculateOrderPricing, resolveCatalogPricing, type PricingPromotion } from './engine';
+
+const now = new Date('2026-06-27T10:00:00.000Z');
+
+const customer = {
+  id: 'cust-south',
+  routeId: 'route-south',
+  priceListId: 'price-list-south',
+};
+
+const route = {
+  id: 'route-south',
+};
+
+const products = [
+  { id: 'prod-herb', name: 'רוטב עשבים', category: 'רטבים', basePrice: 31, isActive: true, minQty: 1 },
+  { id: 'prod-spread', name: 'ממרח חציל', category: 'ממרחים', basePrice: 28, isActive: true, minQty: 1 },
+  { id: 'prod-hidden', name: 'לא פעיל', category: 'רטבים', basePrice: 99, isActive: false, minQty: 1 },
+];
+
+const priceListItems = [
+  { productId: 'prod-herb', price: 30 },
+  { productId: 'prod-spread', price: 28 },
+  { productId: 'prod-hidden', price: 99 },
+];
+
+function promo(overrides: Partial<PricingPromotion> = {}): PricingPromotion {
+  return {
+    id: 'promo-week',
+    title: 'מבצע השבוע',
+    tag: '10% הנחה',
+    description: 'הנחה ללקוחות דרום',
+    effectType: 'PERCENT_OFF',
+    discountValue: 10,
+    buyQuantity: null,
+    freeQuantity: null,
+    priority: 10,
+    startsAt: new Date('2026-06-20T00:00:00.000Z'),
+    endsAt: new Date('2026-06-30T23:59:59.000Z'),
+    isActive: true,
+    productIds: ['prod-herb'],
+    categories: [],
+    customerIds: [],
+    routeIds: ['route-south'],
+    priceListIds: ['price-list-south'],
+    ...overrides,
+  };
+}
+
+describe('pricing engine', () => {
+  it('resolves catalog prices from the customer price list and active eligible promotions', () => {
+    const result = resolveCatalogPricing({
+      customer,
+      route,
+      products,
+      priceListItems,
+      promotions: [
+        promo(),
+        promo({ id: 'future', startsAt: new Date('2026-07-01T00:00:00.000Z'), priority: 99 }),
+        promo({ id: 'wrong-route', routeIds: ['route-north'], priority: 99 }),
+      ],
+      now,
+    });
+
+    expect(result.products).toEqual([
+      expect.objectContaining({
+        id: 'prod-herb',
+        listPrice: 30,
+        price: 27,
+        promoLabel: '10% הנחה',
+        promotion: expect.objectContaining({ id: 'promo-week' }),
+      }),
+      expect.objectContaining({
+        id: 'prod-spread',
+        listPrice: 28,
+        price: 28,
+        promoLabel: undefined,
+        promotion: null,
+      }),
+    ]);
+  });
+
+  it('chooses one promotion by priority, then savings, then earliest end date', () => {
+    const result = calculateOrderPricing({
+      customer,
+      route,
+      products,
+      priceListItems,
+      items: [{ productId: 'prod-herb', quantity: 10 }],
+      promotions: [
+        promo({ id: 'lower-priority', tag: '₪8 הנחה', effectType: 'FIXED_AMOUNT_OFF', discountValue: 8, priority: 1 }),
+        promo({ id: 'priority-small', tag: '₪4 הנחה', effectType: 'FIXED_AMOUNT_OFF', discountValue: 4, priority: 20 }),
+        promo({ id: 'priority-large', tag: '₪5 הנחה', effectType: 'FIXED_AMOUNT_OFF', discountValue: 5, priority: 20 }),
+      ],
+      now,
+    });
+
+    expect(result.lines[0]).toEqual(
+      expect.objectContaining({
+        productId: 'prod-herb',
+        listUnitPrice: 30,
+        unitPrice: 25,
+        discountTotal: 50,
+        lineTotal: 250,
+        promotionId: 'priority-large',
+      }),
+    );
+    expect(result.subtotal).toBe(300);
+    expect(result.discountTotal).toBe(50);
+    expect(result.total).toBe(250);
+  });
+
+  it('calculates fixed price and buy-x-get-y discounts with line snapshots', () => {
+    const fixedPrice = calculateOrderPricing({
+      customer,
+      route,
+      products,
+      priceListItems,
+      items: [{ productId: 'prod-spread', quantity: 3 }],
+      promotions: [promo({ id: 'fixed-price', productIds: ['prod-spread'], routeIds: [], effectType: 'FIXED_UNIT_PRICE', discountValue: 20 })],
+      now,
+    });
+
+    expect(fixedPrice.lines[0]).toEqual(
+      expect.objectContaining({
+        listUnitPrice: 28,
+        unitPrice: 20,
+        discountTotal: 24,
+        lineTotal: 60,
+        promotionSnapshot: expect.objectContaining({ effectType: 'FIXED_UNIT_PRICE' }),
+      }),
+    );
+
+    const buyXGetY = calculateOrderPricing({
+      customer,
+      route,
+      products,
+      priceListItems,
+      items: [{ productId: 'prod-herb', quantity: 14 }],
+      promotions: [promo({ effectType: 'BUY_X_GET_Y', discountValue: null, buyQuantity: 12, freeQuantity: 2 })],
+      now,
+    });
+
+    expect(buyXGetY.lines[0]).toEqual(
+      expect.objectContaining({
+        listUnitPrice: 30,
+        unitPrice: 30,
+        discountTotal: 60,
+        lineTotal: 360,
+      }),
+    );
+  });
+});

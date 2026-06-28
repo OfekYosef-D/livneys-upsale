@@ -62,11 +62,7 @@ export async function assertCustomerAction(customerId: string) {
     throw new AuthorizationError();
   }
 
-  if (session.user.role === 'ADMIN') {
-    return session;
-  }
-
-  if (session.user.customerId !== customerId) {
+  if (session.user.role !== 'CUSTOMER' || session.user.customerId !== customerId) {
     throw new AuthorizationError('Cannot access another customer account');
   }
 
