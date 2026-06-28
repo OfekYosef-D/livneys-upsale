@@ -60,8 +60,10 @@ export function getCartTotal<T extends CatalogProductLike>(cart: Cart, products:
 }
 
 export function getCartPricingSummary<T extends CatalogProductLike>(cart: Cart, products: T[]): { subtotal: number; discountTotal: number; total: number } {
+  const productsById = new Map(products.map((product) => [product.id, product]));
+
   return getCartItems(cart).reduce((summary, item) => {
-    const product = products.find((candidate) => candidate.id === item.productId);
+    const product = productsById.get(item.productId);
     if (!product) return summary;
 
     const listPrice = product.listPrice ?? product.price;
