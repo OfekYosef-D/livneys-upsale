@@ -65,7 +65,7 @@ export function AdminOrderStatusActions({
               }`}
             >
               {icons[nextStatus]}
-              {pending ? 'מעדכן...' : orderStatusLabels[nextStatus]}
+              {orderStatusLabels[nextStatus]}
             </button>
           ))}
         </div>
