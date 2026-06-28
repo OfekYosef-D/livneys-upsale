@@ -26,6 +26,8 @@ vi.mock('@/features/orders/service', () => ({
   createSubmittedOrder: vi.fn(),
 }));
 
+vi.mock('@/features/orders/utils', async () => await vi.importActual('../orders/utils'));
+
 
 vi.mock('@/features/orders/write', () => ({
   formatManualOrderInternalNote: vi.fn(({ intakeChannel, note }: { intakeChannel: string; note?: string | null }) =>
