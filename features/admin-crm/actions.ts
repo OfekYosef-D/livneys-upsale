@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createSubmittedOrder } from '@/features/orders/service';
+import { assertOrderStatusTransition, orderStatusValues, type OrderStatus } from '@/features/orders/utils';
 import { formatManualOrderInternalNote } from '@/features/orders/write';
 import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { assertAdminAction } from '@/lib/authorization';
@@ -31,6 +32,11 @@ const activeToggleSchema = z.object({
 const clonePriceListSchema = z.object({
   id: z.string().trim().min(1),
   name: z.string().trim().min(1).max(160),
+});
+
+const orderStatusMutationSchema = z.object({
+  orderId: z.string().trim().min(1),
+  status: z.enum(orderStatusValues),
 });
 
 export async function createCustomerAction(input: unknown): Promise<ActionResult<{ customerId: string }>> {
@@ -739,6 +745,50 @@ export async function createManualOrderAction(input: unknown): Promise<ActionRes
     revalidatePath(`/admin/customers/${parsed.customerId}`);
     revalidatePath(`/customer/${parsed.customerId}`);
     return actionOk({ orderId: order.orderId, status: order.status });
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function updateOrderStatusAction(input: unknown): Promise<ActionResult<{ orderId: string; status: OrderStatus }>> {
+  try {
+    const parsed = orderStatusMutationSchema.parse(input);
+    await assertAdminAction();
+
+    const existing = await prisma.order.findUnique({
+      where: { id: parsed.orderId },
+      select: {
+        id: true,
+        status: true,
+        customerId: true,
+        routeId: true,
+      },
+    });
+
+    if (!existing) {
+      throw new Error('Order not found');
+    }
+
+    const nextStatus = assertOrderStatusTransition(existing.status, parsed.status);
+    const order = await prisma.order.update({
+      where: { id: existing.id },
+      data: { status: nextStatus },
+      select: {
+        id: true,
+        status: true,
+        customerId: true,
+        routeId: true,
+      },
+    });
+
+    revalidatePath('/admin');
+    revalidatePath(`/admin/orders/${order.id}`);
+    revalidatePath(`/admin/customers/${order.customerId}`);
+    if (order.routeId) {
+      revalidatePath(`/admin/routes/${order.routeId}`);
+    }
+    revalidatePath(`/customer/${order.customerId}`);
+    return actionOk({ orderId: order.id, status: order.status });
   } catch (error) {
     return actionError(error);
   }
