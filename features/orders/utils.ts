@@ -104,6 +104,10 @@ const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
   CANCELLED: [],
 };
 
+export function getAllowedOrderStatusTransitions(current: OrderStatus): OrderStatus[] {
+  return [...allowedTransitions[current]];
+}
+
 export function assertOrderStatusTransition(current: OrderStatus, next: OrderStatus): OrderStatus {
   if (!allowedTransitions[current].includes(next)) {
     throw new Error(`Invalid order status transition: ${current} -> ${next}`);

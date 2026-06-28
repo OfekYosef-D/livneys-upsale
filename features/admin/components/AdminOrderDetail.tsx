@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { getAdminOrderDetail } from '@/features/admin/queries';
 import { money } from '@/lib/format';
+import { AdminOrderStatusActions } from './AdminOrderStatusActions';
 import { OrderStatusPill } from './OrderStatusPill';
 
 type OrderData = NonNullable<Awaited<ReturnType<typeof getAdminOrderDetail>>>;
@@ -73,6 +74,7 @@ export function AdminOrderDetail({ order }: { order: OrderData }) {
           </div>
           {order.notes && <p className="mt-3 rounded-xl border border-black/10 p-3 text-sm font-bold">{order.notes}</p>}
           {order.internalNote && <p className="mt-3 rounded-xl bg-[#e6e1d8] p-3 text-xs font-black text-black/65">{order.internalNote}</p>}
+          <AdminOrderStatusActions orderId={order.id} status={order.status} />
         </section>
       </aside>
     </div>

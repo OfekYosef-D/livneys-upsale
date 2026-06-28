@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertOrderStatusTransition,
   createOrderSnapshotLines,
+  getAllowedOrderStatusTransitions,
   getSubmissionStatus,
 } from './utils';
 
@@ -71,5 +72,11 @@ describe('order domain utilities', () => {
     expect(() => assertOrderStatusTransition('DELIVERED', 'APPROVED')).toThrow(
       'Invalid order status transition',
     );
+  });
+
+  it('lists the next allowed order status transitions for admin controls', () => {
+    expect(getAllowedOrderStatusTransitions('SUBMITTED')).toEqual(['APPROVED', 'CANCELLED']);
+    expect(getAllowedOrderStatusTransitions('APPROVED')).toEqual(['PACKED', 'CANCELLED']);
+    expect(getAllowedOrderStatusTransitions('DELIVERED')).toEqual([]);
   });
 });
