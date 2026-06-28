@@ -1,11 +1,17 @@
 import type { OrderStatus } from '@/features/orders/utils';
 
+export type AdminOrderSource = 'CUSTOMER' | 'ADMIN';
+
 export type AdminOrderLine = {
   id: string;
   productName: string;
   quantity: number;
+  listUnitPrice: number;
   unitPrice: number;
+  lineSubtotal: number;
+  discountTotal: number;
   lineTotal: number;
+  promotionLabel?: string;
 };
 
 export type AdminOrderSummary = {
@@ -15,8 +21,11 @@ export type AdminOrderSummary = {
   routeId: string | null;
   routeName: string;
   status: OrderStatus;
+  source: AdminOrderSource;
   submittedAt: string | null;
   deliveryWindowStart: string;
+  subtotal: number;
+  discountTotal: number;
   total: number;
   lineCount: number;
   hasUpsell: boolean;

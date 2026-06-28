@@ -6,6 +6,12 @@ import { brandLogo } from '@/lib/product-assets';
 
 const navItems = [
   { href: '/admin', label: 'דשבורד' },
+  { href: '/admin/customers', label: 'לקוחות' },
+  { href: '/admin/products', label: 'מוצרים' },
+  { href: '/admin/price-lists', label: 'מחירונים' },
+  { href: '/admin/routes', label: 'קווים' },
+  { href: '/admin/promotions', label: 'מבצעים' },
+  { href: '/admin/recommendations', label: 'המלצות' },
   { href: '/admin/manual-order', label: 'הזמנה ידנית' },
   { href: '/customer/cust-001', label: 'תצוגת לקוח' },
 ];
@@ -14,28 +20,35 @@ export function AdminShell({ children, title, subtitle }: { children: React.Reac
   return (
     <main className="min-h-screen bg-[#f7f5f1] text-black">
       <header className="sticky top-0 z-30 border-b border-black/10 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-3 sm:px-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#e6e1d8]">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e6e1d8]">
               <Image src={brandLogo} alt="Livney's" className="w-8" priority />
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-black">CRM Livney&apos;s</p>
-              <p className="truncate text-xs font-bold text-black/50">ניהול הזמנות, מעקב לקוחות ואפסייל</p>
+              <p className="truncate text-xs font-bold text-black/50">ניהול הזמנות, לקוחות, קווים ואפסייל</p>
             </div>
           </div>
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav className="no-scrollbar hidden max-w-[52rem] items-center gap-1 overflow-x-auto lg:flex">
             {navItems.map((item) => (
-              <Link key={item.href} href={item.href} className="rounded-full px-3 py-2 text-xs font-black text-black/65 hover:bg-[#e6e1d8] focus-visible:ring-2 focus-visible:ring-black/25">
+              <Link key={item.href} href={item.href} className="shrink-0 rounded-full px-3 py-2 text-xs font-black text-black/65 hover:bg-[#e6e1d8] focus-visible:ring-2 focus-visible:ring-black/25">
                 {item.label}
               </Link>
             ))}
           </nav>
           <AdminLogoutButton />
         </div>
+        <nav className="no-scrollbar mx-auto flex max-w-7xl gap-1 overflow-x-auto border-t border-black/10 px-3 py-2 lg:hidden" aria-label="Admin navigation">
+          {navItems.map((item) => (
+            <Link key={item.href} href={item.href} className="shrink-0 rounded-full bg-[#f7f5f1] px-3 py-2 text-xs font-black text-black/70 hover:bg-[#e6e1d8] focus-visible:ring-2 focus-visible:ring-black/25">
+              {item.label}
+            </Link>
+          ))}
+        </nav>
       </header>
 
-      <div className="mx-auto max-w-7xl px-4 py-5">
+      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-5">
         <div className="mb-4 flex flex-col gap-1 border-b border-black/10 pb-4">
           <p className="text-xs font-black text-black/45">אזור צוות</p>
           <h1 className="text-2xl font-black md:text-3xl">{title}</h1>

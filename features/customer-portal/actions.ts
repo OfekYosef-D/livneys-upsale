@@ -1,8 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createOrderSnapshotLines, getSubmissionStatus } from '@/features/orders/utils';
-import { isAfterCutoff } from '@/features/routes/utils';
+import { createSubmittedOrder, getOrderWriteContext } from '@/features/orders/service';
+import { calculateOrderPricing } from '@/features/pricing/engine';
 import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { assertCustomerAction } from '@/lib/authorization';
 import { prisma } from '@/lib/db';
@@ -19,11 +19,15 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
     }
 
     const context = await getOrderWriteContext(parsed.customerId);
-    const snapshotLines = createOrderSnapshotLines({
+    const pricing = calculateOrderPricing({
+      customer: context.customer,
+      route: context.route,
       items: items.map((item) => ({ productId: item.productId, quantity: item.qty })),
       products: context.products,
+      priceListItems: context.priceListItems,
+      promotions: context.promotions,
     });
-    const total = snapshotLines.reduce((sum, line) => sum + line.lineTotal, 0);
+    const snapshotLines = pricing.lines;
     const existingDraft = await prisma.order.findFirst({
       where: {
         customerId: parsed.customerId,
@@ -43,14 +47,21 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
         source: 'CUSTOMER',
         deliveryWindowStart: context.route.nextDeliveryAt,
         deadlineAt: context.route.nextCutoffAt,
-        total,
+        subtotal: pricing.subtotal,
+        discountTotal: pricing.discountTotal,
+        total: pricing.total,
         lines: {
           create: snapshotLines.map((line) => ({
             productId: line.productId,
             productName: line.productName,
             quantity: line.quantity,
+            listUnitPrice: line.listUnitPrice,
             unitPrice: line.unitPrice,
+            lineSubtotal: line.lineSubtotal,
+            discountTotal: line.discountTotal,
             lineTotal: line.lineTotal,
+            promotionId: line.promotionId,
+            promotionSnapshot: line.promotionSnapshot ?? undefined,
           })),
         },
       },
@@ -58,15 +69,22 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
         routeId: context.route.id,
         deliveryWindowStart: context.route.nextDeliveryAt,
         deadlineAt: context.route.nextCutoffAt,
-        total,
+        subtotal: pricing.subtotal,
+        discountTotal: pricing.discountTotal,
+        total: pricing.total,
         lines: {
           deleteMany: {},
           create: snapshotLines.map((line) => ({
             productId: line.productId,
             productName: line.productName,
             quantity: line.quantity,
+            listUnitPrice: line.listUnitPrice,
             unitPrice: line.unitPrice,
+            lineSubtotal: line.lineSubtotal,
+            discountTotal: line.discountTotal,
             lineTotal: line.lineTotal,
+            promotionId: line.promotionId,
+            promotionSnapshot: line.promotionSnapshot ?? undefined,
           })),
         },
       },
@@ -89,113 +107,21 @@ export async function submitCustomerOrderAction(input: SubmitCustomerOrderInput)
       throw new Error('לא ניתן לשלוח הזמנה ריקה.');
     }
 
-    const context = await getOrderWriteContext(parsed.customerId);
-    const snapshotLines = createOrderSnapshotLines({
+    const order = await createSubmittedOrder({
+      customerId: parsed.customerId,
       items: items.map((item) => ({ productId: item.productId, quantity: item.qty })),
-      products: context.products,
-    });
-    const total = snapshotLines.reduce((sum, line) => sum + line.lineTotal, 0);
-    const now = new Date();
-    const status = getSubmissionStatus({
-      now,
-      cutoff: context.route.nextCutoffAt,
-    });
-    const existingDraft = await prisma.order.findFirst({
-      where: {
-        customerId: parsed.customerId,
-        status: 'DRAFT',
-        deliveryWindowStart: context.route.nextDeliveryAt,
-      },
-    });
-
-    const order = await prisma.order.upsert({
-      where: {
-        id: existingDraft?.id ?? '__new_submission__',
-      },
-      create: {
-        customerId: parsed.customerId,
-        routeId: context.route.id,
-        status,
-        source: 'CUSTOMER',
-        deliveryWindowStart: context.route.nextDeliveryAt,
-        deadlineAt: context.route.nextCutoffAt,
-        submittedAt: now,
-        notes: parsed.notes,
-        total,
-        lines: {
-          create: snapshotLines.map((line) => ({
-            productId: line.productId,
-            productName: line.productName,
-            quantity: line.quantity,
-            unitPrice: line.unitPrice,
-            lineTotal: line.lineTotal,
-          })),
-        },
-      },
-      update: {
-        routeId: context.route.id,
-        status,
-        submittedAt: now,
-        notes: parsed.notes,
-        total,
-        lines: {
-          deleteMany: {},
-          create: snapshotLines.map((line) => ({
-            productId: line.productId,
-            productName: line.productName,
-            quantity: line.quantity,
-            unitPrice: line.unitPrice,
-            lineTotal: line.lineTotal,
-          })),
-        },
-      },
+      source: 'CUSTOMER',
+      notes: parsed.notes,
+      replaceDraftForDeliveryWindow: true,
     });
 
     revalidatePath('/admin');
-    revalidatePath(`/admin/routes/${context.route.id}`);
+    revalidatePath(`/admin/routes/${order.routeId}`);
     revalidatePath(`/admin/customers/${parsed.customerId}`);
     revalidatePath(`/customer/${parsed.customerId}`);
 
-    return actionOk({ orderId: order.id, status });
+    return actionOk({ orderId: order.orderId, status: order.status });
   } catch (error) {
     return actionError(error);
   }
-}
-
-async function getOrderWriteContext(customerId: string) {
-  const customer = await prisma.customer.findUnique({
-    where: { id: customerId },
-    include: {
-      route: true,
-      priceList: {
-        include: {
-          items: {
-            include: {
-              product: true,
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (!customer || !customer.isActive) {
-    throw new Error('לקוח לא נמצא או אינו פעיל.');
-  }
-
-  if (isAfterCutoff({ now: new Date(), cutoff: customer.route.nextCutoffAt })) {
-    // The status assignment happens in submit; this call documents the business rule at the data boundary.
-  }
-
-  return {
-    customer,
-    route: customer.route,
-    products: customer.priceList.items
-      .filter((item) => item.product.isActive)
-      .map((item) => ({
-        id: item.productId,
-        name: item.product.name,
-        price: Number(item.price),
-      })),
-  };
 }

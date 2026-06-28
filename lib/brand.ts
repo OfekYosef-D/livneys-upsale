@@ -14,8 +14,3 @@ export const brand = {
     pantry: '#e6e1d8',
   },
 };
-
-export const mockCredentials = {
-  username: 'demo',
-  password: 'demo123',
-};

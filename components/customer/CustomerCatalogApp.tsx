@@ -11,7 +11,7 @@ import {
   buildCartFromOrder,
   filterCatalogProducts,
   getCartItems,
-  getCartTotal,
+  getCartPricingSummary,
   setCartQuantity,
   type Cart,
 } from '@/lib/order-utils';
@@ -43,7 +43,7 @@ export function CustomerCatalogApp({
     [category, products, query],
   );
   const cartItems = useMemo(() => getCartItems(cart), [cart]);
-  const cartTotal = useMemo(() => getCartTotal(cart, products), [cart, products]);
+  const cartPricing = useMemo(() => getCartPricingSummary(cart, products), [cart, products]);
   const itemCount = cartItems.reduce((sum, item) => sum + item.qty, 0);
   const deliveryDate = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'long' }).format(new Date(route.nextDelivery));
 
@@ -136,7 +136,7 @@ export function CustomerCatalogApp({
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/96 p-2.5 backdrop-blur">
         <div className="mx-auto max-w-5xl">
-          <CartSummary itemCount={itemCount} cartTotal={cartTotal} cartItems={cartItems} onReview={reviewOrder} isSaving={isSavingDraft} />
+          <CartSummary itemCount={itemCount} pricing={cartPricing} cartItems={cartItems} onReview={reviewOrder} isSaving={isSavingDraft} />
         </div>
       </div>
     </main>
@@ -162,6 +162,7 @@ function ProductOrderCard({ product, qty, onQty }: { product: PortalProduct; qty
               <p className="mt-0.5 line-clamp-1 text-xs font-bold text-black/55">{product.unit} · {product.caseSize}</p>
             </div>
             <div className="shrink-0 text-left md:hidden">
+              {product.listPrice > product.price && <p className="text-[11px] font-bold text-black/40 line-through">{money(product.listPrice)}</p>}
               <p className="text-sm font-black">{money(product.price)}</p>
               <p className="text-[11px] font-bold text-black/45">ליח׳</p>
             </div>
@@ -170,10 +171,12 @@ function ProductOrderCard({ product, qty, onQty }: { product: PortalProduct; qty
             {product.promoLabel && <span className="rounded-full bg-black px-2 py-1 text-[11px] font-black text-white">{product.promoLabel}</span>}
             <span className="rounded-full bg-white px-2 py-1 text-[11px] font-black text-black/45 ring-1 ring-black/10">מינ׳ {step}</span>
           </div>
+          {product.promotion && <p className="mt-1 line-clamp-1 text-[11px] font-bold text-black/45">{product.promotion.description}</p>}
         </div>
 
         <div className="col-span-2 grid grid-cols-[1fr_9.5rem] items-center gap-3 md:col-span-1 md:grid-cols-1">
           <div className="hidden text-left md:block">
+            {product.listPrice > product.price && <p className="text-xs font-bold text-black/40 line-through">{money(product.listPrice)}</p>}
             <p className="text-base font-black">{money(product.price)}</p>
             <p className="text-[11px] font-bold text-black/45">{product.unit}</p>
           </div>
@@ -186,17 +189,19 @@ function ProductOrderCard({ product, qty, onQty }: { product: PortalProduct; qty
 
 function CartSummary({
   itemCount,
-  cartTotal,
+  pricing,
   cartItems,
   onReview,
   isSaving,
 }: {
   itemCount: number;
-  cartTotal: number;
+  pricing: { subtotal: number; discountTotal: number; total: number };
   cartItems: { productId: string; qty: number }[];
   onReview: () => void;
   isSaving: boolean;
 }) {
+  const cartTotal = pricing.total;
+
   return (
     <div className="rounded-2xl border border-black/10 bg-white p-2.5 shadow-[0_-10px_32px_rgba(0,0,0,0.08)]">
       <div className="flex items-center justify-between gap-3">
@@ -207,6 +212,7 @@ function CartSummary({
           </p>
           <p className="text-base font-black">{itemCount} יח׳ · {money(cartTotal)}</p>
         </div>
+        {pricing.discountTotal > 0 && <p className="text-[11px] font-black text-emerald-700">חיסכון {money(pricing.discountTotal)}</p>}
         <button
           onClick={onReview}
           disabled={cartItems.length === 0 || isSaving}
