@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createSubmittedOrder } from '@/features/orders/service';
-import { assertOrderStatusTransition, type OrderStatus } from '@/features/orders/utils';
+import { assertOrderStatusTransition, orderStatusValues, type OrderStatus } from '@/features/orders/utils';
 import { formatManualOrderInternalNote } from '@/features/orders/write';
 import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { assertAdminAction } from '@/lib/authorization';
@@ -36,7 +36,7 @@ const clonePriceListSchema = z.object({
 
 const orderStatusMutationSchema = z.object({
   orderId: z.string().trim().min(1),
-  status: z.enum(['DRAFT', 'SUBMITTED', 'SPECIAL_REQUEST', 'APPROVED', 'PACKED', 'DELIVERED', 'CANCELLED'] satisfies [OrderStatus, ...OrderStatus[]]),
+  status: z.enum(orderStatusValues),
 });
 
 export async function createCustomerAction(input: unknown): Promise<ActionResult<{ customerId: string }>> {
