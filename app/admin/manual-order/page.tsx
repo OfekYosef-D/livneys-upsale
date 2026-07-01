@@ -10,7 +10,7 @@ export default async function ManualOrderPage() {
   const data = await getManualOrderData();
 
   return (
-    <AdminShell title="הזמנה ידנית" subtitle="יצירת הזמנה אמיתית ללקוח שמזמין בטלפון, WhatsApp או דרך הצוות.">
+    <AdminShell title="הזמנה ידנית" subtitle="יצירת הזמנה אמיתית ללקוח שמזמין בטלפון, WhatsApp או דרך הצוות." activeHref="/admin/manual-order">
       <AdminManualOrderClient data={data} />
     </AdminShell>
   );

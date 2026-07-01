@@ -10,7 +10,7 @@ export default async function Admin() {
   const data = await getAdminDashboardData();
 
   return (
-    <AdminShell title="דשבורד CRM" subtitle="שליטה בהזמנות, קווים, תזכורות ואפסייל ללקוחות מוסדיים.">
+    <AdminShell title="לוח עבודה" subtitle="מה דורש טיפול עכשיו, אילו הזמנות מתקדמות ומה מצב הקווים הקרובים." activeHref="/admin">
       <AdminDashboard data={data} />
     </AdminShell>
   );

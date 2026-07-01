@@ -10,7 +10,7 @@ export default async function AdminProductsPage() {
   const data = await getProductManagementData();
 
   return (
-    <AdminShell title="ניהול מוצרים" subtitle="מוצרים, מחירי בסיס, כמויות מינימום והפעלה ללא פגיעה בהיסטוריית הזמנות.">
+    <AdminShell title="ניהול מוצרים" subtitle="מוצרים, מחירי בסיס, כמויות מינימום והפעלה ללא פגיעה בהיסטוריית הזמנות." activeHref="/admin/products">
       <AdminProductsManager data={data} />
     </AdminShell>
   );

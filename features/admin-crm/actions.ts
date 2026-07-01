@@ -8,6 +8,8 @@ import { formatManualOrderInternalNote } from '@/features/orders/write';
 import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { assertAdminAction } from '@/lib/authorization';
 import { prisma } from '@/lib/db';
+import { enqueueOrderLifecycleWhatsApp } from '../notifications/jobs';
+import { getTemplateKeyForOrderStatus } from '../notifications/templates';
 import {
   createCustomerSchema,
   createPriceListSchema,
@@ -744,6 +746,7 @@ export async function createManualOrderAction(input: unknown): Promise<ActionRes
     revalidatePath(`/admin/routes/${order.routeId}`);
     revalidatePath(`/admin/customers/${parsed.customerId}`);
     revalidatePath(`/customer/${parsed.customerId}`);
+    await enqueueOrderLifecycleSafely({ orderId: order.orderId });
     return actionOk({ orderId: order.orderId, status: order.status });
   } catch (error) {
     return actionError(error);
@@ -788,6 +791,10 @@ export async function updateOrderStatusAction(input: unknown): Promise<ActionRes
       revalidatePath(`/admin/routes/${order.routeId}`);
     }
     revalidatePath(`/customer/${order.customerId}`);
+    const templateKey = getTemplateKeyForOrderStatus(order.status);
+    if (templateKey) {
+      await enqueueOrderLifecycleSafely({ orderId: order.id, templateKey });
+    }
     return actionOk({ orderId: order.id, status: order.status });
   } catch (error) {
     return actionError(error);
@@ -930,4 +937,12 @@ function revalidateAdminCrm() {
 function revalidateCustomerCatalogs() {
   revalidatePath('/customer/[customerId]', 'page');
   revalidatePath('/customer/[customerId]/catalog', 'page');
+}
+
+async function enqueueOrderLifecycleSafely(input: Parameters<typeof enqueueOrderLifecycleWhatsApp>[0]) {
+  try {
+    await enqueueOrderLifecycleWhatsApp(input);
+  } catch (error) {
+    console.error('Failed to enqueue WhatsApp order lifecycle notification', error);
+  }
 }

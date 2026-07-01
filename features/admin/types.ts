@@ -14,6 +14,15 @@ export type AdminOrderLine = {
   promotionLabel?: string;
 };
 
+export type AdminOrderNotificationSummary = {
+  id: string;
+  status: string;
+  templateKey: string;
+  scheduledAt: string;
+  processedAt: string | null;
+  errorMessage: string | null;
+};
+
 export type AdminOrderSummary = {
   id: string;
   customerId: string;
@@ -31,6 +40,22 @@ export type AdminOrderSummary = {
   hasUpsell: boolean;
 };
 
+export type AdminDashboardOrder = AdminOrderSummary & {
+  customerContact: string;
+  customerPhone: string;
+  notes: string | null;
+  internalNote: string | null;
+  lines: AdminOrderLine[];
+  latestNotification: AdminOrderNotificationSummary | null;
+};
+
+export type AdminRouteMissingCustomer = {
+  id: string;
+  name: string;
+  contact: string;
+  phone: string;
+};
+
 export type AdminRouteSummary = {
   id: string;
   name: string;
@@ -39,4 +64,5 @@ export type AdminRouteSummary = {
   customerCount: number;
   orderedCount: number;
   missingCount: number;
+  missingCustomers: AdminRouteMissingCustomer[];
 };

@@ -10,7 +10,7 @@ export default async function AdminRecommendationsPage() {
   const data = await getRecommendationManagementData();
 
   return (
-    <AdminShell title="המלצות לקוח" subtitle="שיוך ידני של מוצרי אפסייל ללקוחות ללא מנוע המלצות מורכב.">
+    <AdminShell title="המלצות לקוח" subtitle="שיוך ידני של מוצרי אפסייל ללקוחות ללא מנוע המלצות מורכב." activeHref="/admin/recommendations">
       <AdminRecommendationsManager data={data} />
     </AdminShell>
   );

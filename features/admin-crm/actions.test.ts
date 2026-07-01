@@ -35,6 +35,10 @@ vi.mock('@/features/orders/write', () => ({
   ),
 }));
 
+vi.mock('../notifications/jobs', () => ({
+  enqueueOrderLifecycleWhatsApp: vi.fn(),
+}));
+
 vi.mock('@/lib/authorization', () => {
   class AuthorizationError extends Error {
     constructor(message = 'Unauthorized') {
@@ -51,11 +55,13 @@ vi.mock('@/lib/authorization', () => {
 
 const { assertAdminAction } = await import('@/lib/authorization');
 const { createSubmittedOrder } = await import('@/features/orders/service');
+const { enqueueOrderLifecycleWhatsApp } = await import('../notifications/jobs');
 const { revalidatePath } = await import('next/cache');
 const { prisma } = await import('@/lib/db');
 
 const mockedAssertAdminAction = vi.mocked(assertAdminAction);
 const mockedCreateSubmittedOrder = vi.mocked(createSubmittedOrder);
+const mockedEnqueueOrderLifecycleWhatsApp = vi.mocked(enqueueOrderLifecycleWhatsApp);
 const mockedRevalidatePath = vi.mocked(revalidatePath);
 const mockedOrderFindUnique = vi.mocked(prisma.order.findUnique);
 const mockedOrderUpdate = vi.mocked(prisma.order.update);
@@ -64,6 +70,7 @@ describe('admin CRM actions', () => {
   beforeEach(() => {
     mockedAssertAdminAction.mockReset();
     mockedCreateSubmittedOrder.mockReset();
+    mockedEnqueueOrderLifecycleWhatsApp.mockReset();
     mockedRevalidatePath.mockReset();
     mockedOrderFindUnique.mockReset();
     mockedOrderUpdate.mockReset();
@@ -99,6 +106,7 @@ describe('admin CRM actions', () => {
       notes: 'Call before delivery',
       internalNote: '[manual-order:intake=PHONE] Ordered with Shai',
     });
+    expect(mockedEnqueueOrderLifecycleWhatsApp).toHaveBeenCalledWith({ orderId: 'ord-manual' });
   });
 
   it('rejects manual order creation before any write when the session is not admin', async () => {
@@ -124,13 +132,13 @@ describe('admin CRM actions', () => {
       status: 'SUBMITTED',
       customerId: 'cust-001',
       routeId: 'route-south',
-    });
+    } as never);
     mockedOrderUpdate.mockResolvedValue({
       id: 'ord-123',
       status: 'APPROVED',
       customerId: 'cust-001',
       routeId: 'route-south',
-    });
+    } as never);
 
     expect(actions.updateOrderStatusAction).toBeTypeOf('function');
 
@@ -158,6 +166,10 @@ describe('admin CRM actions', () => {
     expect(mockedRevalidatePath).toHaveBeenCalledWith('/admin/customers/cust-001');
     expect(mockedRevalidatePath).toHaveBeenCalledWith('/admin/routes/route-south');
     expect(mockedRevalidatePath).toHaveBeenCalledWith('/customer/cust-001');
+    expect(mockedEnqueueOrderLifecycleWhatsApp).toHaveBeenCalledWith({
+      orderId: 'ord-123',
+      templateKey: 'ORDER_APPROVED',
+    });
   });
 
   it('rejects invalid order status transitions before updating', async () => {
@@ -170,7 +182,7 @@ describe('admin CRM actions', () => {
       status: 'DELIVERED',
       customerId: 'cust-001',
       routeId: 'route-south',
-    });
+    } as never);
 
     expect(actions.updateOrderStatusAction).toBeTypeOf('function');
 

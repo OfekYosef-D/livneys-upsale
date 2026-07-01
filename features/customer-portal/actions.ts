@@ -6,6 +6,7 @@ import { calculateOrderPricing } from '@/features/pricing/engine';
 import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { assertCustomerAction } from '@/lib/authorization';
 import { prisma } from '@/lib/db';
+import { enqueueOrderLifecycleWhatsApp } from '../notifications/jobs';
 import { saveDraftOrderSchema, submitCustomerOrderSchema, type SaveDraftOrderInput, type SubmitCustomerOrderInput } from './schema';
 
 export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<ActionResult<{ orderId: string | null }>> {
@@ -119,9 +120,18 @@ export async function submitCustomerOrderAction(input: SubmitCustomerOrderInput)
     revalidatePath(`/admin/routes/${order.routeId}`);
     revalidatePath(`/admin/customers/${parsed.customerId}`);
     revalidatePath(`/customer/${parsed.customerId}`);
+    await enqueueOrderLifecycleSafely({ orderId: order.orderId });
 
     return actionOk({ orderId: order.orderId, status: order.status });
   } catch (error) {
     return actionError(error);
+  }
+}
+
+async function enqueueOrderLifecycleSafely(input: Parameters<typeof enqueueOrderLifecycleWhatsApp>[0]) {
+  try {
+    await enqueueOrderLifecycleWhatsApp(input);
+  } catch (error) {
+    console.error('Failed to enqueue WhatsApp order lifecycle notification', error);
   }
 }

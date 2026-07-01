@@ -1,7 +1,7 @@
 import type { OrderSource, OrderStatus } from '@prisma/client';
 import { activeOrderStatuses } from '@/features/orders/utils';
 import { prisma } from '@/lib/db';
-import type { AdminOrderSummary, AdminRouteSummary } from './types';
+import type { AdminDashboardOrder, AdminOrderLine, AdminOrderSummary, AdminRouteSummary } from './types';
 
 const activeStatuses = activeOrderStatuses as OrderStatus[];
 
@@ -17,9 +17,20 @@ export async function getAdminDashboardData() {
         customer: true,
         route: true,
         lines: true,
+        notificationJobs: {
+          orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }],
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            templateKey: true,
+            scheduledAt: true,
+            processedAt: true,
+            errorMessage: true,
+          },
+        },
       },
       orderBy: [{ submittedAt: 'desc' }, { updatedAt: 'desc' }],
-      take: 25,
     }),
     prisma.route.findMany({
       where: { isActive: true },
@@ -33,6 +44,8 @@ export async function getAdminDashboardData() {
                   in: activeStatuses,
                 },
               },
+              select: { id: true },
+              take: 1,
             },
           },
         },
@@ -49,9 +62,17 @@ export async function getAdminDashboardData() {
     }),
   ]);
 
-  const orderSummaries = orders.map(mapOrderSummary);
+  const orderSummaries = orders.map(mapDashboardOrder);
   const routeSummaries: AdminRouteSummary[] = routes.map((route) => {
     const orderedCount = route.customers.filter((customer) => customer.orders.length > 0).length;
+    const missingCustomers = route.customers
+      .filter((customer) => customer.orders.length === 0)
+      .map((customer) => ({
+        id: customer.id,
+        name: customer.name,
+        contact: customer.contact,
+        phone: customer.phone,
+      }));
 
     return {
       id: route.id,
@@ -61,6 +82,7 @@ export async function getAdminDashboardData() {
       customerCount: route.customers.length,
       orderedCount,
       missingCount: route.customers.length - orderedCount,
+      missingCustomers,
     };
   });
 
@@ -225,6 +247,86 @@ function mapOrderSummary(order: {
     total: Number(order.total),
     lineCount: order.lines.length,
     hasUpsell: order.lines.length >= 3,
+  };
+}
+
+function mapDashboardOrder(order: {
+  id: string;
+  customerId: string;
+  status: OrderStatus;
+  source: OrderSource;
+  submittedAt: Date | null;
+  deliveryWindowStart: Date;
+  notes: string | null;
+  internalNote: string | null;
+  subtotal: unknown;
+  discountTotal: unknown;
+  total: unknown;
+  customer: { id: string; name: string; contact: string; phone: string };
+  route: { id: string; name: string } | null;
+  lines: Array<{
+    id: string;
+    productName: string;
+    quantity: number;
+    listUnitPrice: unknown;
+    unitPrice: unknown;
+    lineSubtotal: unknown;
+    discountTotal: unknown;
+    lineTotal: unknown;
+    promotionSnapshot: unknown;
+  }>;
+  notificationJobs: Array<{
+    id: string;
+    status: string;
+    templateKey: string;
+    scheduledAt: Date;
+    processedAt: Date | null;
+    errorMessage: string | null;
+  }>;
+}): AdminDashboardOrder {
+  const latestNotification = order.notificationJobs[0] ?? null;
+
+  return {
+    ...mapOrderSummary(order),
+    customerContact: order.customer.contact,
+    customerPhone: order.customer.phone,
+    notes: order.notes,
+    internalNote: order.internalNote,
+    lines: order.lines.map(mapOrderLine),
+    latestNotification: latestNotification
+      ? {
+          id: latestNotification.id,
+          status: latestNotification.status,
+          templateKey: latestNotification.templateKey,
+          scheduledAt: latestNotification.scheduledAt.toISOString(),
+          processedAt: latestNotification.processedAt?.toISOString() ?? null,
+          errorMessage: latestNotification.errorMessage,
+        }
+      : null,
+  };
+}
+
+function mapOrderLine(line: {
+  id: string;
+  productName: string;
+  quantity: number;
+  listUnitPrice: unknown;
+  unitPrice: unknown;
+  lineSubtotal: unknown;
+  discountTotal: unknown;
+  lineTotal: unknown;
+  promotionSnapshot: unknown;
+}): AdminOrderLine {
+  return {
+    id: line.id,
+    productName: line.productName,
+    quantity: line.quantity,
+    listUnitPrice: Number(line.listUnitPrice),
+    unitPrice: Number(line.unitPrice),
+    lineSubtotal: Number(line.lineSubtotal),
+    discountTotal: Number(line.discountTotal),
+    lineTotal: Number(line.lineTotal),
+    promotionLabel: getPromotionLabel(line.promotionSnapshot),
   };
 }
 

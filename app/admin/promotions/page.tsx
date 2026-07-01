@@ -10,7 +10,7 @@ export default async function AdminPromotionsPage() {
   const data = await getPromotionManagementData();
 
   return (
-    <AdminShell title="מבצעים" subtitle="מבצעי מוצר פשוטים שמופיעים בהקשר הקטלוג הקיים.">
+    <AdminShell title="מבצעים" subtitle="מבצעי מוצר פשוטים שמופיעים בהקשר הקטלוג הקיים." activeHref="/admin/promotions">
       <AdminPromotionsManager data={data} />
     </AdminShell>
   );

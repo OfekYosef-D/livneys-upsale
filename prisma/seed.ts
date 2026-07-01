@@ -47,7 +47,9 @@ const routeWindows: Record<string, { delivery: Date; cutoff: Date; deliveryWeekd
 };
 
 async function resetDemoData() {
+  await prisma.whatsAppWebhookEvent.deleteMany();
   await prisma.notificationEvent.deleteMany();
+  await prisma.notificationJob.deleteMany();
   await prisma.reminderJob.deleteMany();
   await prisma.reminderRule.deleteMany();
   await prisma.customerContactLog.deleteMany();
@@ -391,11 +393,36 @@ async function createReminderExample({
       whatsappUrl,
     },
   });
+  const notificationJob =
+    channel === 'WHATSAPP'
+      ? await prisma.notificationJob.create({
+          data: {
+            customerId,
+            reminderJobId: reminderJob.id,
+            channel,
+            templateKey: 'ORDER_REMINDER',
+            templateName: null,
+            status: 'DRY_RUN',
+            dryRun: true,
+            payload: {
+              to: '972500000000',
+              languageCode: 'he',
+              bodyParameters: ['לקוח לדוגמה', 'Livney', 'דרום', '01/07/2026', '30/06/2026, 18:00', 'http://localhost:3000/customer/cust-004'],
+            },
+            message,
+            scheduledAt,
+            processedAt: scheduledAt,
+            attempts: 1,
+            dedupeKey: `seed:reminder:${reminderJob.id}`,
+          },
+        })
+      : null;
 
   await prisma.notificationEvent.create({
     data: {
       customerId,
       reminderJobId: reminderJob.id,
+      notificationJobId: notificationJob?.id,
       channel,
       type: 'REMINDER_EXAMPLE',
       status: status === 'PENDING' ? 'PENDING' : 'SENT',

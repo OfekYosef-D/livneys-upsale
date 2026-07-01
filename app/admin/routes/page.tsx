@@ -10,7 +10,7 @@ export default async function AdminRoutesPage() {
   const data = await getRouteManagementData();
 
   return (
-    <AdminShell title="ניהול קווים" subtitle="חלונות חלוקה, דדליינים, נהגים ואנשי קשר תפעוליים.">
+    <AdminShell title="ניהול קווים" subtitle="חלונות חלוקה, דדליינים, נהגים ואנשי קשר תפעוליים." activeHref="/admin/routes">
       <AdminRoutesManager data={data} />
     </AdminShell>
   );

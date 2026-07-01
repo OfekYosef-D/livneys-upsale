@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import Link from 'next/link';
+import { useEffect } from 'react';
 import { Edit3, Eye, Plus, Power, Search, X } from 'lucide-react';
 import type { AdminStatusFilter } from '@/features/admin-crm/ui-utils';
 
@@ -117,6 +118,21 @@ export function AdminFormDialog({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  useEffect(() => {
+    if (!open) return;
+
+    document.querySelector<HTMLButtonElement>('[aria-modal="true"] button')?.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose, open]);
+
   if (!open) return null;
 
   return (
@@ -160,6 +176,16 @@ export function AdminActionButtons({
   active: boolean;
   viewHref?: string;
 }) {
+  function confirmToggle() {
+    const message = active
+      ? 'להשבית את הפריט? הוא לא יוצג כפעיל, אבל ההיסטוריה הקיימת תישמר.'
+      : 'להפעיל את הפריט? הוא יחזור להיות זמין במערכת.';
+
+    if (window.confirm(message)) {
+      onToggle();
+    }
+  }
+
   return (
     <div className="flex w-full flex-wrap gap-2 sm:w-auto">
       {viewHref && (
@@ -172,7 +198,7 @@ export function AdminActionButtons({
         <Edit3 size={14} />
         עריכה
       </button>
-      <button type="button" onClick={onToggle} className="inline-flex min-h-9 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[#e6e1d8] px-3 text-xs font-black hover:bg-black hover:text-white sm:flex-none">
+      <button type="button" onClick={confirmToggle} className="inline-flex min-h-9 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[#e6e1d8] px-3 text-xs font-black hover:bg-black hover:text-white sm:flex-none">
         <Power size={14} />
         {active ? 'השבתה' : 'הפעלה'}
       </button>

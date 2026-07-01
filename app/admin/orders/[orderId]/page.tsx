@@ -15,7 +15,7 @@ export default async function AdminOrderPage({ params }: { params: { orderId: st
   }
 
   return (
-    <AdminShell title={`הזמנה ${order.id}`} subtitle="שורות ההזמנה נשמרות עם Snapshot של שם ומחיר בזמן השליחה.">
+    <AdminShell title={`הזמנה ${order.id}`} subtitle="שורות ההזמנה נשמרות עם Snapshot של שם ומחיר בזמן השליחה." activeHref="/admin">
       <AdminOrderDetail order={order} />
     </AdminShell>
   );
