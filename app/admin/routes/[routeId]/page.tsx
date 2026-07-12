@@ -6,7 +6,8 @@ import { requireAdmin } from '@/lib/admin-guard';
 
 export const dynamic = 'force-dynamic';
 
-export default async function RoutePage({ params }: { params: { routeId: string } }) {
+export default async function RoutePage(props: { params: Promise<{ routeId: string }> }) {
+  const params = await props.params;
   await requireAdmin(`/admin/routes/${params.routeId}`);
   const route = await getAdminRouteDetail(params.routeId);
 

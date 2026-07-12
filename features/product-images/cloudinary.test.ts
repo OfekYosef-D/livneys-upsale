@@ -1,11 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildCloudinarySignature,
+  isCloudinaryConfigured,
   validateProductImageFile,
   uploadProductImageToCloudinary,
 } from './cloudinary';
 
 describe('Cloudinary product image upload helpers', () => {
+  it('reports whether all required upload credentials are configured', () => {
+    expect(isCloudinaryConfigured({
+      CLOUDINARY_CLOUD_NAME: 'demo',
+      CLOUDINARY_API_KEY: 'key',
+      CLOUDINARY_API_SECRET: 'secret',
+    })).toBe(true);
+    expect(isCloudinaryConfigured({ CLOUDINARY_CLOUD_NAME: 'demo' })).toBe(false);
+  });
+
   it('signs upload parameters with sorted keys and the API secret', () => {
     const signature = buildCloudinarySignature(
       {

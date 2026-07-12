@@ -6,7 +6,8 @@ import { requireAdmin } from '@/lib/admin-guard';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminOrderPage({ params }: { params: { orderId: string } }) {
+export default async function AdminOrderPage(props: { params: Promise<{ orderId: string }> }) {
+  const params = await props.params;
   await requireAdmin(`/admin/orders/${params.orderId}`);
   const order = await getAdminOrderDetail(params.orderId);
 

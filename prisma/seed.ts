@@ -7,6 +7,7 @@ import promotions from '../data/promotions.json';
 import routes from '../data/routes.json';
 import { createOrderSnapshotLines } from '../features/orders/utils';
 import { defaultInstitutionalRouteNames, productPricePresets } from '../features/owner-rules/constants';
+import { assertDemoSeedAllowed } from '../features/deployment/database-safety';
 
 const prisma = new PrismaClient();
 
@@ -469,6 +470,11 @@ async function createReminderExample({
 }
 
 async function main() {
+  assertDemoSeedAllowed({
+    databaseUrl: process.env.DATABASE_URL,
+    nodeEnv: process.env.NODE_ENV,
+    allowDestructiveDemoSeed: process.env.ALLOW_DESTRUCTIVE_DEMO_SEED,
+  });
   await resetDemoData();
   await seedProductsAndPricing();
   await seedRoutesCustomersAndUsers();
