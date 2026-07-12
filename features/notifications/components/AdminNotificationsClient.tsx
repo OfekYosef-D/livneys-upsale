@@ -21,6 +21,9 @@ import type { getNotificationManagementData } from '@/features/notifications/que
 import {
   compareJobsForOperator,
   filterNotificationJobsForOperator,
+  notificationJobFilterLabels,
+  notificationJobStatusLabels,
+  notificationTemplateLabels,
   type JobStatusFilter,
 } from '@/features/notifications/ui-utils';
 
@@ -28,34 +31,6 @@ type NotificationData = Awaited<ReturnType<typeof getNotificationManagementData>
 type ReminderRule = NotificationData['reminderRules'][number];
 type NotificationJob = NotificationData['jobs'][number];
 type WebhookEvent = NotificationData['webhookEvents'][number];
-
-const statusLabels: Record<string, string> = {
-  PENDING: 'ממתינה',
-  PROCESSING: 'בעיבוד',
-  DRY_RUN: 'נרשמה בבדיקה',
-  SENT: 'נשלחה',
-  FAILED: 'נכשלה',
-  CANCELLED: 'בוטלה',
-};
-
-const filterLabels: Record<JobStatusFilter, string> = {
-  all: 'הכל',
-  PENDING: 'ממתינות',
-  PROCESSING: 'בעיבוד',
-  DRY_RUN: 'בדיקה',
-  SENT: 'נשלחו',
-  FAILED: 'נכשלו',
-};
-
-const templateLabels: Record<string, string> = {
-  ORDER_REMINDER: 'תזכורת הזמנה',
-  ORDER_RECEIVED: 'הזמנה התקבלה',
-  ORDER_APPROVED: 'הזמנה אושרה',
-  ORDER_PACKED: 'הזמנה נארזה',
-  ORDER_DELIVERED: 'הזמנה סופקה',
-  ORDER_CANCELLED: 'הזמנה בוטלה',
-  ORDER_SPECIAL_REQUEST: 'בקשה מיוחדת',
-};
 
 export function AdminNotificationsClient({ data, initialSearch = '' }: { data: NotificationData; initialSearch?: string }) {
   const router = useRouter();
@@ -127,7 +102,7 @@ export function AdminNotificationsClient({ data, initialSearch = '' }: { data: N
           />
           <OperatorNote
             label="הגדרות לבדיקה"
-            value={setupIssueCount === 0 ? 'נראות תקינות' : `${setupIssueCount} סעיפים דורשים בדיקה`}
+            value={setupIssueCount === 0 ? 'הגדרות תקינות' : `${setupIssueCount} סעיפים דורשים בדיקה`}
             tone={setupIssueCount === 0 ? 'green' : 'amber'}
           />
           <OperatorNote
@@ -209,7 +184,7 @@ export function AdminNotificationsClient({ data, initialSearch = '' }: { data: N
                 onClick={() => setStatus(item)}
                 className={`min-h-10 shrink-0 rounded-full px-3 text-xs font-black transition ${status === item ? 'bg-black text-white' : 'bg-[#e6e1d8] text-black hover:bg-black hover:text-white'}`}
               >
-                {filterLabels[item]}
+                {notificationJobFilterLabels[item]}
               </button>
             ))}
           </div>
@@ -307,9 +282,9 @@ function NotificationJobRow({
         </div>
 
         <div className="grid gap-2 rounded-xl bg-[#f7f5f1] p-3 sm:grid-cols-2 xl:grid-cols-3">
-          <InfoCell label="סוג הודעה">{templateLabels[job.templateKey] ?? job.templateName ?? 'הודעת WhatsApp'}</InfoCell>
+          <InfoCell label="סוג הודעה">{notificationTemplateLabels[job.templateKey] ?? job.templateName ?? 'הודעת WhatsApp'}</InfoCell>
           <InfoCell label="תוזמנה">{formatDateTime(job.scheduledAt)}</InfoCell>
-          <InfoCell label="עובדה">{job.processedAt ? formatDateTime(job.processedAt) : 'טרם עובדה'}</InfoCell>
+          <InfoCell label="עובד">{job.processedAt ? formatDateTime(job.processedAt) : 'טרם עובד'}</InfoCell>
           {job.orderId && <InfoCell label="הזמנה">{job.orderId}</InfoCell>}
           {job.nextAttemptAt && <InfoCell label="ניסיון הבא">{formatDateTime(job.nextAttemptAt)}</InfoCell>}
           {job.lastAttemptAt && <InfoCell label="ניסיון אחרון">{formatDateTime(job.lastAttemptAt)}</InfoCell>}
@@ -536,7 +511,7 @@ function StatusBadge({ status, dryRun }: { status: string; dryRun: boolean }) {
             ? 'bg-blue-100 text-blue-800'
             : 'bg-[#e6e1d8] text-black/65';
 
-  return <span className={`w-fit rounded-full px-2 py-1 text-xs font-black ${tone}`}>{statusLabels[status] ?? status}</span>;
+  return <span className={`w-fit rounded-full px-2 py-1 text-xs font-black ${tone}`}>{notificationJobStatusLabels[status] ?? status}</span>;
 }
 
 function formatDateTime(value: string): string {

@@ -57,7 +57,7 @@ export function CustomerLoginClient({ customers }: { customers: CustomerLoginOpt
         <section className="space-y-5">
           <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-[0_18px_55px_rgba(0,0,0,0.07)] md:p-5">
             <div className="flex items-center justify-between gap-4">
-              <Image src={brandLogo} alt="Livney's" className="w-28" priority />
+              <Image src={brandLogo} alt={brand.hebrewName} className="w-28" priority />
               <span className="rounded-full bg-[#e6e1d8] px-3 py-1 text-xs font-black">B2B</span>
             </div>
             <div className="mt-5">
@@ -70,7 +70,7 @@ export function CustomerLoginClient({ customers }: { customers: CustomerLoginOpt
 
             <form onSubmit={submit} className="mt-5 space-y-3">
               <label className="block">
-                <span className="mb-1.5 block text-xs font-black">חברה לדמו</span>
+                <span className="mb-1.5 block text-xs font-black">התחברות לדוגמה</span>
                 <select
                   name="company"
                   value={customerId}

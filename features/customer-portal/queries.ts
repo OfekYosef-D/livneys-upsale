@@ -4,7 +4,19 @@ import { resolveCatalogPricing } from '@/features/pricing/engine';
 import { formatRouteDeadline } from '@/features/routes/utils';
 import { prisma } from '@/lib/db';
 import { mapPortalOrder } from './order-mapping';
-import type { CustomerPortalData, PortalProduct } from './types';
+import type { CustomerPortalData, PortalOrder, PortalProduct } from './types';
+
+function filterPortalOrderToActiveProducts(order: PortalOrder, activeProductIds: Set<string>): PortalOrder {
+  const items = order.items.filter((item) => activeProductIds.has(item.productId));
+  if (items.length === order.items.length) {
+    return order;
+  }
+
+  return {
+    ...order,
+    items,
+  };
+}
 
 const submittedStatuses: OrderStatus[] = [
   'SUBMITTED',
@@ -86,6 +98,7 @@ export async function getCustomerPortalData(customerId: string): Promise<Custome
       basePrice: Number(item.product.basePrice),
       isActive: item.product.isActive,
       minQty: item.product.minQty,
+      orderMultiple: item.product.orderMultiple,
     })),
     priceListItems: customer.priceList.items.map((item) => ({
       productId: item.productId,
@@ -127,6 +140,7 @@ export async function getCustomerPortalData(customerId: string): Promise<Custome
         unit: item.product.unit,
         caseSize: item.product.caseSize,
         minQty: item.product.minQty,
+        orderMultiple: item.product.orderMultiple,
         assetImage: item.product.assetImage,
         imageUrl: item.product.imageUrl,
         stockLabel: item.product.stockLabel,
@@ -138,6 +152,8 @@ export async function getCustomerPortalData(customerId: string): Promise<Custome
         promotion: priced?.promotion ?? null,
       };
     });
+
+  const activeProductIds = new Set(products.map((product) => product.id));
 
   return {
     customer: {
@@ -158,7 +174,7 @@ export async function getCustomerPortalData(customerId: string): Promise<Custome
       opsContactPhone: customer.route.opsContactPhone,
     },
     products,
-    lastOrder: mapPortalOrder(lastSubmittedOrder, customerId),
+    lastOrder: filterPortalOrderToActiveProducts(mapPortalOrder(lastSubmittedOrder, customerId), activeProductIds),
   };
 }
 
@@ -175,7 +191,10 @@ export async function getCustomerReviewData(customerId: string): Promise<Custome
 
   return {
     ...portalData,
-    lastOrder: draftOrder ? mapPortalOrder(draftOrder, customerId) : portalData.lastOrder,
+    lastOrder: filterPortalOrderToActiveProducts(
+      draftOrder ? mapPortalOrder(draftOrder, customerId) : portalData.lastOrder,
+      new Set(portalData.products.map((product) => product.id)),
+    ),
   };
 }
 

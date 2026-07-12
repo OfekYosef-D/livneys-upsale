@@ -18,6 +18,7 @@ import {
 import { AdminOrderStatusActions } from '@/features/admin/components/AdminOrderStatusActions';
 import { OrderStatusPill } from '@/features/admin/components/OrderStatusPill';
 import type { getAdminDashboardData } from '@/features/admin/queries';
+import { notificationJobStatusLabels, notificationTemplateLabels } from '@/features/notifications/ui-utils';
 import type { OrderStatus } from '@/features/orders/utils';
 import { money } from '@/lib/format';
 
@@ -33,32 +34,29 @@ const statusFilterOptions: Array<{ value: StatusFilter; label: string }> = [
   { value: 'PACKED', label: 'ארוזות' },
 ];
 
-const notificationLabels: Record<string, string> = {
-  PENDING: 'ממתינה לשליחה',
-  PROCESSING: 'בתהליך שליחה',
-  DRY_RUN: 'בדיקה בלבד',
-  SENT: 'נשלחה',
-  FAILED: 'נכשלה',
-  CANCELLED: 'בוטלה',
-};
+function buildUrgentHeadline(needsApproval: number, missingOrders: number): string {
+  if (needsApproval === 0 && missingOrders === 0) {
+    return 'הכל מעודכן — אין טיפול דחוף';
+  }
 
-const notificationTemplateLabels: Record<string, string> = {
-  ORDER_REMINDER: 'תזכורת הזמנה',
-  ORDER_RECEIVED: 'הזמנה התקבלה',
-  ORDER_APPROVED: 'הזמנה אושרה',
-  ORDER_PACKED: 'הזמנה נארזה',
-  ORDER_DELIVERED: 'הזמנה סופקה',
-  ORDER_CANCELLED: 'הזמנה בוטלה',
-  ORDER_SPECIAL_REQUEST: 'בקשה מיוחדת',
-};
+  if (needsApproval > 0 && missingOrders > 0) {
+    return `${needsApproval} הזמנות לאישור · ${missingOrders} לקוחות חסרים`;
+  }
+
+  if (needsApproval > 0) {
+    return `${needsApproval} הזמנות ממתינות לאישור`;
+  }
+
+  return `${missingOrders} לקוחות עדיין לא הזמינו`;
+}
 
 export function AdminDashboard({ data }: { data: DashboardData }) {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
   const [routeId, setRouteId] = useState('all');
   const [selectedOrderId, setSelectedOrderId] = useState(data.orders[0]?.id ?? '');
-  const urgentCount = data.kpis.needsApproval + data.kpis.missingOrders;
   const readyCount = data.kpis.readyForRoute;
+  const urgentHeadline = buildUrgentHeadline(data.kpis.needsApproval, data.kpis.missingOrders);
 
   const filteredOrders = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -100,7 +98,7 @@ export function AdminDashboard({ data }: { data: DashboardData }) {
           <div className="min-w-0">
             <p className="text-xs font-black text-black/45">מה צריך טיפול עכשיו</p>
             <h2 className="mt-1 text-2xl font-black leading-tight">
-              {urgentCount > 0 ? `${urgentCount} דברים פתוחים לטיפול` : 'אין טיפול דחוף כרגע'}
+              {urgentHeadline}
             </h2>
             <p className="mt-2 max-w-3xl text-sm font-bold leading-6 text-black/58">
               מתחילים מהזמנות שמחכות לאישור, בקשות מיוחדות ולקוחות שעדיין לא הזמינו. כל פעולה חשובה נשארת ליד המידע שצריך כדי לקבל החלטה.
@@ -209,7 +207,7 @@ function OrderQueueButton({ order, selected, onSelect }: { order: DashboardOrder
           {hasMessageFailure && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-black text-red-800">הודעה נכשלה</span>}
         </span>
         <span className="mt-1 block break-words text-xs font-bold leading-5 text-black/50">
-          קו {order.routeName} / {formatDate(order.deliveryWindowStart)} / {order.source === 'ADMIN' ? 'הוזן ידנית' : 'נשלח מהלקוח'}
+          קו {order.routeName} / {formatDate(order.deliveryWindowStart)} / {order.source === 'ADMIN' ? 'הזמנה ידנית' : 'פורטל לקוח'}
         </span>
       </span>
       <OrderStatusPill status={order.status} />
@@ -323,7 +321,7 @@ function NotificationStatusCard({ order }: { order: DashboardOrder }) {
         <div>
           <div className="flex items-center gap-2 text-sm font-black">
             <MessageCircle size={16} />
-            <span>{notificationLabels[notification.status] ?? notification.status}</span>
+            <span>{notificationJobStatusLabels[notification.status] ?? notification.status}</span>
           </div>
           <p className="mt-1 text-xs font-bold opacity-70">
             {notificationTemplateLabels[notification.templateKey] ?? notification.templateKey} / {formatDateTime(notification.processedAt ?? notification.scheduledAt)}

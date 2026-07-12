@@ -10,7 +10,7 @@ export default async function Admin() {
   const data = await getAdminDashboardData();
 
   return (
-    <AdminShell title="לוח עבודה" subtitle="מה דורש טיפול עכשיו, אילו הזמנות מתקדמות ומה מצב הקווים הקרובים." activeHref="/admin">
+    <AdminShell title="לוח עבודה" subtitle="הזמנות שדורשות טיפול, התקדמות הזמנות ומצב קווי החלוקה הקרובים." activeHref="/admin">
       <AdminDashboard data={data} />
     </AdminShell>
   );

@@ -18,10 +18,12 @@
 
 html {
   background: var(--paper);
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
+  overflow-x: hidden;
   background:
     linear-gradient(90deg, rgba(230, 225, 216, 0.26) 1px, transparent 1px),
     linear-gradient(180deg, rgba(230, 225, 216, 0.26) 1px, transparent 1px),

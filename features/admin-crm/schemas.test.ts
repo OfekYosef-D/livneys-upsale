@@ -47,10 +47,38 @@ describe('admin CRM schemas', () => {
         unit: 'unit',
         caseSize: 'case',
         minQty: 0,
+        orderMultiple: 0,
         imageUrl: 'not-a-url',
         isActive: true,
       }),
     ).toThrow();
+  });
+
+  it('normalizes product order multiples for case-pack ordering', () => {
+    const parsed = productMutationSchema.parse({
+      sku: 'spr-185',
+      name: 'Product',
+      category: 'Spreads',
+      basePrice: 16.9,
+      unit: '185g jar',
+      caseSize: '12 units per case',
+      minQty: 6,
+      orderMultiple: '6',
+      imageUrl: '',
+      assetImage: '',
+      stockLabel: '',
+      description: '',
+      isActive: true,
+      prices: [],
+    });
+
+    expect(parsed).toMatchObject({
+      sku: 'SPR-185',
+      basePrice: 16.9,
+      minQty: 6,
+      orderMultiple: 6,
+      imageUrl: null,
+    });
   });
 
   it('rejects route cutoff dates after delivery dates', () => {

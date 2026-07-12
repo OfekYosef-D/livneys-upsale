@@ -12,6 +12,13 @@ enum UserRole {
   CUSTOMER
 }
 
+enum CompanyRegistrationStatus {
+  PENDING
+  CONTACTED
+  CONVERTED
+  ARCHIVED
+}
+
 enum OrderStatus {
   DRAFT
   SUBMITTED
@@ -82,11 +89,17 @@ model User {
 model Customer {
   id                      String                          @id
   name                    String
+  invoiceName             String?
   contact                 String
   email                   String?
   phone                   String
+  accountingContactName   String?
+  accountingEmail         String?
+  accountingPhone         String?
+  businessType            String?
   region                  String
   address                 String
+  deliveryConstraints     String?
   notes                   String?
   statusLabel             String?
   isActive                Boolean                         @default(true)
@@ -121,6 +134,7 @@ model Product {
   unit            String
   caseSize        String
   minQty          Int                             @default(1)
+  orderMultiple   Int                             @default(1)
   imageUrl        String?
   assetImage      String?
   stockLabel      String?
@@ -136,6 +150,31 @@ model Product {
 
   @@index([category])
   @@index([isActive])
+}
+
+model CompanyRegistrationRequest {
+  id                    String                    @id @default(cuid())
+  businessName          String
+  invoiceName           String?
+  contactName           String
+  phone                 String
+  email                 String
+  accountingContactName String?
+  accountingEmail       String?
+  accountingPhone       String?
+  businessType          String
+  address               String
+  deliveryNotes         String?
+  openingOrderNotes     String?
+  status                CompanyRegistrationStatus @default(PENDING)
+  internalNote          String?
+  convertedCustomerId   String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([businessName])
+  @@index([email])
 }
 
 model PriceList {

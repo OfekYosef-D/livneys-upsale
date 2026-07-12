@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
 import { money } from '@/lib/format';
 import { brandLogo } from '@/lib/product-assets';
+import { brand } from '@/lib/brand';
 import { buildCartFromOrder, getCartItems, getCartPricingSummary, type Cart } from '@/lib/order-utils';
 
 export function ConfirmationClient({
@@ -41,7 +42,7 @@ export function ConfirmationClient({
             </div>
             <h1 className="mt-3 text-2xl font-black leading-tight md:text-3xl">ההזמנה התקבלה לאישור</h1>
             <p className="mx-auto mt-2 max-w-xl text-sm font-bold leading-6 text-black/60">
-              תודה {customer.contact}. הצוות של Livney&apos;s יבדוק את ההזמנה ויצור קשר אם צריך התאמות לפני החלוקה.
+              תודה {customer.contact}. הצוות של {brand.hebrewName} יבדוק את ההזמנה ויצור קשר אם נדרשות התאמות לפני החלוקה.
             </p>
           </div>
 
@@ -85,7 +86,7 @@ export function ConfirmationClient({
                   </div>
                 )}
                 <div className="flex items-center justify-between pt-1 text-base font-black">
-                  <span>סה״כ</span>
+                  <span>סה״כ משוער</span>
                   <span className="tabular-nums">{money(orderTotal)}</span>
                 </div>
               </div>
@@ -97,7 +98,7 @@ export function ConfirmationClient({
               חזרה לקטלוג
             </Button>
             <Link href="/login" className="inline-flex min-h-10 flex-1 items-center justify-center rounded-full bg-[#e6e1d8] px-4 text-sm font-black text-black focus-visible:ring-2 focus-visible:ring-black/30">
-              כניסה לחברה אחרת
+              התחברות כלקוח אחר
             </Link>
           </div>
         </section>

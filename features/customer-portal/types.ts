@@ -27,6 +27,7 @@ export type PortalProduct = {
   unit: string;
   caseSize: string;
   minQty: number;
+  orderMultiple: number;
   assetImage?: string | null;
   imageUrl?: string | null;
   stockLabel?: string | null;

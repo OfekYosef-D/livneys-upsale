@@ -29,7 +29,7 @@ export function AdminCrudPageHeader({
           onClick={onAction}
           className="inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white hover:bg-black/90 focus-visible:ring-2 focus-visible:ring-black/25 sm:w-auto"
         >
-          <Plus size={16} />
+          <Plus aria-hidden="true" size={16} />
           {actionLabel}
         </button>
       </div>
@@ -59,11 +59,14 @@ export function AdminListToolbar({
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-black/10 bg-white p-3 shadow-[0_14px_42px_rgba(0,0,0,0.04)]">
       <label className="relative block w-full md:max-w-sm">
-        <Search className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-black/35" size={17} />
+        <Search aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-black/35" size={17} />
         <input
+          name="adminSearch"
           value={search}
           onChange={(event) => onSearch(event.target.value)}
           placeholder={searchLabel}
+          autoComplete="off"
+          spellCheck={false}
           className="min-h-10 w-full rounded-full border border-black/10 bg-[#f7f5f1] py-2 pl-3 pr-10 text-sm font-bold outline-none focus:border-black focus:ring-2 focus:ring-black/10"
         />
       </label>
@@ -94,7 +97,7 @@ export function AdminToolbarSelect({
   return (
     <label className="flex min-h-10 min-w-0 items-center gap-2 rounded-full border border-black/10 bg-[#f7f5f1] px-3 text-xs font-black text-black/55 sm:min-w-44">
       <span className="shrink-0">{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm font-black text-black outline-none">
+      <select name={label} value={value} onChange={(event) => onChange(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm font-black text-black outline-none focus-visible:ring-2 focus-visible:ring-black/15">
         {options.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
         ))}
@@ -136,20 +139,20 @@ export function AdminFormDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/35 px-3 py-6" role="presentation">
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto overscroll-contain bg-black/35 px-3 py-6" role="presentation">
       <section className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_24px_80px_rgba(0,0,0,0.25)]" role="dialog" aria-modal="true" aria-labelledby="admin-crm-dialog-title">
         <div className="flex items-start justify-between gap-3 border-b border-black/10 bg-[#f7f5f1] px-4 py-3">
           <div>
             <h2 id="admin-crm-dialog-title" className="text-lg font-black">{title}</h2>
             {description && <p className="mt-1 text-sm font-bold leading-6 text-black/55">{description}</p>}
           </div>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e6e1d8] hover:bg-black hover:text-white" aria-label="סגירה">
-            <X size={17} />
+          <button type="button" onClick={onClose} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e6e1d8] hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-black/25" aria-label="סגירה">
+            <X aria-hidden="true" size={17} />
           </button>
         </div>
-        <div className="max-h-[calc(92vh-5rem)] overflow-y-auto p-4 sm:p-5">
+        <div className="max-h-[calc(92vh-5rem)] overflow-y-auto overscroll-contain p-4 sm:p-5">
           {children}
-          {message && <p className="mt-3 rounded-xl border border-black/10 bg-[#e6e1d8] p-3 text-sm font-black">{message}</p>}
+          {message && <p className="mt-3 rounded-xl border border-black/10 bg-[#e6e1d8] p-3 text-sm font-black" aria-live="polite">{message}</p>}
         </div>
       </section>
     </div>
@@ -189,17 +192,17 @@ export function AdminActionButtons({
   return (
     <div className="flex w-full flex-wrap gap-2 sm:w-auto">
       {viewHref && (
-        <Link href={viewHref} className="inline-flex min-h-9 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-white px-3 text-xs font-black ring-1 ring-black/10 hover:bg-black hover:text-white sm:flex-none">
-          <Eye size={14} />
+        <Link href={viewHref} className="inline-flex min-h-9 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-white px-3 text-xs font-black ring-1 ring-black/10 hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-black/25 sm:flex-none">
+          <Eye aria-hidden="true" size={14} />
           צפה
         </Link>
       )}
-      <button type="button" onClick={onEdit} className="inline-flex min-h-9 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[#e6e1d8] px-3 text-xs font-black hover:bg-black hover:text-white sm:flex-none">
-        <Edit3 size={14} />
+      <button type="button" onClick={onEdit} className="inline-flex min-h-9 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[#e6e1d8] px-3 text-xs font-black hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-black/25 sm:flex-none">
+        <Edit3 aria-hidden="true" size={14} />
         עריכה
       </button>
-      <button type="button" onClick={confirmToggle} className="inline-flex min-h-9 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[#e6e1d8] px-3 text-xs font-black hover:bg-black hover:text-white sm:flex-none">
-        <Power size={14} />
+      <button type="button" onClick={confirmToggle} className="inline-flex min-h-9 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[#e6e1d8] px-3 text-xs font-black hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-black/25 sm:flex-none">
+        <Power aria-hidden="true" size={14} />
         {active ? 'השבתה' : 'הפעלה'}
       </button>
     </div>
@@ -212,7 +215,7 @@ export function AdminStatusBadge({ active }: { active: boolean }) {
 
 function StatusFilterButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className={`min-h-9 shrink-0 rounded-full px-3 text-xs font-black ${active ? 'bg-black text-white' : 'bg-[#e6e1d8] text-black hover:bg-black hover:text-white'}`}>
+    <button type="button" onClick={onClick} className={`min-h-9 shrink-0 rounded-full px-3 text-xs font-black focus-visible:ring-2 focus-visible:ring-black/25 ${active ? 'bg-black text-white' : 'bg-[#e6e1d8] text-black hover:bg-black hover:text-white'}`}>
       {label}
     </button>
   );

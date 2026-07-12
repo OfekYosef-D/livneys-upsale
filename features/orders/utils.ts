@@ -26,6 +26,7 @@ export type SnapshotProduct = {
   name: string;
   price: number;
   minQty?: number;
+  orderMultiple?: number;
 };
 
 export type SnapshotItem = {
@@ -52,6 +53,36 @@ export type OrderSnapshotLine = {
   } | null;
 };
 
+export function normalizeCustomerOrderItems(
+  items: Array<{ productId: string; qty?: number; quantity?: number }>,
+  activeProducts: Array<{ id: string; minQty?: number; orderMultiple?: number; name: string }>,
+): SnapshotItem[] {
+  const productsById = new Map(activeProducts.map((product) => [product.id, product]));
+  const normalized: SnapshotItem[] = [];
+
+  for (const item of items) {
+    const quantity = Math.floor(item.qty ?? item.quantity ?? 0);
+    if (quantity <= 0) continue;
+
+    const product = productsById.get(item.productId);
+    if (!product) continue;
+
+    const minQty = product.minQty ?? 1;
+    if (quantity < minQty) {
+      throw new Error(`הכמות המינימלית עבור ${product.name} היא ${minQty}.`);
+    }
+
+    const orderMultiple = Math.max(1, Math.floor(product.orderMultiple ?? 1));
+    if (orderMultiple > 1 && quantity % orderMultiple !== 0) {
+      throw new Error(`הכמות עבור ${product.name} חייבת להיות בכפולות של ${orderMultiple}.`);
+    }
+
+    normalized.push({ productId: item.productId, quantity });
+  }
+
+  return normalized;
+}
+
 export function createOrderSnapshotLines({
   items,
   products,
@@ -73,6 +104,11 @@ export function createOrderSnapshotLines({
 
       if (quantity < minQty) {
         throw new Error(`Minimum quantity for ${product.name} is ${minQty}`);
+      }
+
+      const orderMultiple = Math.max(1, Math.floor(product.orderMultiple ?? 1));
+      if (orderMultiple > 1 && quantity % orderMultiple !== 0) {
+        throw new Error(`Order quantity for ${product.name} must be a multiple of ${orderMultiple}`);
       }
 
       const unitPrice = product.price;

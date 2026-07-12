@@ -8,6 +8,7 @@ const navItems = [
   { href: '/admin', label: 'לוח עבודה' },
   { href: '/admin/manual-order', label: 'הזמנה ידנית' },
   { href: '/admin/customers', label: 'לקוחות' },
+  { href: '/admin/registrations', label: 'הרשמות' },
   { href: '/admin/routes', label: 'קווים' },
   { href: '/admin/notifications', label: 'הודעות' },
   { href: '/admin/products', label: 'מוצרים' },
@@ -20,7 +21,7 @@ export function AdminShell({ children, title, subtitle, activeHref }: { children
   const isActive = (href: string) => activeHref === href || (href !== '/admin' && Boolean(activeHref?.startsWith(`${href}/`)));
 
   return (
-    <main className="min-h-screen bg-[#f7f5f1] text-black">
+    <main className="min-h-screen overflow-x-hidden bg-[#f7f5f1] text-black">
       <header className="sticky top-0 z-30 border-b border-black/10 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-3 sm:px-4">
           <div className="flex min-w-0 items-center gap-3">
@@ -29,7 +30,7 @@ export function AdminShell({ children, title, subtitle, activeHref }: { children
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-black">CRM Livney&apos;s</p>
-              <p className="truncate text-xs font-bold text-black/50">ניהול הזמנות, לקוחות, קווים ואפסייל</p>
+              <p className="truncate text-xs font-bold text-black/50">הזמנות B2B, לקוחות, קווי חלוקה והמלצות מכירה</p>
             </div>
           </div>
           <nav className="no-scrollbar hidden max-w-[52rem] items-center gap-1 overflow-x-auto lg:flex">

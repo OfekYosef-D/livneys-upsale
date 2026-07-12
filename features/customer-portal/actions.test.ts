@@ -40,17 +40,19 @@ vi.mock('@/lib/authorization', () => ({
 }));
 
 const { assertCustomerAction } = await import('@/lib/authorization');
-const { createSubmittedOrder } = await import('@/features/orders/service');
+const { createSubmittedOrder, getOrderWriteContext } = await import('@/features/orders/service');
 const { enqueueOrderLifecycleWhatsApp } = await import('../notifications/jobs');
 
 const mockedAssertCustomerAction = vi.mocked(assertCustomerAction);
 const mockedCreateSubmittedOrder = vi.mocked(createSubmittedOrder);
+const mockedGetOrderWriteContext = vi.mocked(getOrderWriteContext);
 const mockedEnqueueOrderLifecycleWhatsApp = vi.mocked(enqueueOrderLifecycleWhatsApp);
 
 describe('customer portal actions', () => {
   beforeEach(() => {
     mockedAssertCustomerAction.mockReset();
     mockedCreateSubmittedOrder.mockReset();
+    mockedGetOrderWriteContext.mockReset();
     mockedEnqueueOrderLifecycleWhatsApp.mockReset();
   });
 
@@ -63,6 +65,33 @@ describe('customer portal actions', () => {
       orderId: 'ord-customer',
       status: 'SUBMITTED',
       routeId: 'route-south',
+    });
+    mockedGetOrderWriteContext.mockResolvedValue({
+      customer: {
+        id: 'cust-001',
+        routeId: 'route-south',
+        priceListId: 'price-list-standard',
+        isActive: true,
+      },
+      route: {
+        id: 'route-south',
+        isActive: true,
+        nextDeliveryAt: new Date('2026-07-10T08:00:00.000Z'),
+        nextCutoffAt: new Date('2026-07-09T15:00:00.000Z'),
+      },
+      products: [
+        {
+          id: 'prod-a',
+          name: 'Product A',
+          category: 'Spreads',
+          basePrice: 100,
+          isActive: true,
+          minQty: 1,
+          orderMultiple: 1,
+        },
+      ],
+      priceListItems: [{ productId: 'prod-a', price: 100 }],
+      promotions: [],
     });
 
     const result = await actions.submitCustomerOrderAction({

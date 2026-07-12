@@ -6,7 +6,8 @@ import { money } from '@/lib/format';
 import { fallbackProductImage, productImages } from '@/lib/product-assets';
 
 export function ProductCard({ product, qty, onQty }: { product: PortalProduct; qty: number; onQty: (v: number) => void }) {
-  const image = productImages[product.assetImage ?? ''] ?? fallbackProductImage;
+  const image = product.imageUrl?.startsWith('http') ? product.imageUrl : productImages[product.assetImage ?? ''] ?? fallbackProductImage;
+  const orderMultiple = product.orderMultiple ?? product.minQty ?? 1;
 
   return (
     <article className="overflow-hidden rounded-2xl border border-black/10 bg-white">
@@ -23,7 +24,7 @@ export function ProductCard({ product, qty, onQty }: { product: PortalProduct; q
           <b>{money(product.price)}</b>
         </div>
         <div className="mt-4">
-          <QuantityStepper value={qty} min={product.minQty ?? 1} step={product.minQty ?? 1} onChange={onQty} />
+          <QuantityStepper value={qty} min={product.minQty ?? orderMultiple} step={orderMultiple} onChange={onQty} />
         </div>
       </div>
     </article>

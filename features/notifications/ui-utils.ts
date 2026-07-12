@@ -1,5 +1,33 @@
 export type JobStatusFilter = 'all' | 'PENDING' | 'PROCESSING' | 'DRY_RUN' | 'SENT' | 'FAILED';
 
+export const notificationJobStatusLabels: Record<string, string> = {
+  PENDING: 'ממתינה לשליחה',
+  PROCESSING: 'בתהליך שליחה',
+  DRY_RUN: 'בדיקה בלבד',
+  SENT: 'נשלחה',
+  FAILED: 'נכשלה',
+  CANCELLED: 'בוטלה',
+};
+
+export const notificationJobFilterLabels: Record<JobStatusFilter, string> = {
+  all: 'הכל',
+  PENDING: 'ממתינות לשליחה',
+  PROCESSING: 'בתהליך שליחה',
+  DRY_RUN: 'בדיקה בלבד',
+  SENT: 'נשלחו',
+  FAILED: 'נכשלו',
+};
+
+export const notificationTemplateLabels: Record<string, string> = {
+  ORDER_REMINDER: 'תזכורת הזמנה',
+  ORDER_RECEIVED: 'הזמנה התקבלה',
+  ORDER_APPROVED: 'הזמנה אושרה',
+  ORDER_PACKED: 'הזמנה נארזה',
+  ORDER_DELIVERED: 'הזמנה סופקה',
+  ORDER_CANCELLED: 'הזמנה בוטלה',
+  ORDER_SPECIAL_REQUEST: 'בקשה מיוחדת',
+};
+
 export type OperatorNotificationJob = {
   status: string;
   scheduledAt: string;

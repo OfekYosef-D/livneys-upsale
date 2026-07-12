@@ -60,11 +60,17 @@ export const productPriceSchema = z.object({
 
 export const customerMutationSchema = z.object({
   name: requiredText(160),
+  invoiceName: nullableText(160),
   contact: requiredText(120),
   email: nullableEmail,
   phone: requiredText(40),
+  accountingContactName: nullableText(120),
+  accountingEmail: nullableEmail,
+  accountingPhone: nullableText(40),
+  businessType: nullableText(80),
   region: requiredText(120),
   address: requiredText(240),
+  deliveryConstraints: nullableText(1000),
   routeId: requiredText(120),
   priceListId: requiredText(120),
   notes: nullableText(1000),
@@ -91,6 +97,7 @@ export const productMutationSchema = z.object({
   unit: requiredText(40),
   caseSize: requiredText(80),
   minQty: z.coerce.number().int().min(1),
+  orderMultiple: z.coerce.number().int().min(1).default(1),
   imageUrl: z.preprocess((value) => {
     if (value === undefined || value === null || value === '') return null;
     return value;

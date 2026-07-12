@@ -2,11 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { createSubmittedOrder, getOrderWriteContext } from '@/features/orders/service';
-import { calculateOrderPricing } from '@/features/pricing/engine';
 import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { assertCustomerAction } from '@/lib/authorization';
 import { prisma } from '@/lib/db';
 import { enqueueOrderLifecycleWhatsApp } from '../notifications/jobs';
+import { normalizeCustomerOrderItems } from '../orders/utils';
+import { calculateOrderPricing } from '../pricing/engine';
 import { saveDraftOrderSchema, submitCustomerOrderSchema, type SaveDraftOrderInput, type SubmitCustomerOrderInput } from './schema';
 
 export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<ActionResult<{ orderId: string | null }>> {
@@ -14,16 +15,16 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
     const parsed = saveDraftOrderSchema.parse(input);
     await assertCustomerAction(parsed.customerId);
 
-    const items = parsed.items.filter((item) => item.qty > 0);
-    if (items.length === 0) {
+    const context = await getOrderWriteContext(parsed.customerId);
+    const normalizedItems = normalizeCustomerOrderItems(parsed.items, context.products);
+    if (normalizedItems.length === 0) {
       return actionOk({ orderId: null });
     }
 
-    const context = await getOrderWriteContext(parsed.customerId);
     const pricing = calculateOrderPricing({
       customer: context.customer,
       route: context.route,
-      items: items.map((item) => ({ productId: item.productId, quantity: item.qty })),
+      items: normalizedItems,
       products: context.products,
       priceListItems: context.priceListItems,
       promotions: context.promotions,
@@ -103,14 +104,15 @@ export async function submitCustomerOrderAction(input: SubmitCustomerOrderInput)
     const parsed = submitCustomerOrderSchema.parse(input);
     await assertCustomerAction(parsed.customerId);
 
-    const items = parsed.items.filter((item) => item.qty > 0);
-    if (items.length === 0) {
+    const context = await getOrderWriteContext(parsed.customerId);
+    const normalizedItems = normalizeCustomerOrderItems(parsed.items, context.products);
+    if (normalizedItems.length === 0) {
       throw new Error('לא ניתן לשלוח הזמנה ריקה.');
     }
 
     const order = await createSubmittedOrder({
       customerId: parsed.customerId,
-      items: items.map((item) => ({ productId: item.productId, quantity: item.qty })),
+      items: normalizedItems,
       source: 'CUSTOMER',
       notes: parsed.notes,
       replaceDraftForDeliveryWindow: true,
