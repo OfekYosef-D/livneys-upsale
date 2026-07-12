@@ -10,7 +10,7 @@ export default async function AdminPriceListsPage() {
   const data = await getPriceListManagementData();
 
   return (
-    <AdminShell title="מחירונים" subtitle="ניהול מלא של מחירי מוצרים לפי מחירון, שכפול מחירונים ושיוך ללקוחות.">
+    <AdminShell title="מחירונים" subtitle="ניהול מלא של מחירי מוצרים לפי מחירון, שכפול מחירונים ושיוך ללקוחות." activeHref="/admin/price-lists">
       <AdminPriceListsManager data={data} />
     </AdminShell>
   );

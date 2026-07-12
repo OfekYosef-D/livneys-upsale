@@ -18,7 +18,7 @@ export function AdminCustomerDetail({ customer }: { customer: CustomerData }) {
           <Info label="כתובת" value={customer.address} />
           {customer.notes && <p className="mt-3 rounded-xl bg-[#e6e1d8] p-3 text-sm font-bold">{customer.notes}</p>}
           <Link href="/admin/manual-order" className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-black px-4 text-sm font-black text-white hover:bg-black/90">
-            פתיחת הזמנה ידנית
+            הזמנה ידנית
           </Link>
         </section>
 

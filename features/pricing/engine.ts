@@ -17,6 +17,7 @@ export type PricingProduct = {
   basePrice: number;
   isActive: boolean;
   minQty?: number;
+  orderMultiple?: number;
 };
 
 export type PricingPriceListItem = {
@@ -144,13 +145,13 @@ export function calculateOrderPricing({
     .map((item) => {
       const product = products.find((candidate) => candidate.id === item.productId);
       if (!product || !product.isActive) {
-        throw new Error(`Unknown product ${item.productId}`);
+        throw new Error(`המוצר ${item.productId} אינו זמין להזמנה.`);
       }
 
       const quantity = Math.floor(item.quantity);
       const minQty = product.minQty ?? 1;
       if (quantity < minQty) {
-        throw new Error(`Minimum quantity for ${product.name} is ${minQty}`);
+        throw new Error(`הכמות המינימלית עבור ${product.name} היא ${minQty}.`);
       }
 
       const listUnitPrice = pricesByProductId.get(product.id) ?? product.basePrice;

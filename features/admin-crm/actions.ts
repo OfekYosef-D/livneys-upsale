@@ -8,6 +8,8 @@ import { formatManualOrderInternalNote } from '@/features/orders/write';
 import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { assertAdminAction } from '@/lib/authorization';
 import { prisma } from '@/lib/db';
+import { enqueueOrderLifecycleWhatsApp } from '../notifications/jobs';
+import { getTemplateKeyForOrderStatus } from '../notifications/templates';
 import {
   createCustomerSchema,
   createPriceListSchema,
@@ -52,11 +54,17 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
         data: {
           id: customerId,
           name: parsed.name,
+          invoiceName: parsed.invoiceName,
           contact: parsed.contact,
           email: parsed.email,
           phone: parsed.phone,
+          accountingContactName: parsed.accountingContactName,
+          accountingEmail: parsed.accountingEmail,
+          accountingPhone: parsed.accountingPhone,
+          businessType: parsed.businessType,
           region: parsed.region,
           address: parsed.address,
+          deliveryConstraints: parsed.deliveryConstraints,
           routeId: parsed.routeId,
           priceListId: parsed.priceListId,
           notes: parsed.notes,
@@ -93,12 +101,12 @@ export async function updateCustomerAction(input: unknown): Promise<ActionResult
       });
 
       if (!existing) {
-        throw new Error('Customer not found');
+        throw new Error('הלקוח לא נמצא.');
       }
 
       if (existing.user && existing.email !== parsed.email) {
         if (!parsed.email) {
-          throw new Error('Cannot clear email for a customer with a login account');
+          throw new Error('לא ניתן להסיר אימייל מלקוח עם חשבון התחברות.');
         }
 
         await tx.user.update({
@@ -114,11 +122,17 @@ export async function updateCustomerAction(input: unknown): Promise<ActionResult
         where: { id: parsed.id },
         data: {
           name: parsed.name,
+          invoiceName: parsed.invoiceName,
           contact: parsed.contact,
           email: parsed.email,
           phone: parsed.phone,
+          accountingContactName: parsed.accountingContactName,
+          accountingEmail: parsed.accountingEmail,
+          accountingPhone: parsed.accountingPhone,
+          businessType: parsed.businessType,
           region: parsed.region,
           address: parsed.address,
+          deliveryConstraints: parsed.deliveryConstraints,
           routeId: parsed.routeId,
           priceListId: parsed.priceListId,
           notes: parsed.notes,
@@ -210,7 +224,7 @@ export async function updatePriceListAction(input: unknown): Promise<ActionResul
     await prisma.$transaction(async (tx) => {
       const existing = await tx.priceList.findUnique({ where: { id: parsed.id } });
       if (!existing) {
-        throw new Error('Price list not found');
+        throw new Error('המחירון לא נמצא.');
       }
 
       if (parsed.isDefault) {
@@ -268,7 +282,7 @@ export async function clonePriceListAction(input: unknown): Promise<ActionResult
     });
 
     if (!source) {
-      throw new Error('Price list not found');
+      throw new Error('המחירון לא נמצא.');
     }
 
     const priceListId = createEntityId('price-list', parsed.name);
@@ -314,6 +328,7 @@ export async function createProductAction(input: unknown): Promise<ActionResult<
           unit: parsed.unit,
           caseSize: parsed.caseSize,
           minQty: parsed.minQty,
+          orderMultiple: parsed.orderMultiple,
           imageUrl: parsed.imageUrl,
           assetImage: parsed.assetImage,
           stockLabel: parsed.stockLabel,
@@ -372,6 +387,7 @@ export async function updateProductAction(input: unknown): Promise<ActionResult<
           unit: parsed.unit,
           caseSize: parsed.caseSize,
           minQty: parsed.minQty,
+          orderMultiple: parsed.orderMultiple,
           imageUrl: parsed.imageUrl,
           assetImage: parsed.assetImage,
           stockLabel: parsed.stockLabel,
@@ -744,6 +760,7 @@ export async function createManualOrderAction(input: unknown): Promise<ActionRes
     revalidatePath(`/admin/routes/${order.routeId}`);
     revalidatePath(`/admin/customers/${parsed.customerId}`);
     revalidatePath(`/customer/${parsed.customerId}`);
+    await enqueueOrderLifecycleSafely({ orderId: order.orderId });
     return actionOk({ orderId: order.orderId, status: order.status });
   } catch (error) {
     return actionError(error);
@@ -766,7 +783,7 @@ export async function updateOrderStatusAction(input: unknown): Promise<ActionRes
     });
 
     if (!existing) {
-      throw new Error('Order not found');
+      throw new Error('ההזמנה לא נמצאה.');
     }
 
     const nextStatus = assertOrderStatusTransition(existing.status, parsed.status);
@@ -788,6 +805,10 @@ export async function updateOrderStatusAction(input: unknown): Promise<ActionRes
       revalidatePath(`/admin/routes/${order.routeId}`);
     }
     revalidatePath(`/customer/${order.customerId}`);
+    const templateKey = getTemplateKeyForOrderStatus(order.status);
+    if (templateKey) {
+      await enqueueOrderLifecycleSafely({ orderId: order.id, templateKey });
+    }
     return actionOk({ orderId: order.id, status: order.status });
   } catch (error) {
     return actionError(error);
@@ -801,11 +822,11 @@ async function assertRouteAndPriceList(routeId: string, priceListId: string, req
   ]);
 
   if (!route || (requireActiveRoute && !route.isActive)) {
-    throw new Error('Route not found or inactive');
+    throw new Error('הקו לא נמצא או אינו פעיל.');
   }
 
   if (!priceList) {
-    throw new Error('Price list not found');
+    throw new Error('המחירון לא נמצא.');
   }
 }
 
@@ -815,7 +836,7 @@ async function assertProductExists(productId: string) {
   });
 
   if (!product) {
-    throw new Error('Product not found');
+    throw new Error('המוצר לא נמצא.');
   }
 }
 
@@ -828,7 +849,7 @@ async function assertProductsExist(productIds: string[]) {
   });
 
   if (count !== uniqueIds.length) {
-    throw new Error('One or more products were not found');
+    throw new Error('חלק מהמוצרים לא נמצאו.');
   }
 }
 
@@ -841,7 +862,7 @@ async function assertPriceListsExist(priceListIds: string[]) {
   });
 
   if (count !== uniqueIds.length) {
-    throw new Error('One or more price lists were not found');
+    throw new Error('חלק מהמחירונים לא נמצאו.');
   }
 }
 
@@ -870,7 +891,7 @@ async function assertCustomersExist(customerIds: string[]) {
   });
 
   if (count !== uniqueIds.length) {
-    throw new Error('One or more customers were not found');
+    throw new Error('חלק מהלקוחות לא נמצאו.');
   }
 }
 
@@ -883,7 +904,7 @@ async function assertRoutesExist(routeIds: string[]) {
   });
 
   if (count !== uniqueIds.length) {
-    throw new Error('One or more routes were not found');
+    throw new Error('חלק מהקווים לא נמצאו.');
   }
 }
 
@@ -898,11 +919,11 @@ async function assertCustomerAndProduct(customerId: string, productId: string) {
   ]);
 
   if (!customer || !customer.isActive) {
-    throw new Error('Customer not found or inactive');
+    throw new Error('הלקוח לא נמצא או אינו פעיל.');
   }
 
   if (!product || !product.isActive) {
-    throw new Error('Product not found or inactive');
+    throw new Error('המוצר לא נמצא או אינו פעיל.');
   }
 }
 
@@ -930,4 +951,12 @@ function revalidateAdminCrm() {
 function revalidateCustomerCatalogs() {
   revalidatePath('/customer/[customerId]', 'page');
   revalidatePath('/customer/[customerId]/catalog', 'page');
+}
+
+async function enqueueOrderLifecycleSafely(input: Parameters<typeof enqueueOrderLifecycleWhatsApp>[0]) {
+  try {
+    await enqueueOrderLifecycleWhatsApp(input);
+  } catch (error) {
+    console.error('Failed to enqueue WhatsApp order lifecycle notification', error);
+  }
 }

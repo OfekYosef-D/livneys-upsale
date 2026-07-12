@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Package, Save, Search, ShoppingCart } from 'lucide-react';
+import { Check, ImageUp, Package, Save, Search, ShoppingCart } from 'lucide-react';
 import {
   clonePriceListAction,
   createCustomerAction,
@@ -25,6 +25,8 @@ import {
   updateRecommendationAction,
   updateRouteAction,
 } from '@/features/admin-crm/actions';
+import { orderStatusLabels } from '@/features/orders/utils';
+import { institutionalBusinessTypes, productPricePresets, promotionPresets } from '@/features/owner-rules/constants';
 import {
   AdminActionButtons,
   AdminCrudPageHeader,
@@ -126,20 +128,20 @@ export function AdminCustomersManager({ data }: { data: CustomerData }) {
       </AdminListToolbar>
 
       {filtered.length === 0 ? (
-        <AdminEmptyState title="אין לקוחות מתאימים" description="נסה לשנות את החיפוש או את סינון הסטטוס." />
+        <AdminEmptyState title="אין לקוחות מתאימים" description="נסו לשנות את החיפוש או את סינון הסטטוס." />
       ) : (
         <section className="overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_18px_54px_rgba(0,0,0,0.05)]">
           <div className="divide-y divide-black/10">
             {filtered.map((customer) => (
               <article key={customer.id} className="grid gap-3 px-4 py-4 hover:bg-[#f7f5f1] lg:grid-cols-[minmax(0,1.15fr)_minmax(8rem,.9fr)_minmax(7rem,.8fr)_minmax(8rem,.8fr)_7rem_minmax(11rem,13rem)] lg:items-center">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-black">{customer.name}</p>
-                  <p className="truncate text-xs font-bold text-black/50">{customer.contact} · {customer.phone}</p>
-                  {customer.email && <p className="truncate text-xs font-bold text-black/40">{customer.email}</p>}
+                  <p className="break-words text-sm font-black">{customer.name}</p>
+                  <p className="break-words text-xs font-bold text-black/50">{customer.contact} · {customer.phone}</p>
+                  {customer.email && <p className="break-words text-xs font-bold text-black/40">{customer.email}</p>}
                 </div>
                 <SmallStack label="קו" value={customer.routeName} />
                 <SmallStack label="מחירון" value={customer.priceListName} />
-                <SmallStack label="הזמנה אחרונה" value={customer.latestOrder ? `${orderStatusLabel(customer.latestOrder.status)} · ${money(customer.latestOrder.total)}` : 'אין הזמנות'} />
+                <SmallStack label="הזמנה אחרונה" value={customer.latestOrder ? `${orderStatusLabels[customer.latestOrder.status as keyof typeof orderStatusLabels] ?? customer.latestOrder.status} · ${money(customer.latestOrder.total)}` : 'אין הזמנות'} />
                 <AdminStatusBadge active={customer.isActive} />
                 <AdminActionButtons
                   viewHref={`/admin/customers/${customer.id}`}
@@ -204,14 +206,14 @@ export function AdminPriceListsManager({ data }: { data: PriceListData }) {
       <ActionMessage message={!dialog ? action.message : null} />
       <div className="flex flex-col gap-2 rounded-2xl border border-black/10 bg-white p-3 shadow-[0_14px_42px_rgba(0,0,0,0.04)] sm:flex-row sm:items-center sm:justify-between">
         <label className="relative block w-full sm:max-w-sm">
-          <Search className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-black/35" size={17} />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="חיפוש לפי מחירון או מוצר" className="min-h-10 w-full rounded-full border border-black/10 bg-[#f7f5f1] py-2 pl-3 pr-10 text-sm font-bold outline-none focus:border-black focus:ring-2 focus:ring-black/10" />
+          <Search aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-black/35" size={17} />
+          <input name="priceListSearch" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="חיפוש לפי מחירון או מוצר" autoComplete="off" spellCheck={false} className="min-h-10 w-full rounded-full border border-black/10 bg-[#f7f5f1] py-2 pl-3 pr-10 text-sm font-bold outline-none focus:border-black focus:ring-2 focus:ring-black/10" />
         </label>
         <span className="w-fit rounded-full bg-[#e6e1d8] px-3 py-2 text-xs font-black text-black/60">{filtered.length}/{data.priceLists.length}</span>
       </div>
 
       {filtered.length === 0 ? (
-        <AdminEmptyState title="אין מחירונים מתאימים" description="נסה לשנות את החיפוש." />
+        <AdminEmptyState title="אין מחירונים מתאימים" description="נסו לשנות את החיפוש." />
       ) : (
         <section className="grid gap-4 lg:grid-cols-2">
           {filtered.map((priceList) => {
@@ -223,8 +225,8 @@ export function AdminPriceListsManager({ data }: { data: PriceListData }) {
               <article key={priceList.id} className="rounded-2xl border border-black/10 bg-white p-4 shadow-[0_18px_54px_rgba(0,0,0,0.05)]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-base font-black">{priceList.name}</p>
-                    <p className="mt-1 line-clamp-2 text-xs font-bold leading-5 text-black/55">{priceList.description || 'ללא תיאור'}</p>
+                    <p className="break-words text-base font-black">{priceList.name}</p>
+                    <p className="mt-1 break-words text-xs font-bold leading-5 text-black/55">{priceList.description || 'ללא תיאור'}</p>
                   </div>
                   {priceList.isDefault && <span className="shrink-0 rounded-full bg-black px-2 py-1 text-xs font-black text-white">ברירת מחדל</span>}
                 </div>
@@ -341,7 +343,7 @@ export function AdminProductsManager({ data }: { data: ProductData }) {
       </AdminListToolbar>
 
       {filtered.length === 0 ? (
-        <AdminEmptyState title="אין מוצרים מתאימים" description="נסה לשנות את החיפוש או את סינון הסטטוס." />
+        <AdminEmptyState title="אין מוצרים מתאימים" description="נסו לשנות את החיפוש או את סינון הסטטוס." />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
           {filtered.map((product) => (
@@ -350,13 +352,13 @@ export function AdminProductsManager({ data }: { data: ProductData }) {
               <div className="flex flex-1 flex-col p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-base font-black">{product.name}</p>
-                    <p className="mt-1 truncate text-xs font-bold text-black/50">{product.sku} / {product.category}</p>
+                    <p className="break-words text-base font-black">{product.name}</p>
+                    <p className="mt-1 break-words text-xs font-bold text-black/50">{product.sku} / {product.category}</p>
                   </div>
                   <AdminStatusBadge active={product.isActive} />
                 </div>
 
-                {product.description && <p className="mt-3 line-clamp-2 min-h-[3rem] text-sm font-bold leading-6 text-black/60">{product.description}</p>}
+                {product.description && <p className="mt-3 break-words text-sm font-bold leading-6 text-black/60">{product.description}</p>}
 
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <MetricPill label="מחיר" value={money(product.defaultPrice ?? product.basePrice)} />
@@ -457,7 +459,7 @@ export function AdminRoutesManager({ data }: { data: RouteData }) {
       </AdminListToolbar>
 
       {filtered.length === 0 ? (
-        <AdminEmptyState title="אין קווים מתאימים" description="נסה לשנות את החיפוש או את סינון הסטטוס." />
+        <AdminEmptyState title="אין קווים מתאימים" description="נסו לשנות את החיפוש או את סינון הסטטוס." />
       ) : (
         <section className="grid gap-4 lg:grid-cols-2">
           {filtered.map((route) => (
@@ -574,19 +576,19 @@ export function AdminPromotionsManager({ data }: { data: PromotionData }) {
       </AdminListToolbar>
 
       {filtered.length === 0 ? (
-        <AdminEmptyState title="אין מבצעים מתאימים" description="נסה לשנות את החיפוש או את סינון הסטטוס." />
+        <AdminEmptyState title="אין מבצעים מתאימים" description="נסו לשנות את החיפוש או את סינון הסטטוס." />
       ) : (
         <section className="grid gap-4 lg:grid-cols-2">
           {filtered.map((promotion) => (
             <article key={promotion.id} className="rounded-2xl border border-black/10 bg-white p-4 shadow-[0_18px_54px_rgba(0,0,0,0.05)]">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-black">{promotion.title}</p>
-                  <p className="truncate text-xs font-bold text-black/50">{promotion.tag} · {promotion.productName}</p>
+                  <p className="break-words text-sm font-black">{promotion.title}</p>
+                  <p className="break-words text-xs font-bold text-black/50">{promotion.tag} · {promotion.productName}</p>
                 </div>
                 <AdminStatusBadge active={promotion.isActive} />
               </div>
-              <p className="mt-3 line-clamp-2 text-sm font-bold leading-6 text-black/60">{promotion.description}</p>
+              <p className="mt-3 break-words text-sm font-bold leading-6 text-black/60">{promotion.description}</p>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <MetricPill label="כלל" value={formatPromotionEffect(promotion)} />
                 <MetricPill label="יעדים" value={promotion.targetSummary} />
@@ -685,7 +687,7 @@ export function AdminRecommendationsManager({ data }: { data: RecommendationData
       </AdminListToolbar>
 
       {filtered.length === 0 ? (
-        <AdminEmptyState title="אין המלצות מתאימות" description="נסה לשנות את החיפוש או את סינון הסטטוס." />
+        <AdminEmptyState title="אין המלצות מתאימות" description="נסו לשנות את החיפוש או את סינון הסטטוס." />
       ) : (
         <section className="grid gap-4 lg:grid-cols-2">
           {filtered.map((recommendation) => (
@@ -697,7 +699,7 @@ export function AdminRecommendationsManager({ data }: { data: RecommendationData
                 </div>
                 <AdminStatusBadge active={recommendation.isActive} />
               </div>
-              <p className="mt-3 rounded-xl bg-[#e6e1d8] p-3 text-sm font-bold text-black/65">{recommendation.reason ?? 'ללא סיבה'}</p>
+              <p className="mt-3 rounded-xl bg-[#e6e1d8] p-3 text-sm font-bold text-black/65">{recommendation.reason ?? 'ללא נימוק'}</p>
               <div className="mt-3">
                 <AdminActionButtons
                   active={recommendation.isActive}
@@ -767,7 +769,7 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(18rem,22rem)_1fr]">
       <section className="rounded-2xl border border-black/10 bg-white p-4 shadow-[0_18px_54px_rgba(0,0,0,0.05)]">
-        <SectionTitle title="הזמנה ידנית" subtitle="הזמנה אמיתית עם אותו מנגנון מחיר, מינימום ו-Snapshot." />
+        <SectionTitle title="הזמנה ידנית" subtitle="הזמנה אמיתית עם אותו מנגנון מחיר, מינימום ותמונת מצב בזמן השליחה." />
         {data.customers.length === 0 ? (
           <AdminEmptyState title="אין לקוחות פעילים" description="אין לקוחות פעילים עם קו פעיל להזמנה ידנית." />
         ) : (
@@ -775,6 +777,11 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
             className="mt-4 space-y-3"
             onSubmit={(event) => {
               event.preventDefault();
+              if (selectedItems.length === 0) {
+                action.fail('בחרו לפחות מוצר אחד לפני יצירת ההזמנה.');
+                return;
+              }
+
               const form = new FormData(event.currentTarget);
               action.run(
                 () =>
@@ -842,7 +849,7 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
                 <div className="mt-3 space-y-1 border-t border-black/10 pt-3">
                   {selectedItems.slice(0, 3).map((product) => (
                     <p key={product.id} className="flex items-center justify-between gap-3 text-xs font-black text-black/60">
-                      <span className="truncate">{product.name}</span>
+                      <span className="break-words">{product.name}</span>
                       <span className="shrink-0 tabular-nums">×{items[product.id]}</span>
                     </p>
                   ))}
@@ -855,7 +862,10 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
                 נקה כמויות
               </button>
             )}
-            <SubmitButton pending={action.pending} label="יצירת הזמנה" icon={<ShoppingCart size={16} />} />
+            <FormImpactNote>
+              שמירה תיצור הזמנה אמיתית ללקוח הנבחר. אם הודעות WhatsApp פעילות במערכת, המשך הטיפול בהזמנה עשוי ליצור הודעות לפי ההגדרות הקיימות.
+            </FormImpactNote>
+            <SubmitButton pending={action.pending} disabled={selectedItems.length === 0} label="יצירת הזמנה" icon={<ShoppingCart size={16} />} />
           </form>
         )}
         <ActionMessage message={action.message} />
@@ -891,7 +901,7 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
         )}
         <div className="divide-y divide-black/10">
           {!customer ? (
-            <p className="p-4 text-sm font-bold text-black/45">בחר לקוח כדי לראות מוצרים.</p>
+            <p className="p-4 text-sm font-bold text-black/45">בחרו לקוח כדי לראות מוצרים.</p>
           ) : visibleProducts.length === 0 ? (
             <p className="p-4 text-sm font-bold text-black/45">אין מוצרים שמתאימים לחיפוש או לסינון.</p>
           ) : (
@@ -900,8 +910,8 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
                 <div className="flex min-w-0 items-center gap-3">
                   <ProductThumbnail name={product.name} assetImage={product.assetImage} imageUrl={product.imageUrl} />
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-black">{product.name}</p>
-                    <p className="truncate text-xs font-bold text-black/50">{product.sku} / {product.category} / {product.caseSize}</p>
+                    <p className="break-words text-sm font-black">{product.name}</p>
+                    <p className="break-words text-xs font-bold text-black/50">{product.sku} / {product.category} / {product.caseSize}</p>
                   </div>
                 </div>
                 <div className="rounded-xl bg-[#e6e1d8] p-2">
@@ -910,13 +920,13 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
                   <p className="mt-0.5 text-sm font-black tabular-nums">{money(product.price)}</p>
                   {product.promoLabel && <p className="mt-1 w-fit rounded-full bg-black px-1.5 py-0.5 text-[10px] font-black text-white">{product.promoLabel}</p>}
                 </div>
-                <SmallStack label="מינימום" value={String(product.minQty)} />
+                <SmallStack label="מינ׳ / כפולה" value={`${product.minQty} / ${product.orderMultiple ?? product.minQty}`} />
                 <input
                   aria-label={`כמות ${product.name}`}
                   className={`${fieldClass} text-center tabular-nums`}
                   type="number"
                   min={0}
-                  step={1}
+                  step={product.orderMultiple ?? product.minQty ?? 1}
                   value={items[product.id] ?? 0}
                   onChange={(event) => {
                     const next = Number(event.target.value);
@@ -951,16 +961,35 @@ function CustomerForm({
     <FormShell onSubmit={onSubmit}>
       <div className="grid gap-3 md:grid-cols-2">
         <Input name="name" label="שם עסק" defaultValue={customer?.name} required />
+        <Input name="invoiceName" label="שם לחשבונית" defaultValue={customer?.invoiceName ?? ''} hint="אם השם בחשבונית שונה משם העסק." />
         <Input name="contact" label="איש קשר" defaultValue={customer?.contact} required />
-        <Input name="email" label="אימייל" defaultValue={customer?.email ?? ''} />
-        <Input name="phone" label="טלפון" defaultValue={customer?.phone} required />
+        <Input name="email" label="אימייל" defaultValue={customer?.email ?? ''} type="email" autoComplete="email" hint="משמש לזיהוי ולקשר עם הלקוח. אפשר להשאיר ריק אם אין כתובת." />
+        <Input name="phone" label="טלפון" defaultValue={customer?.phone} type="tel" inputMode="tel" autoComplete="tel" required hint="מומלץ לשמור בפורמט בינלאומי, למשל ‎+972…" />
+        <Select
+          name="businessType"
+          label="סוג עסק"
+          defaultValue={customer?.businessType ?? ''}
+          required={false}
+          options={[{ value: '', label: 'לא נבחר' }, ...institutionalBusinessTypes.map((type) => ({ value: type, label: type }))]}
+        />
         <Input name="region" label="אזור" defaultValue={customer?.region} required />
         <Input name="address" label="כתובת" defaultValue={customer?.address} required />
         <Select name="routeId" label="קו" defaultValue={customer?.routeId} options={routes.map((route) => ({ value: route.id, label: `${route.name}${route.isActive ? '' : ' (לא פעיל)'}` }))} />
         <Select name="priceListId" label="מחירון" defaultValue={customer?.priceListId} options={priceLists.map((priceList) => ({ value: priceList.id, label: `${priceList.name}${priceList.isDefault ? ' · ברירת מחדל' : ''}` }))} />
       </div>
-      <Input name="statusLabel" label="סטטוס פנימי" defaultValue={customer?.statusLabel ?? ''} />
-      <Textarea name="notes" label="הערות" defaultValue={customer?.notes ?? ''} />
+      <Textarea name="deliveryConstraints" label="אילוצי חלוקה" defaultValue={customer?.deliveryConstraints ?? ''} hint="חלונות שעות, הוראות פריקה, מגבלות כניסה וכדומה." />
+      <details className="rounded-2xl border border-black/10 p-3">
+        <summary className="cursor-pointer text-sm font-black">פרטי הנהלת חשבונות ושדות מתקדמים</summary>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <Input name="accountingContactName" label="איש קשר לחשבונות" defaultValue={customer?.accountingContactName ?? ''} />
+          <Input name="accountingEmail" label="אימייל לחשבונות" defaultValue={customer?.accountingEmail ?? ''} type="email" autoComplete="email" />
+          <Input name="accountingPhone" label="טלפון לחשבונות" defaultValue={customer?.accountingPhone ?? ''} type="tel" inputMode="tel" autoComplete="tel" />
+          <Input name="statusLabel" label="סטטוס פנימי" defaultValue={customer?.statusLabel ?? ''} hint="טקסט קצר לצוות, למשל צריך אישור בעלים או לקוח עונתי." />
+        </div>
+        <div className="mt-3">
+          <Textarea name="notes" label="הערות" defaultValue={customer?.notes ?? ''} hint="מידע שימושי לשיחות והזמנות עתידיות. לא נשלח אוטומטית ללקוח." />
+        </div>
+      </details>
       <div className="grid gap-2 md:grid-cols-3">
         <Checkbox name="isActive" label="פעיל" defaultChecked={customer?.isActive ?? true} />
         <Checkbox name="emailEnabled" label="התראות אימייל" defaultChecked={customer?.emailEnabled ?? true} />
@@ -988,30 +1017,156 @@ function ProductForm({
 
   return (
     <FormShell onSubmit={onSubmit}>
+      {!product && <ProductPresetButtons priceLists={priceLists} />}
       <div className="grid gap-3 md:grid-cols-2">
-        <Input name="sku" label="SKU" defaultValue={product?.sku} required />
+        <Input name="sku" label="SKU" defaultValue={product?.sku ?? ''} hint="אפשר להשאיר ריק, המערכת תיצור SKU פנימי לפי שם המוצר." />
         <Input name="name" label="שם מוצר" defaultValue={product?.name} required />
         <Input name="category" label="קטגוריה" defaultValue={product?.category} required />
-        <Input name="basePrice" label="מחיר בסיס" defaultValue={product?.basePrice ?? 1} type="number" required />
+        <Input name="basePrice" label="מחיר בסיס" defaultValue={product?.basePrice ?? 1} type="number" min={0.01} step={0.01} inputMode="decimal" required />
         <Input name="unit" label="יחידה" defaultValue={product?.unit ?? 'יח׳'} required />
         <Input name="caseSize" label="גודל מארז" defaultValue={product?.caseSize ?? '1'} required />
-        <Input name="minQty" label="כמות מינימום" defaultValue={product?.minQty ?? 1} type="number" required />
-        <Input name="stockLabel" label="סטטוס מלאי" defaultValue={product?.stockLabel ?? ''} />
-        <Input name="imageUrl" label="Image URL" defaultValue={product?.imageUrl ?? ''} />
-        <Input name="assetImage" label="Asset image" defaultValue={product?.assetImage ?? ''} />
+        <Input name="minQty" label="כמות מינימום" defaultValue={product?.minQty ?? 1} type="number" min={1} step={1} inputMode="numeric" required />
+        <Input name="orderMultiple" label="כפולת הזמנה" defaultValue={product?.orderMultiple ?? product?.minQty ?? 1} type="number" min={1} step={1} inputMode="numeric" required hint="לדוגמה 6: הלקוח יכול להזמין 6, 12, 18 וכו׳." />
+        <Input name="stockLabel" label="סטטוס מלאי" defaultValue={product?.stockLabel ?? ''} hint="טקסט קצר שמופיע לצוות ולקטלוג, למשל חסר זמנית." />
       </div>
+      <ProductImageUpload defaultValue={product?.imageUrl ?? ''} />
+      <details className="rounded-2xl border border-black/10 p-3">
+        <summary className="cursor-pointer text-sm font-black">שדות תמונה מתקדמים</summary>
+        <div className="mt-3">
+          <Input name="assetImage" label="תמונה מקומית" defaultValue={product?.assetImage ?? ''} autoComplete="off" hint="שם קובץ או מפתח תמונה שכבר קיים במערכת, לא חובה." />
+        </div>
+      </details>
       <Textarea name="description" label="תיאור" defaultValue={product?.description ?? ''} />
       <section className="rounded-2xl border border-black/10 p-3">
         <p className="text-sm font-black">מחירים לפי מחירון</p>
         <div className="mt-2 grid gap-2 md:grid-cols-2">
           {priceLists.map((priceList) => (
-            <Input key={priceList.id} name={`priceList:${priceList.id}`} label={`${priceList.name}${priceList.isDefault ? ' · ברירת מחדל' : ''}`} defaultValue={pricesByPriceListId.get(priceList.id) ?? product?.basePrice ?? 1} type="number" required />
+            <Input key={priceList.id} name={`priceList:${priceList.id}`} label={`${priceList.name}${priceList.isDefault ? ' · ברירת מחדל' : ''}`} defaultValue={pricesByPriceListId.get(priceList.id) ?? product?.basePrice ?? 1} type="number" min={0.01} step={0.01} inputMode="decimal" required />
           ))}
         </div>
       </section>
       <Checkbox name="isActive" label="פעיל" defaultChecked={product?.isActive ?? true} />
+      <FormImpactNote>
+        שמירה תעדכן את פרטי המוצר ואת המחירים להזמנות חדשות בלבד. הזמנות שכבר נשמרו ממשיכות להציג את המחיר שהיה בזמן ההזמנה.
+      </FormImpactNote>
       <FormActions pending={pending} onCancel={onCancel} />
     </FormShell>
+  );
+}
+
+function ProductPresetButtons({ priceLists }: { priceLists: ProductData['priceLists'] }) {
+  return (
+    <section className="rounded-2xl border border-black/10 bg-[#f7f5f1] p-3">
+      <p className="text-sm font-black">תבניות מוצר מהירות</p>
+      <p className="mt-1 text-xs font-bold leading-5 text-black/50">בחרו סוג מארז כדי למלא מחיר, מינימום וכפולות. אפשר לערוך כל שדה לפני שמירה.</p>
+      <div className="mt-2 grid gap-2 md:grid-cols-2">
+        {productPricePresets.map((preset) => (
+          <button
+            key={preset.id}
+            type="button"
+            className="rounded-xl bg-white px-3 py-2 text-right text-xs font-black ring-1 ring-black/10 hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-black/25"
+            onClick={(event) => {
+              const form = event.currentTarget.closest('form');
+              const category = preset.id.includes('500') ? 'מוסדי' : 'ממרחים';
+
+              setNamedFormValue(form, 'category', category);
+              setNamedFormValue(form, 'unit', preset.unit);
+              setNamedFormValue(form, 'caseSize', preset.caseSize);
+              setNamedFormValue(form, 'minQty', String(preset.minQty));
+              setNamedFormValue(form, 'orderMultiple', String(preset.orderMultiple));
+              setNamedFormValue(form, 'basePrice', String(preset.price));
+
+              for (const priceList of priceLists) {
+                setNamedFormValue(form, `priceList:${priceList.id}`, String(preset.price));
+              }
+            }}
+          >
+            <span className="block">{preset.label}</span>
+            <span className="mt-1 block font-bold text-black/50">{money(preset.price)} · מינ׳ {preset.minQty} · כפולות {preset.orderMultiple}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ProductImageUpload({ defaultValue }: { defaultValue?: string | null }) {
+  const initialImageUrl = defaultValue?.startsWith('http') ? defaultValue : '';
+  const [imageUrl, setImageUrl] = useState(initialImageUrl);
+  const [message, setMessage] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  async function uploadFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!productImageMimeTypes.includes(file.type as (typeof productImageMimeTypes)[number])) {
+      setMessage('אפשר להעלות רק תמונות JPG, PNG, WebP או GIF.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > maxProductImageBytes) {
+      setMessage('התמונה גדולה מדי. המקסימום הוא 5MB.');
+      event.target.value = '';
+      return;
+    }
+
+    setIsUploading(true);
+    setMessage(null);
+
+    try {
+      const body = new FormData();
+      body.set('file', file);
+      const response = await fetch('/api/admin/product-images', {
+        method: 'POST',
+        body,
+      });
+      const data = (await response.json().catch(() => ({}))) as { imageUrl?: unknown; error?: unknown };
+
+      if (!response.ok || typeof data.imageUrl !== 'string') {
+        throw new Error(typeof data.error === 'string' ? data.error : 'העלאת התמונה נכשלה.');
+      }
+
+      setImageUrl(data.imageUrl);
+      setMessage('התמונה הועלתה ונשמרת עם המוצר.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'העלאת התמונה נכשלה.');
+    } finally {
+      setIsUploading(false);
+      event.target.value = '';
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-black/10 p-3">
+      <div className="grid gap-3 md:grid-cols-[9rem_1fr] md:items-start">
+        <div className="grid aspect-square place-items-center overflow-hidden rounded-xl bg-[#e6e1d8] text-black/45">
+          {imageUrl ? <img src={imageUrl} alt="תצוגה מקדימה" width={144} height={144} className="h-full w-full object-cover" /> : <ImageUp aria-hidden="true" size={34} />}
+        </div>
+        <div className="space-y-2">
+          <label className="block">
+            <span className="text-xs font-black text-black/50">תמונת מוצר</span>
+            <input
+              name="imageUrl"
+              type="url"
+              autoComplete="off"
+              value={imageUrl}
+              onChange={(event) => setImageUrl(event.target.value)}
+              placeholder="https://example.com/product.jpg…"
+              className={fieldClass}
+            />
+          </label>
+          <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white hover:bg-black/85">
+            <ImageUp aria-hidden="true" size={16} />
+            {isUploading ? 'מעלה…' : 'העלאת תמונה'}
+            <input name="productImageFile" type="file" accept={productImageMimeTypes.join(',')} className="sr-only" disabled={isUploading} onChange={uploadFile} />
+          </label>
+          <p className="text-xs font-bold leading-5 text-black/45">נשמר כקישור HTTPS. אפשר גם להדביק קישור קיים ולהמשיך להשתמש בתמונה מקומית בשדות המתקדמים.</p>
+          {message && <p className="rounded-xl bg-[#e6e1d8] p-2 text-xs font-black text-black/65" aria-live="polite">{message}</p>}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1046,14 +1201,17 @@ function PriceListForm({
           {products.map((product) => (
             <label key={product.id} className="grid grid-cols-[minmax(0,1fr)_8rem] items-center gap-2 px-3 py-2">
               <span className="min-w-0">
-                <span className="block truncate text-sm font-black">{product.name}</span>
-                <span className="block truncate text-[11px] font-bold text-black/45">{product.sku} · {product.category}</span>
+                <span className="block break-words text-sm font-black">{product.name}</span>
+                <span className="block break-words text-[11px] font-bold text-black/45">{product.sku} · {product.category}</span>
               </span>
-              <input name={`price:${product.id}`} type="number" min="0.01" step="0.01" defaultValue={pricesByProductId.get(product.id) ?? product.basePrice} className="w-full rounded-xl border border-black/10 bg-white px-2 py-2 text-left text-sm font-black tabular-nums outline-none focus:ring-2 focus:ring-black/20" />
+              <input name={`price:${product.id}`} type="number" min="0.01" step="0.01" inputMode="decimal" defaultValue={pricesByProductId.get(product.id) ?? product.basePrice} className="w-full rounded-xl border border-black/10 bg-white px-2 py-2 text-left text-sm font-black tabular-nums outline-none focus:ring-2 focus:ring-black/20" />
             </label>
           ))}
         </div>
       </section>
+      <FormImpactNote>
+        שמירה תעדכן את מחירון הלקוחות להזמנות הבאות. הזמנות קיימות לא יחושבו מחדש.
+      </FormImpactNote>
       <FormActions pending={pending} onCancel={onCancel} />
     </FormShell>
   );
@@ -1079,10 +1237,10 @@ function RouteForm({ route, pending, onSubmit, onCancel }: { route: RouteData['r
         <Input name="region" label="אזור" defaultValue={route?.region} required />
         <Input name="driver" label="נהג" defaultValue={route?.driver ?? ''} />
         <Input name="opsContactName" label="איש קשר תפעולי" defaultValue={route?.opsContactName ?? ''} />
-        <Input name="opsContactPhone" label="טלפון תפעולי" defaultValue={route?.opsContactPhone ?? ''} />
-        <Input name="deliveryWeekday" label="יום חלוקה 0-6" defaultValue={route?.deliveryWeekday ?? 2} type="number" required />
-        <Input name="cutoffWeekday" label="יום דדליין 0-6" defaultValue={route?.cutoffWeekday ?? 1} type="number" required />
-        <Input name="cutoffTime" label="שעת דדליין" defaultValue={route?.cutoffTime ?? '18:00'} required />
+        <Input name="opsContactPhone" label="טלפון תפעולי" defaultValue={route?.opsContactPhone ?? ''} type="tel" inputMode="tel" autoComplete="tel" />
+        <Input name="deliveryWeekday" label="יום חלוקה" defaultValue={route?.deliveryWeekday ?? 2} type="number" min={0} max={6} step={1} inputMode="numeric" required hint="0=ראשון, 1=שני, 2=שלישי, 3=רביעי, 4=חמישי, 5=שישי, 6=שבת." />
+        <Input name="cutoffWeekday" label="יום סגירת הזמנות" defaultValue={route?.cutoffWeekday ?? 1} type="number" min={0} max={6} step={1} inputMode="numeric" required hint="היום האחרון שבו הלקוח יכול להזמין לפני החלוקה. 0=ראשון, 6=שבת." />
+        <Input name="cutoffTime" label="שעת סגירת הזמנות" defaultValue={route?.cutoffTime ?? '18:00'} type="time" required />
         <Input name="nextDeliveryAt" label="חלוקה קרובה" defaultValue={toDateTimeLocal(route?.nextDeliveryAt)} type="datetime-local" required />
         <Input name="nextCutoffAt" label="דדליין קרוב" defaultValue={toDateTimeLocal(route?.nextCutoffAt)} type="datetime-local" required />
       </div>
@@ -1121,6 +1279,7 @@ function PromotionForm({
 
   return (
     <FormShell onSubmit={onSubmit}>
+      {!promotion && <PromotionPresetButtons />}
       <div className="grid gap-3 md:grid-cols-2">
         <Input name="title" label="כותרת" defaultValue={promotion?.title} required />
         <Input name="tag" label="תג" defaultValue={promotion?.tag} required />
@@ -1136,14 +1295,14 @@ function PromotionForm({
             { value: 'BUY_X_GET_Y', label: 'קנה X קבל Y' },
           ]}
         />
-        <Input name="discountValue" label="ערך הנחה / מחיר" defaultValue={promotion?.discountValue ?? ''} type="number" />
-        <Input name="buyQuantity" label="קנה כמות" defaultValue={promotion?.buyQuantity ?? ''} type="number" />
-        <Input name="freeQuantity" label="קבל ללא חיוב" defaultValue={promotion?.freeQuantity ?? ''} type="number" />
-        <Input name="priority" label="עדיפות" defaultValue={promotion?.priority ?? 0} type="number" required />
+        <Input name="discountValue" label="ערך הנחה / מחיר" defaultValue={promotion?.discountValue ?? ''} type="number" min={0} step={0.01} inputMode="decimal" hint="לפי סוג המבצע: אחוז הנחה, סכום הנחה, או מחיר יחידה קבוע." />
+        <Input name="buyQuantity" label="קנה כמות" defaultValue={promotion?.buyQuantity ?? ''} type="number" min={0} step={1} inputMode="numeric" hint="רלוונטי רק למבצע קנה X קבל Y." />
+        <Input name="freeQuantity" label="קבל ללא חיוב" defaultValue={promotion?.freeQuantity ?? ''} type="number" min={0} step={1} inputMode="numeric" hint="רלוונטי רק למבצע קנה X קבל Y." />
+        <Input name="priority" label="עדיפות" defaultValue={promotion?.priority ?? 0} type="number" step={1} inputMode="numeric" required hint="כשכמה מבצעים מתאימים, מספר גבוה יותר מקבל קדימות." />
         <Input name="startsAt" label="מתאריך" defaultValue={toDateTimeLocal(promotion?.startsAt)} type="datetime-local" />
         <Input name="endsAt" label="עד תאריך" defaultValue={toDateTimeLocal(promotion?.endsAt)} type="datetime-local" />
       </div>
-      <Textarea name="description" label="תיאור" defaultValue={promotion?.description ?? ''} required />
+      <Textarea name="description" label="תיאור" defaultValue={promotion?.description ?? ''} required hint="נוסח קצר וברור שיופיע ליד המבצע לצוות או ללקוח." />
       <div className="grid gap-3 lg:grid-cols-2">
         <CheckboxGroup title="מוצרים" name="productIds" options={products.map((product) => ({ value: product.id, label: `${product.name} · ${product.sku}${product.isActive ? '' : ' (לא פעיל)'}` }))} selected={selectedProductIds} />
         <CheckboxGroup title="קטגוריות" name="categories" options={categories.map((category) => ({ value: category, label: category }))} selected={selectedCategories} />
@@ -1152,8 +1311,43 @@ function PromotionForm({
         <CheckboxGroup title="מחירונים" name="priceListIds" options={priceLists.map((priceList) => ({ value: priceList.id, label: `${priceList.name}${priceList.isDefault ? ' · ברירת מחדל' : ''}` }))} selected={selectedPriceListIds} />
       </div>
       <Checkbox name="isActive" label="פעיל" defaultChecked={promotion?.isActive ?? true} />
+      <FormImpactNote>
+        אחרי שמירה, המבצע הפעיל יכול להשפיע על מחירי קטלוג והזמנות חדשות לפי המוצרים והלקוחות שנבחרו. הזמנות קיימות נשארות עם הסיכום שנשמר בזמן ההזמנה.
+      </FormImpactNote>
       <FormActions pending={pending} onCancel={onCancel} />
     </FormShell>
+  );
+}
+
+function PromotionPresetButtons() {
+  return (
+    <section className="rounded-2xl border border-black/10 bg-[#f7f5f1] p-3">
+      <p className="text-sm font-black">תבניות מבצע נפוצות</p>
+      <div className="mt-2 grid gap-2 md:grid-cols-2">
+        {promotionPresets.map((preset) => (
+          <button
+            key={preset.id}
+            type="button"
+            className="rounded-xl bg-white px-3 py-2 text-right text-xs font-black ring-1 ring-black/10 hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-black/25"
+            onClick={(event) => {
+              const form = event.currentTarget.closest('form');
+
+              setNamedFormValue(form, 'title', preset.title);
+              setNamedFormValue(form, 'tag', preset.tag);
+              setNamedFormValue(form, 'description', preset.description);
+              setNamedFormValue(form, 'effectType', preset.effectType);
+              setNamedFormValue(form, 'discountValue', String(preset.discountValue));
+              setNamedFormValue(form, 'buyQuantity', '');
+              setNamedFormValue(form, 'freeQuantity', '');
+              setNamedFormValue(form, 'priority', preset.id === 'cash-5' ? '30' : '20');
+            }}
+          >
+            <span className="block">{preset.label}</span>
+            <span className="mt-1 block font-bold text-black/50">{preset.discountValue}% הנחה · נדרש שיוך לקוחות/קווים לפי הצורך</span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1164,7 +1358,7 @@ function RecommendationForm({ recommendation, customers, products, pending, onSu
         <Select name="customerId" label="לקוח" defaultValue={recommendation?.customerId} options={customers.map((customer) => ({ value: customer.id, label: customer.name }))} />
         <Select name="productId" label="מוצר" defaultValue={recommendation?.productId} options={products.map((product) => ({ value: product.id, label: `${product.name} · ${product.sku}` }))} />
       </div>
-      <Textarea name="reason" label="סיבה" defaultValue={recommendation?.reason ?? ''} />
+      <Textarea name="reason" label="סיבה" defaultValue={recommendation?.reason ?? ''} hint="משפט קצר שיעזור להבין למה המוצר מומלץ ללקוח הזה." />
       <Checkbox name="isActive" label="פעיל" defaultChecked={recommendation?.isActive ?? true} />
       <FormActions pending={pending} onCancel={onCancel} />
     </FormShell>
@@ -1205,7 +1399,7 @@ function ProductThumbnail({
   if (thumbnail.type === 'url') {
     return (
       <div className={frameClass}>
-        <img src={thumbnail.src} alt={name} className={`h-full w-full ${imageClass}`} />
+        <img src={thumbnail.src} alt={name} width={isCard ? 640 : 96} height={isCard ? 480 : 96} loading="lazy" className={`h-full w-full ${imageClass}`} />
       </div>
     );
   }
@@ -1213,7 +1407,7 @@ function ProductThumbnail({
   return (
     <div className={`${isCard ? 'aspect-[4/3] w-full' : 'h-24 w-24 shrink-0 rounded-xl'} grid place-items-center bg-[#e6e1d8] text-black/55`}>
       <div className="text-center">
-        <Package className="mx-auto" size={isCard ? 32 : 22} />
+        <Package aria-hidden="true" className="mx-auto" size={isCard ? 32 : 22} />
         <p className="mt-1 text-sm font-black">{thumbnail.initials}</p>
       </div>
     </div>
@@ -1238,18 +1432,24 @@ function useCrmAction() {
     });
   }
 
-  return { message, pending, run };
+  return { message, pending, run, fail: setMessage };
 }
 
 function readCustomerForm(form: FormData, id?: string) {
   return {
     ...(id ? { id } : {}),
     name: stringValue(form, 'name'),
+    invoiceName: stringValue(form, 'invoiceName'),
     contact: stringValue(form, 'contact'),
     email: stringValue(form, 'email'),
     phone: stringValue(form, 'phone'),
+    accountingContactName: stringValue(form, 'accountingContactName'),
+    accountingEmail: stringValue(form, 'accountingEmail'),
+    accountingPhone: stringValue(form, 'accountingPhone'),
+    businessType: stringValue(form, 'businessType'),
     region: stringValue(form, 'region'),
     address: stringValue(form, 'address'),
+    deliveryConstraints: stringValue(form, 'deliveryConstraints'),
     routeId: stringValue(form, 'routeId'),
     priceListId: stringValue(form, 'priceListId'),
     notes: stringValue(form, 'notes'),
@@ -1261,16 +1461,20 @@ function readCustomerForm(form: FormData, id?: string) {
 }
 
 function readProductForm(form: FormData, priceLists: ProductData['priceLists'], id?: string) {
+  const name = stringValue(form, 'name');
+  const sku = stringValue(form, 'sku') || createLocalSku(name);
+
   return {
     ...(id ? { id } : {}),
-    sku: stringValue(form, 'sku'),
-    name: stringValue(form, 'name'),
+    sku,
+    name,
     category: stringValue(form, 'category'),
     description: stringValue(form, 'description'),
     basePrice: numberValue(form, 'basePrice'),
     unit: stringValue(form, 'unit'),
     caseSize: stringValue(form, 'caseSize'),
     minQty: numberValue(form, 'minQty'),
+    orderMultiple: numberValue(form, 'orderMultiple'),
     imageUrl: stringValue(form, 'imageUrl'),
     assetImage: stringValue(form, 'assetImage'),
     stockLabel: stringValue(form, 'stockLabel'),
@@ -1363,8 +1567,8 @@ function FormShell({ children, onSubmit }: { children: React.ReactNode; onSubmit
 
 function FormActions({ pending, onCancel }: { pending: boolean; onCancel: () => void }) {
   return (
-    <div className="flex flex-wrap gap-2 border-t border-black/10 pt-3">
-      <SubmitButton pending={pending} label="שמירה" icon={<Save size={16} />} />
+    <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap gap-2 border-t border-black/10 bg-white/95 px-4 pt-3 backdrop-blur sm:-mx-5 sm:px-5">
+      <SubmitButton pending={pending} label="שמירה" icon={<Save aria-hidden="true" size={16} />} />
       <button type="button" className="min-h-10 rounded-full bg-[#e6e1d8] px-4 text-sm font-black hover:bg-black hover:text-white" onClick={onCancel}>
         ביטול
       </button>
@@ -1372,38 +1576,95 @@ function FormActions({ pending, onCancel }: { pending: boolean; onCancel: () => 
   );
 }
 
-function SubmitButton({ pending, label, icon }: { pending: boolean; label: string; icon: React.ReactNode }) {
+function FormImpactNote({ children }: { children: React.ReactNode }) {
   return (
-    <button type="submit" disabled={pending} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white disabled:opacity-45">
-      {pending ? <Check size={16} /> : icon}
-      {pending ? 'שומר...' : label}
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-900">
+      {children}
+    </div>
+  );
+}
+
+function SubmitButton({ pending, disabled = false, label, icon }: { pending: boolean; disabled?: boolean; label: string; icon: React.ReactNode }) {
+  return (
+    <button type="submit" disabled={pending || disabled} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white disabled:opacity-45">
+      {pending ? <Check aria-hidden="true" size={16} /> : icon}
+      {pending ? 'שומר…' : label}
     </button>
   );
 }
 
-function Input({ name, label, defaultValue = '', type = 'text', required = false }: { name: string; label: string; defaultValue?: string | number | null; type?: string; required?: boolean }) {
+function Input({
+  name,
+  label,
+  defaultValue = '',
+  type = 'text',
+  required = false,
+  hint,
+  min,
+  max,
+  step,
+  inputMode,
+  autoComplete,
+}: {
+  name: string;
+  label: string;
+  defaultValue?: string | number | null;
+  type?: string;
+  required?: boolean;
+  hint?: string;
+  min?: string | number;
+  max?: string | number;
+  step?: string | number;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
+  autoComplete?: string;
+}) {
   return (
     <label className="block">
       <span className="text-xs font-black text-black/50">{label}</span>
-      <input name={name} type={type} required={required} defaultValue={defaultValue ?? ''} className={fieldClass} />
+      <input
+        name={name}
+        type={type}
+        required={required}
+        min={min}
+        max={max}
+        step={step}
+        inputMode={inputMode}
+        autoComplete={autoComplete}
+        defaultValue={defaultValue ?? ''}
+        className={fieldClass}
+      />
+      {hint && <span className="mt-1 block text-xs font-bold leading-5 text-black/45">{hint}</span>}
     </label>
   );
 }
 
-function Textarea({ name, label, defaultValue = '', required = false }: { name: string; label: string; defaultValue?: string | null; required?: boolean }) {
+function Textarea({ name, label, defaultValue = '', required = false, hint }: { name: string; label: string; defaultValue?: string | null; required?: boolean; hint?: string }) {
   return (
     <label className="block">
       <span className="text-xs font-black text-black/50">{label}</span>
       <textarea name={name} required={required} defaultValue={defaultValue ?? ''} rows={3} className={`${fieldClass} min-h-24 resize-y`} />
+      {hint && <span className="mt-1 block text-xs font-bold leading-5 text-black/45">{hint}</span>}
     </label>
   );
 }
 
-function Select({ name, label, defaultValue, options }: { name: string; label: string; defaultValue?: string | null; options: { value: string; label: string }[] }) {
+function Select({
+  name,
+  label,
+  defaultValue,
+  options,
+  required = true,
+}: {
+  name: string;
+  label: string;
+  defaultValue?: string | null;
+  options: { value: string; label: string }[];
+  required?: boolean;
+}) {
   return (
     <label className="block">
       <span className="text-xs font-black text-black/50">{label}</span>
-      <select name={name} required defaultValue={defaultValue ?? options[0]?.value ?? ''} className={fieldClass}>
+      <select name={name} required={required} defaultValue={defaultValue ?? options[0]?.value ?? ''} className={fieldClass}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
         ))}
@@ -1434,7 +1695,7 @@ function CheckboxGroup({ title, name, options, selected }: { title: string; name
           options.map((option) => (
             <label key={option.value} className="flex items-center gap-2 rounded-xl px-2 py-1 text-xs font-bold hover:bg-[#e6e1d8]">
               <input name={name} type="checkbox" value={option.value} defaultChecked={selectedSet.has(option.value)} className="h-4 w-4 accent-black" />
-              <span className="min-w-0 truncate">{option.label}</span>
+              <span className="min-w-0 break-words">{option.label}</span>
             </label>
           ))
         )}
@@ -1482,7 +1743,28 @@ function MetricPill({ label, value }: { label: string; value: string }) {
 function ActionMessage({ message }: { message: string | null }) {
   if (!message) return null;
 
-  return <p className="rounded-xl border border-black/10 bg-[#e6e1d8] p-3 text-sm font-black">{message}</p>;
+  return <p className="rounded-xl border border-black/10 bg-[#e6e1d8] p-3 text-sm font-black" aria-live="polite">{message}</p>;
+}
+
+function setNamedFormValue(form: HTMLFormElement | null, name: string, value: string) {
+  const field = form?.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+  if (!field || typeof field.value !== 'string') return;
+
+  field.value = value;
+  field.dispatchEvent(new Event('input', { bubbles: true }));
+  field.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function createLocalSku(name: string): string {
+  const normalized = name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toUpperCase()
+    .slice(0, 24);
+
+  return normalized ? `LIV-${normalized}` : `LIV-${Date.now().toString(36).toUpperCase()}`;
 }
 
 function stringValue(form: FormData, name: string): string {
@@ -1538,18 +1820,6 @@ function promotionMatchesWindow(start: string | null | undefined, end: string | 
   return endsAt < now;
 }
 
-function orderStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    DRAFT: 'טיוטה',
-    SUBMITTED: 'התקבל',
-    SPECIAL_REQUEST: 'בקשה מיוחדת',
-    APPROVED: 'מאושר',
-    PACKED: 'ארוז',
-    DELIVERED: 'סופק',
-    CANCELLED: 'בוטל',
-  };
-
-  return labels[status] ?? status;
-}
-
+const productImageMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+const maxProductImageBytes = 5 * 1024 * 1024;
 const fieldClass = 'mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-black focus:ring-2 focus:ring-black/10';

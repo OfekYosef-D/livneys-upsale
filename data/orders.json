@@ -39,5 +39,15 @@
       { "productId": "prod-herb", "qty": 8 },
       { "productId": "prod-hosting-box", "qty": 3 }
     ]
+  },
+  {
+    "id": "ord-1005",
+    "customerId": "cust-002",
+    "date": "2026-06-13",
+    "status": "מאושר",
+    "items": [
+      { "productId": "prod-pesto", "qty": 6 },
+      { "productId": "prod-berry-jam", "qty": 6 }
+    ]
   }
 ]

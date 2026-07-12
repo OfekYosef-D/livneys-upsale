@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCartFromOrder,
+  enforceCartMinimums,
   filterCatalogProducts,
+  getAllowedProductIds,
   getCartItems,
   getCartPricingSummary,
   getCartTotal,
+  prepareCustomerCart,
+  sanitizeCart,
   setCartQuantity,
 } from './order-utils';
 
@@ -120,5 +124,57 @@ describe('order utilities', () => {
     expect(filterCatalogProducts(products, { segment: 'previous' }).map((p) => p.id)).toEqual(['jam']);
     expect(filterCatalogProducts(products, { segment: 'recommended' }).map((p) => p.id)).toEqual(['sauce', 'gift']);
     expect(filterCatalogProducts(products, { segment: 'promotions' }).map((p) => p.id)).toEqual(['sauce']);
+  });
+
+  it('drops unavailable products when preparing a customer cart from a previous order', () => {
+    const prepared = prepareCustomerCart(
+      [
+        { productId: 'jam', qty: 12 },
+        { productId: 'gift', qty: 4 },
+        { productId: 'missing', qty: 2 },
+      ],
+      products,
+    );
+
+    expect(prepared.removedUnavailableCount).toBe(1);
+    expect(getCartItems(prepared.cart, getAllowedProductIds(products))).toEqual([
+      { productId: 'jam', qty: 12 },
+      { productId: 'gift', qty: 4 },
+    ]);
+  });
+
+  it('raises quantities below the product minimum when preparing a customer cart', () => {
+    const prepared = prepareCustomerCart([{ productId: 'gift', qty: 1 }], [{ id: 'gift', minQty: 2 }]);
+
+    expect(prepared.adjustedBelowMinimumCount).toBe(1);
+    expect(prepared.cart).toEqual({ gift: 2 });
+  });
+
+  it('sanitizes stale cart lines and ignores unknown products in pricing', () => {
+    const cart = { jam: 4, missing: 3 };
+    const sanitized = sanitizeCart(cart, getAllowedProductIds(products));
+
+    expect(sanitized.removedProductIds).toEqual(['missing']);
+    expect(getCartPricingSummary(sanitized.cart, products).total).toBe(136);
+  });
+
+  it('enforces minimum quantities on an existing cart', () => {
+    const { cart, adjustedProductIds } = enforceCartMinimums({ gift: 1 }, [{ id: 'gift', minQty: 2 }]);
+
+    expect(adjustedProductIds).toEqual(['gift']);
+    expect(cart).toEqual({ gift: 2 });
+  });
+
+  it('builds carts only from allowed product ids', () => {
+    const allowed = getAllowedProductIds([{ id: 'jam' }]);
+    const cart = buildCartFromOrder(
+      [
+        { productId: 'jam', qty: 3 },
+        { productId: 'gift', qty: 2 },
+      ],
+      allowed,
+    );
+
+    expect(cart).toEqual({ jam: 3 });
   });
 });

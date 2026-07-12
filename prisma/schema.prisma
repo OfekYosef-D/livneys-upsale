@@ -12,6 +12,13 @@ enum UserRole {
   CUSTOMER
 }
 
+enum CompanyRegistrationStatus {
+  PENDING
+  CONTACTED
+  CONVERTED
+  ARCHIVED
+}
+
 enum OrderStatus {
   DRAFT
   SUBMITTED
@@ -47,6 +54,15 @@ enum NotificationStatus {
   FAILED
 }
 
+enum NotificationJobStatus {
+  PENDING
+  PROCESSING
+  DRY_RUN
+  SENT
+  FAILED
+  CANCELLED
+}
+
 enum PromotionEffectType {
   DISPLAY_ONLY
   PERCENT_OFF
@@ -73,11 +89,17 @@ model User {
 model Customer {
   id                      String                          @id
   name                    String
+  invoiceName             String?
   contact                 String
   email                   String?
   phone                   String
+  accountingContactName   String?
+  accountingEmail         String?
+  accountingPhone         String?
+  businessType            String?
   region                  String
   address                 String
+  deliveryConstraints     String?
   notes                   String?
   statusLabel             String?
   isActive                Boolean                         @default(true)
@@ -92,7 +114,9 @@ model Customer {
   reminderJobs            ReminderJob[]
   notificationPreference  NotificationPreference?
   notificationEvents      NotificationEvent[]
+  notificationJobs        NotificationJob[]
   contactLogs             CustomerContactLog[]
+  whatsappWebhookEvents   WhatsAppWebhookEvent[]
   createdAt               DateTime                        @default(now())
   updatedAt               DateTime                        @updatedAt
 
@@ -110,6 +134,7 @@ model Product {
   unit            String
   caseSize        String
   minQty          Int                             @default(1)
+  orderMultiple   Int                             @default(1)
   imageUrl        String?
   assetImage      String?
   stockLabel      String?
@@ -125,6 +150,31 @@ model Product {
 
   @@index([category])
   @@index([isActive])
+}
+
+model CompanyRegistrationRequest {
+  id                    String                    @id @default(cuid())
+  businessName          String
+  invoiceName           String?
+  contactName           String
+  phone                 String
+  email                 String
+  accountingContactName String?
+  accountingEmail       String?
+  accountingPhone       String?
+  businessType          String
+  address               String
+  deliveryNotes         String?
+  openingOrderNotes     String?
+  status                CompanyRegistrationStatus @default(PENDING)
+  internalNote          String?
+  convertedCustomerId   String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([businessName])
+  @@index([email])
 }
 
 model PriceList {
@@ -198,6 +248,7 @@ model Order {
   customer            Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
   route               Route?      @relation(fields: [routeId], references: [id], onDelete: SetNull)
   lines               OrderLine[]
+  notificationJobs    NotificationJob[]
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 
@@ -368,6 +419,7 @@ model ReminderJob {
   customer            Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
   route               Route               @relation(fields: [routeId], references: [id], onDelete: Cascade)
   notificationEvents  NotificationEvent[]
+  notificationJobs    NotificationJob[]
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
 
@@ -390,20 +442,89 @@ model NotificationEvent {
   id            String              @id @default(cuid())
   customerId    String
   reminderJobId String?
+  notificationJobId String?
   channel       NotificationChannel
   type          String
   status        NotificationStatus
   subject       String?
   message       String
+  templateKey   String?
+  dryRun        Boolean             @default(false)
+  providerMessageId String?
+  providerStatus String?
   errorMessage  String?
   customer      Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
   reminderJob   ReminderJob?        @relation(fields: [reminderJobId], references: [id], onDelete: SetNull)
+  notificationJob NotificationJob?   @relation(fields: [notificationJobId], references: [id], onDelete: SetNull)
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
   @@index([customerId])
   @@index([reminderJobId])
+  @@index([notificationJobId])
   @@index([status])
+  @@index([providerMessageId])
+}
+
+model NotificationJob {
+  id                String                @id @default(cuid())
+  customerId        String
+  orderId           String?
+  reminderJobId     String?
+  channel           NotificationChannel   @default(WHATSAPP)
+  templateKey       String
+  templateName      String?
+  status            NotificationJobStatus @default(PENDING)
+  dryRun            Boolean               @default(true)
+  payload           Json
+  message           String?
+  scheduledAt       DateTime              @default(now())
+  nextAttemptAt     DateTime?
+  lastAttemptAt     DateTime?
+  processedAt       DateTime?
+  attempts          Int                   @default(0)
+  maxAttempts       Int                   @default(3)
+  providerMessageId String?
+  errorMessage      String?
+  dedupeKey         String                @unique
+  customer          Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order             Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  reminderJob       ReminderJob?          @relation(fields: [reminderJobId], references: [id], onDelete: SetNull)
+  notificationEvents NotificationEvent[]
+  webhookEvents     WhatsAppWebhookEvent[]
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([customerId])
+  @@index([orderId])
+  @@index([reminderJobId])
+  @@index([status, scheduledAt])
+  @@index([nextAttemptAt])
+  @@index([providerMessageId])
+}
+
+model WhatsAppWebhookEvent {
+  id                String           @id @default(cuid())
+  dedupeKey         String           @unique
+  providerEventId   String?
+  providerMessageId String?
+  kind              String
+  providerStatus    String?
+  fromPhone         String?
+  customerId        String?
+  notificationJobId String?
+  payload           Json
+  receivedAt        DateTime         @default(now())
+  processedAt       DateTime?
+  errorMessage      String?
+  customer          Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  notificationJob   NotificationJob? @relation(fields: [notificationJobId], references: [id], onDelete: SetNull)
+  createdAt         DateTime         @default(now())
+
+  @@index([providerMessageId])
+  @@index([customerId])
+  @@index([notificationJobId])
+  @@index([kind])
 }
 
 model CustomerContactLog {

@@ -66,6 +66,7 @@ export async function getOrderWriteContext(customerId: string): Promise<OrderWri
         basePrice: Number(item.product.basePrice),
         isActive: item.product.isActive,
         minQty: item.product.minQty,
+        orderMultiple: item.product.orderMultiple,
       })),
     priceListItems: customer.priceList.items.map((item) => ({
       productId: item.productId,

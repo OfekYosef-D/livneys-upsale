@@ -1,7 +1,9 @@
 import type { OrderSource } from '@prisma/client';
 import { calculateOrderPricing, type PricingPriceListItem, type PricingProduct, type PricingPromotion } from '../pricing/engine';
+import { validateInstitutionalOrderRules } from './business-rules';
 import {
   getSubmissionStatus,
+  normalizeCustomerOrderItems,
   type OrderSnapshotLine,
   type OrderStatus,
   type SnapshotItem,
@@ -71,7 +73,10 @@ export function buildSubmittedOrderPayload({
   const pricing = calculateOrderPricing({
     customer: context.customer,
     route: context.route,
-    items,
+    items: normalizeCustomerOrderItems(
+      items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+      context.products,
+    ),
     products: context.products,
     priceListItems: context.priceListItems,
     promotions: context.promotions,
@@ -82,6 +87,13 @@ export function buildSubmittedOrderPayload({
   if (lines.length === 0) {
     throw new Error('Order must include at least one product');
   }
+
+  validateInstitutionalOrderRules({
+    source,
+    total: pricing.total,
+    items: lines.map((line) => ({ productId: line.productId, quantity: line.quantity })),
+    products: context.products,
+  });
 
   return {
     order: {

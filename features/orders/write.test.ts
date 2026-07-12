@@ -132,7 +132,7 @@ describe('shared order write utilities', () => {
         promotions: [promotion],
       },
       items: [{ productId: 'prod-a', quantity: 4 }],
-      source: 'CUSTOMER',
+      source: 'ADMIN',
       now: new Date('2026-06-29T14:00:00.000Z'),
     });
 
@@ -158,7 +158,7 @@ describe('shared order write utilities', () => {
     const result = buildSubmittedOrderPayload({
       context: { customer, route, products, priceListItems, promotions: [] },
       items: [{ productId: 'prod-a', quantity: 2 }],
-      source: 'CUSTOMER',
+      source: 'ADMIN',
       now: new Date('2026-06-29T16:00:00.000Z'),
     });
 
@@ -195,5 +195,20 @@ describe('shared order write utilities', () => {
         now: new Date('2026-06-29T14:00:00.000Z'),
       }),
     ).toThrow('Route is inactive');
+  });
+
+  it('drops unavailable products instead of failing when building submitted order payloads', () => {
+    const result = buildSubmittedOrderPayload({
+      context: { customer, route, products, priceListItems, promotions: [] },
+      items: [
+        { productId: 'prod-a', quantity: 2 },
+        { productId: 'prod-disabled', quantity: 4 },
+      ],
+      source: 'ADMIN',
+      now: new Date('2026-06-29T14:00:00.000Z'),
+    });
+
+    expect(result.lines).toHaveLength(1);
+    expect(result.lines[0]?.productId).toBe('prod-a');
   });
 });

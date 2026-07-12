@@ -10,7 +10,7 @@ export default async function AdminCustomersPage() {
   const data = await getCustomerManagementData();
 
   return (
-    <AdminShell title="ניהול לקוחות" subtitle="יצירה, עריכה והפעלה של לקוחות, קווים, מחירונים והעדפות הודעה.">
+    <AdminShell title="ניהול לקוחות" subtitle="יצירה, עריכה והפעלה של לקוחות, קווים, מחירונים והעדפות הודעה." activeHref="/admin/customers">
       <AdminCustomersManager data={data} />
     </AdminShell>
   );

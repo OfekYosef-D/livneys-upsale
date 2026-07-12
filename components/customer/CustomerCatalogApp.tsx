@@ -3,15 +3,18 @@
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Search, ShoppingBag, Truck } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { CartAdjustmentNotice } from '@/components/customer/CartAdjustmentNotice';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { fallbackProductImage, productImages, brandLogo } from '@/lib/product-assets';
 import { money } from '@/lib/format';
 import {
-  buildCartFromOrder,
   filterCatalogProducts,
+  getAllowedProductIds,
   getCartItems,
   getCartPricingSummary,
+  prepareCustomerCart,
+  REMOVED_UNAVAILABLE_CART_ITEMS_MESSAGE,
   setCartQuantity,
   type Cart,
 } from '@/lib/order-utils';
@@ -30,19 +33,48 @@ export function CustomerCatalogApp({
   lastOrder: PortalOrder;
 }) {
   const router = useRouter();
-  const initialCart = useMemo(() => buildCartFromOrder(lastOrder.items), [lastOrder.items]);
-  const [cart, setCart] = useState<Cart>(initialCart);
+  const allowedProductIds = useMemo(() => getAllowedProductIds(products), [products]);
+  const preparedCart = useMemo(() => prepareCustomerCart(lastOrder.items, products), [lastOrder.items, products]);
+  const [cart, setCart] = useState<Cart>(preparedCart.cart);
+  const [cartNotice, setCartNotice] = useState('');
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
   const [error, setError] = useState('');
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+
+  useEffect(() => {
+    setCart(preparedCart.cart);
+
+    if (preparedCart.removedUnavailableCount > 0) {
+      setCartNotice(REMOVED_UNAVAILABLE_CART_ITEMS_MESSAGE);
+      return;
+    }
+
+    if (preparedCart.adjustedBelowMinimumCount > 0) {
+      setCartNotice('כמות של חלק מהמוצרים עודכנה לכמות המינימלית.');
+      return;
+    }
+
+    if (preparedCart.adjustedToMultipleCount > 0) {
+      setCartNotice('הכמות של חלק מהמוצרים עודכנה לכפולות הארגז.');
+      return;
+    }
+
+    setCartNotice('');
+  }, [preparedCart]);
+
+  useEffect(() => {
+    if (category !== 'all' && !products.some((product) => product.category === category)) {
+      setCategory('all');
+    }
+  }, [category, products]);
 
   const categories = useMemo(() => ['all', ...Array.from(new Set(products.map((product) => product.category)))], [products]);
   const visibleProducts = useMemo(
     () => filterCatalogProducts(products, { category, query, segment: 'all' }),
     [category, products, query],
   );
-  const cartItems = useMemo(() => getCartItems(cart), [cart]);
+  const cartItems = useMemo(() => getCartItems(cart, allowedProductIds), [allowedProductIds, cart]);
   const cartPricing = useMemo(() => getCartPricingSummary(cart, products), [cart, products]);
   const itemCount = cartItems.reduce((sum, item) => sum + item.qty, 0);
   const deliveryDate = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'long' }).format(new Date(route.nextDelivery));
@@ -113,6 +145,8 @@ export function CustomerCatalogApp({
             </div>
           </div>
 
+          {cartNotice && <CartAdjustmentNotice message={cartNotice} />}
+
           <section className="space-y-2">
             {visibleProducts.map((product) => (
               <ProductOrderCard
@@ -144,8 +178,8 @@ export function CustomerCatalogApp({
 }
 
 function ProductOrderCard({ product, qty, onQty }: { product: PortalProduct; qty: number; onQty: (qty: number) => void }) {
-  const image = productImages[product.assetImage ?? ''] ?? fallbackProductImage;
-  const step = product.minQty ?? 1;
+  const image = product.imageUrl?.startsWith('http') ? product.imageUrl : productImages[product.assetImage ?? ''] ?? fallbackProductImage;
+  const step = product.orderMultiple ?? product.minQty ?? 1;
 
   return (
     <article className="group rounded-2xl border border-black/10 bg-white p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.045)] transition hover:border-black/20">
@@ -164,7 +198,7 @@ function ProductOrderCard({ product, qty, onQty }: { product: PortalProduct; qty
             <div className="shrink-0 text-left md:hidden">
               {product.listPrice > product.price && <p className="text-[11px] font-bold text-black/40 line-through">{money(product.listPrice)}</p>}
               <p className="text-sm font-black">{money(product.price)}</p>
-              <p className="text-[11px] font-bold text-black/45">ליח׳</p>
+              <p className="text-[11px] font-bold text-black/45">ליחידה</p>
             </div>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -180,7 +214,7 @@ function ProductOrderCard({ product, qty, onQty }: { product: PortalProduct; qty
             <p className="text-base font-black">{money(product.price)}</p>
             <p className="text-[11px] font-bold text-black/45">{product.unit}</p>
           </div>
-          <QuantityStepper value={qty} min={step} step={1} onChange={onQty} />
+          <QuantityStepper value={qty} min={product.minQty ?? step} step={step} onChange={onQty} />
         </div>
       </div>
     </article>
@@ -208,7 +242,7 @@ function CartSummary({
         <div>
           <p className="flex items-center gap-1.5 text-xs font-black text-black/45">
             <Truck size={13} />
-            עד {itemCount === 0 ? 'להוספת מוצרים' : 'לשליחה'}
+            {itemCount === 0 ? 'הוסיפו מוצרים לסל' : 'מוכן לשליחה'}
           </p>
           <p className="text-base font-black">{itemCount} יח׳ · {money(cartTotal)}</p>
         </div>
@@ -219,7 +253,7 @@ function CartSummary({
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-not-allowed disabled:bg-black/30"
         >
           <ShoppingBag size={16} />
-          {isSaving ? 'שומר...' : 'סקירה'}
+          {isSaving ? 'שומר…' : 'סקירת הזמנה'}
         </button>
       </div>
     </div>

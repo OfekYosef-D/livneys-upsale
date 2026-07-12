@@ -15,7 +15,7 @@ export default async function RoutePage({ params }: { params: { routeId: string 
   }
 
   return (
-    <AdminShell title={`קו ${route.name}`} subtitle="מבט לפי קו: מי הזמין, מי חסר ומה מוכן לחלוקה.">
+    <AdminShell title={`קו ${route.name}`} subtitle="מבט לפי קו: מי הזמין, מי חסר ומה מוכן לחלוקה." activeHref="/admin/routes">
       <AdminRouteDetail route={route} />
     </AdminShell>
   );

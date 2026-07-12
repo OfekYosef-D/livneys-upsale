@@ -3,12 +3,21 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Truck } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { CartAdjustmentNotice } from '@/components/customer/CartAdjustmentNotice';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { submitCustomerOrderAction } from '@/features/customer-portal/actions';
 import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
 import { money } from '@/lib/format';
-import { buildCartFromOrder, getCartItems, getCartPricingSummary, setCartQuantity, type Cart } from '@/lib/order-utils';
+import {
+  getAllowedProductIds,
+  getCartItems,
+  getCartPricingSummary,
+  prepareCustomerCart,
+  REMOVED_UNAVAILABLE_CART_ITEMS_MESSAGE,
+  setCartQuantity,
+  type Cart,
+} from '@/lib/order-utils';
 
 export function ReviewOrderClient({
   customer,
@@ -22,12 +31,36 @@ export function ReviewOrderClient({
   lastOrder: PortalOrder;
 }) {
   const router = useRouter();
-  const [cart, setCart] = useState<Cart>(() => buildCartFromOrder(lastOrder.items));
+  const allowedProductIds = useMemo(() => getAllowedProductIds(products), [products]);
+  const preparedCart = useMemo(() => prepareCustomerCart(lastOrder.items, products), [lastOrder.items, products]);
+  const [cart, setCart] = useState<Cart>(() => preparedCart.cart);
+  const [cartNotice, setCartNotice] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const cartItems = useMemo(() => getCartItems(cart), [cart]);
+  useEffect(() => {
+    setCart(preparedCart.cart);
+
+    if (preparedCart.removedUnavailableCount > 0) {
+      setCartNotice(REMOVED_UNAVAILABLE_CART_ITEMS_MESSAGE);
+      return;
+    }
+
+    if (preparedCart.adjustedBelowMinimumCount > 0) {
+      setCartNotice('כמות של חלק מהמוצרים עודכנה לכמות המינימלית.');
+      return;
+    }
+
+    if (preparedCart.adjustedToMultipleCount > 0) {
+      setCartNotice('הכמות של חלק מהמוצרים עודכנה לכפולות הארגז.');
+      return;
+    }
+
+    setCartNotice('');
+  }, [preparedCart]);
+
+  const cartItems = useMemo(() => getCartItems(cart, allowedProductIds), [allowedProductIds, cart]);
   const cartPricing = useMemo(() => getCartPricingSummary(cart, products), [cart, products]);
 
   async function submitOrder() {
@@ -59,6 +92,7 @@ export function ReviewOrderClient({
         </header>
 
         <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_17rem]">
+          {cartNotice && <div className="lg:col-span-2"><CartAdjustmentNotice message={cartNotice} /></div>}
           <section>
             {cartItems.length === 0 ? (
               <div className="rounded-2xl border border-black/10 bg-white p-6 text-center">
@@ -74,7 +108,9 @@ export function ReviewOrderClient({
                 </div>
                 <div className="divide-y divide-black/10">
                   {cartItems.map((item) => {
-                    const product = products.find((candidate) => candidate.id === item.productId) ?? products[0];
+                    const product = products.find((candidate) => candidate.id === item.productId);
+                    if (!product) return null;
+
                     const linePricing = getCartPricingSummary({ [item.productId]: item.qty }, [product]);
 
                     return (
@@ -95,7 +131,7 @@ export function ReviewOrderClient({
                           <QuantityStepper
                             value={item.qty}
                             min={product.minQty ?? 1}
-                            step={1}
+                            step={product.orderMultiple ?? product.minQty ?? 1}
                             onChange={(qty) => setCart((current) => setCartQuantity(current, item.productId, qty))}
                           />
                         </div>
@@ -124,7 +160,7 @@ export function ReviewOrderClient({
                 <textarea
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
-                  placeholder="לדוגמה: נא לתאם הגעה בבוקר"
+                  placeholder="לדוגמה: נא לתאם הגעה בשעות הבוקר"
                   className="min-h-20 w-full rounded-xl border border-black/12 bg-white p-2.5 text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-black/25"
                 />
               </label>

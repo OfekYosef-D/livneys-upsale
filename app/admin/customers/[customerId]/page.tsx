@@ -15,7 +15,7 @@ export default async function CustomerProfile({ params }: { params: { customerId
   }
 
   return (
-    <AdminShell title={customer.name} subtitle="פרופיל לקוח, היסטוריית הזמנות והמלצות אפסייל.">
+    <AdminShell title={customer.name} subtitle="פרופיל לקוח, היסטוריית הזמנות והמלצות אפסייל." activeHref="/admin/customers">
       <AdminCustomerDetail customer={customer} />
     </AdminShell>
   );

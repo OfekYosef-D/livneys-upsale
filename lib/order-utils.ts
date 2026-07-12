@@ -5,6 +5,22 @@ export type OrderLine = {
   qty: number;
 };
 
+export type CartProductConstraints = {
+  id: string;
+  minQty?: number;
+  orderMultiple?: number;
+};
+
+export type PreparedCustomerCart = {
+  cart: Cart;
+  removedUnavailableCount: number;
+  adjustedBelowMinimumCount: number;
+  adjustedToMultipleCount: number;
+};
+
+export const REMOVED_UNAVAILABLE_CART_ITEMS_MESSAGE =
+  'חלק מהמוצרים מההזמנה הקודמת אינם זמינים עוד והוסרו מהסל.';
+
 export type CatalogProductLike = {
   id: string;
   name: string;
@@ -32,8 +48,93 @@ export type CatalogFilters = {
   segment?: CatalogSegment;
 };
 
-export function buildCartFromOrder(items: OrderLine[]): Cart {
-  return items.reduce<Cart>((cart, item) => setCartQuantity(cart, item.productId, item.qty), {});
+export function getAllowedProductIds(products: CartProductConstraints[]): Set<string> {
+  return new Set(products.map((product) => product.id));
+}
+
+export function buildCartFromOrder(items: OrderLine[], allowedProductIds?: Set<string>): Cart {
+  return items.reduce<Cart>((cart, item) => {
+    if (allowedProductIds && !allowedProductIds.has(item.productId)) {
+      return cart;
+    }
+
+    return setCartQuantity(cart, item.productId, item.qty);
+  }, {});
+}
+
+export function sanitizeCart(cart: Cart, allowedProductIds: Set<string>): { cart: Cart; removedProductIds: string[] } {
+  const removedProductIds: string[] = [];
+  const next: Cart = {};
+
+  for (const [productId, qty] of Object.entries(cart)) {
+    if (qty <= 0) continue;
+
+    if (!allowedProductIds.has(productId)) {
+      removedProductIds.push(productId);
+      continue;
+    }
+
+    next[productId] = qty;
+  }
+
+  return { cart: next, removedProductIds };
+}
+
+export function enforceCartMinimums<T extends CartProductConstraints>(cart: Cart, products: T[]): { cart: Cart; adjustedProductIds: string[] } {
+  const productsById = new Map(products.map((product) => [product.id, product]));
+  const adjustedProductIds: string[] = [];
+  let next = cart;
+
+  for (const [productId, qty] of Object.entries(cart)) {
+    if (qty <= 0) continue;
+
+    const product = productsById.get(productId);
+    if (!product) continue;
+
+    const minQty = product.minQty ?? 1;
+    if (qty < minQty) {
+      adjustedProductIds.push(productId);
+      next = setCartQuantity(next, productId, minQty);
+    }
+  }
+
+  return { cart: next, adjustedProductIds };
+}
+
+export function enforceCartMultiples<T extends CartProductConstraints>(cart: Cart, products: T[]): { cart: Cart; adjustedProductIds: string[] } {
+  const productsById = new Map(products.map((product) => [product.id, product]));
+  const adjustedProductIds: string[] = [];
+  let next = cart;
+
+  for (const [productId, qty] of Object.entries(cart)) {
+    if (qty <= 0) continue;
+
+    const product = productsById.get(productId);
+    if (!product) continue;
+
+    const multiple = Math.max(1, Math.floor(product.orderMultiple ?? 1));
+    if (multiple <= 1 || qty % multiple === 0) continue;
+
+    adjustedProductIds.push(productId);
+    next = setCartQuantity(next, productId, Math.ceil(qty / multiple) * multiple);
+  }
+
+  return { cart: next, adjustedProductIds };
+}
+
+export function prepareCustomerCart(orderItems: OrderLine[], products: CartProductConstraints[]): PreparedCustomerCart {
+  const allowedProductIds = getAllowedProductIds(products);
+  const removedUnavailableCount = orderItems.filter((item) => item.qty > 0 && !allowedProductIds.has(item.productId)).length;
+  const seededCart = buildCartFromOrder(orderItems, allowedProductIds);
+  const { cart: minimumCart, adjustedProductIds } = enforceCartMinimums(seededCart, products);
+  const { cart: multipleCart, adjustedProductIds: multipleAdjustedProductIds } = enforceCartMultiples(minimumCart, products);
+
+  return {
+    cart: multipleCart,
+    removedUnavailableCount,
+    adjustedBelowMinimumCount: adjustedProductIds.length,
+    adjustedToMultipleCount: multipleAdjustedProductIds.length,
+  };
 }
 
 export function setCartQuantity(cart: Cart, productId: string, qty: number): Cart {
@@ -49,9 +150,9 @@ export function setCartQuantity(cart: Cart, productId: string, qty: number): Car
   return next;
 }
 
-export function getCartItems(cart: Cart): OrderLine[] {
+export function getCartItems(cart: Cart, allowedProductIds?: Set<string>): OrderLine[] {
   return Object.entries(cart)
-    .filter(([, qty]) => qty > 0)
+    .filter(([productId, qty]) => qty > 0 && (!allowedProductIds || allowedProductIds.has(productId)))
     .map(([productId, qty]) => ({ productId, qty }));
 }
 
@@ -61,8 +162,9 @@ export function getCartTotal<T extends CatalogProductLike>(cart: Cart, products:
 
 export function getCartPricingSummary<T extends CatalogProductLike>(cart: Cart, products: T[]): { subtotal: number; discountTotal: number; total: number } {
   const productsById = new Map(products.map((product) => [product.id, product]));
+  const allowedProductIds = getAllowedProductIds(products);
 
-  return getCartItems(cart).reduce((summary, item) => {
+  return getCartItems(cart, allowedProductIds).reduce((summary, item) => {
     const product = productsById.get(item.productId);
     if (!product) return summary;
 

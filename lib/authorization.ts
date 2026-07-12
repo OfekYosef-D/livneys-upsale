@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
 export class AuthorizationError extends Error {
-  constructor(message = 'Unauthorized') {
+  constructor(message = 'אין הרשאה לבצע פעולה זו.') {
     super(message);
     this.name = 'AuthorizationError';
   }
@@ -63,7 +63,7 @@ export async function assertCustomerAction(customerId: string) {
   }
 
   if (session.user.role !== 'CUSTOMER' || session.user.customerId !== customerId) {
-    throw new AuthorizationError('Cannot access another customer account');
+    throw new AuthorizationError('אין גישה לחשבון לקוח אחר.');
   }
 
   return session;

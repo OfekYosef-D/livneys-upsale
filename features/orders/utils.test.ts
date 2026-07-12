@@ -4,6 +4,7 @@ import {
   createOrderSnapshotLines,
   getAllowedOrderStatusTransitions,
   getSubmissionStatus,
+  normalizeCustomerOrderItems,
 } from './utils';
 
 describe('order domain utilities', () => {
@@ -78,5 +79,26 @@ describe('order domain utilities', () => {
     expect(getAllowedOrderStatusTransitions('SUBMITTED')).toEqual(['APPROVED', 'CANCELLED']);
     expect(getAllowedOrderStatusTransitions('APPROVED')).toEqual(['PACKED', 'CANCELLED']);
     expect(getAllowedOrderStatusTransitions('DELIVERED')).toEqual([]);
+  });
+
+  it('drops unavailable products when normalizing customer order items', () => {
+    expect(
+      normalizeCustomerOrderItems(
+        [
+          { productId: 'prod-eggplant', qty: 3 },
+          { productId: 'prod-missing', qty: 2 },
+        ],
+        [{ id: 'prod-eggplant', name: 'ממרח חציל', minQty: 1 }],
+      ),
+    ).toEqual([{ productId: 'prod-eggplant', quantity: 3 }]);
+  });
+
+  it('rejects customer order items below the product minimum quantity', () => {
+    expect(() =>
+      normalizeCustomerOrderItems(
+        [{ productId: 'prod-case', qty: 2 }],
+        [{ id: 'prod-case', name: 'מארז מסעדה', minQty: 6 }],
+      ),
+    ).toThrow('הכמות המינימלית עבור מארז מסעדה היא 6.');
   });
 });

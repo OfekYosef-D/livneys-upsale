@@ -6,6 +6,7 @@ import products from '../data/products.json';
 import promotions from '../data/promotions.json';
 import routes from '../data/routes.json';
 import { createOrderSnapshotLines } from '../features/orders/utils';
+import { defaultInstitutionalRouteNames, productPricePresets } from '../features/owner-rules/constants';
 
 const prisma = new PrismaClient();
 
@@ -46,11 +47,24 @@ const routeWindows: Record<string, { delivery: Date; cutoff: Date; deliveryWeekd
   },
 };
 
+const ownerRoutes = defaultInstitutionalRouteNames.map((name, index) => ({
+  id: `route-owner-${index + 1}`,
+  name,
+  driver: null,
+}));
+
+const herbProductIds = new Set(['prod-olive-spread', 'prod-herbs-spread']);
+const spreadPreset = productPricePresets.find((preset) => preset.id === 'spread-185')!;
+const herbPreset = productPricePresets.find((preset) => preset.id === 'herb-185')!;
+
 async function resetDemoData() {
+  await prisma.whatsAppWebhookEvent.deleteMany();
   await prisma.notificationEvent.deleteMany();
+  await prisma.notificationJob.deleteMany();
   await prisma.reminderJob.deleteMany();
   await prisma.reminderRule.deleteMany();
   await prisma.customerContactLog.deleteMany();
+  await prisma.companyRegistrationRequest.deleteMany();
   await prisma.notificationPreference.deleteMany();
   await prisma.customerProductRecommendation.deleteMany();
   await prisma.promotion.deleteMany();
@@ -67,6 +81,9 @@ async function resetDemoData() {
 function normalizeOrderStatus(status: string, orderId: string): OrderStatus {
   if (status.includes('טיוט') || orderId === 'ord-1004') return 'DRAFT';
   if (status.includes('סופק') || orderId === 'ord-1001' || orderId === 'ord-1003') return 'DELIVERED';
+  if (status.includes('מאושר') || orderId === 'ord-1005') return 'APPROVED';
+  if (status.includes('ארוז')) return 'PACKED';
+  if (status.includes('בקשה מיוחדת')) return 'SPECIAL_REQUEST';
   return 'SUBMITTED';
 }
 
@@ -100,6 +117,21 @@ function getSeedPromotionEffect(promotionId: string): {
   };
 }
 
+function getInstitutionalProductPreset(product: (typeof products)[number]) {
+  if (herbProductIds.has(product.id)) return herbPreset;
+  if (String(product.unit).includes('500')) return product.name.includes('זעתר') || product.name.includes('טימין') ? productPricePresets.find((preset) => preset.id === 'herb-institutional-500')! : productPricePresets.find((preset) => preset.id === 'institutional-500')!;
+  if (String(product.unit).includes('185') || String(product.unit).includes('210')) return spreadPreset;
+  return null;
+}
+
+function getSeedProductPrice(product: (typeof products)[number]): number {
+  return getInstitutionalProductPreset(product)?.price ?? product.price;
+}
+
+function getSeedProductOrderMultiple(product: (typeof products)[number]): number {
+  return getInstitutionalProductPreset(product)?.orderMultiple ?? product.minQty ?? 1;
+}
+
 async function seedProductsAndPricing() {
   await prisma.priceList.createMany({
     data: [
@@ -119,18 +151,21 @@ async function seedProductsAndPricing() {
   });
 
   for (const product of products) {
+    const institutionalPrice = getSeedProductPrice(product);
+
     await prisma.product.create({
       data: {
         id: product.id,
         sku: product.sku,
         name: product.name,
         category: product.category,
-        basePrice: product.price,
+        basePrice: institutionalPrice,
         unit: product.unit,
         caseSize: product.caseSize,
         minQty: product.minQty ?? 1,
+        orderMultiple: getSeedProductOrderMultiple(product),
         assetImage: product.assetImage,
-        imageUrl: product.assetImage ? `/assets/${product.assetImage}` : null,
+        imageUrl: null,
         stockLabel: product.stockLabel ?? null,
         description: product.description ?? null,
         isActive: true,
@@ -142,12 +177,12 @@ async function seedProductsAndPricing() {
         {
           priceListId: 'price-list-standard',
           productId: product.id,
-          price: product.price,
+          price: institutionalPrice,
         },
         {
           priceListId: 'price-list-south',
           productId: product.id,
-          price: Math.max(1, product.price - (product.recommended ? 1 : 0)),
+          price: Math.max(1, institutionalPrice - (product.recommended ? 1 : 0)),
         },
       ],
     });
@@ -158,7 +193,7 @@ async function seedRoutesCustomersAndUsers() {
   const hashedAdminPassword = await bcrypt.hash(adminPassword, 12);
   const hashedCustomerPassword = await bcrypt.hash(customerPassword, 12);
 
-  for (const route of routes) {
+  for (const route of [...routes, ...ownerRoutes]) {
     const window = routeWindows[route.id] ?? routeWindows['route-south'];
 
     await prisma.route.create({
@@ -195,11 +230,14 @@ async function seedRoutesCustomersAndUsers() {
       data: {
         id: customer.id,
         name: customer.name,
+        invoiceName: customer.name,
         contact: customer.contact,
         email,
         phone: customer.phone,
+        businessType: customer.id === 'cust-003' ? 'יקבים' : 'מעדניות',
         region: customer.region,
         address: customer.address,
+        deliveryConstraints: null,
         notes: customer.notes,
         statusLabel: customer.status,
         routeId: customer.routeId,
@@ -272,7 +310,7 @@ async function seedPromotionsRecommendationsAndOrders() {
       products: products.map((product) => ({
         id: product.id,
         name: product.name,
-        price: product.price,
+        price: getSeedProductPrice(product),
         minQty: product.minQty ?? 1,
       })),
     });
@@ -391,11 +429,36 @@ async function createReminderExample({
       whatsappUrl,
     },
   });
+  const notificationJob =
+    channel === 'WHATSAPP'
+      ? await prisma.notificationJob.create({
+          data: {
+            customerId,
+            reminderJobId: reminderJob.id,
+            channel,
+            templateKey: 'ORDER_REMINDER',
+            templateName: null,
+            status: 'DRY_RUN',
+            dryRun: true,
+            payload: {
+              to: '972500000000',
+              languageCode: 'he',
+              bodyParameters: ['לקוח לדוגמה', 'Livney', 'דרום', '01/07/2026', '30/06/2026, 18:00', 'http://localhost:3000/customer/cust-004'],
+            },
+            message,
+            scheduledAt,
+            processedAt: scheduledAt,
+            attempts: 1,
+            dedupeKey: `seed:reminder:${reminderJob.id}`,
+          },
+        })
+      : null;
 
   await prisma.notificationEvent.create({
     data: {
       customerId,
       reminderJobId: reminderJob.id,
+      notificationJobId: notificationJob?.id,
       channel,
       type: 'REMINDER_EXAMPLE',
       status: status === 'PENDING' ? 'PENDING' : 'SENT',
