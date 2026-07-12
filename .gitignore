@@ -9,3 +9,5 @@ npm-debug.log*
 next-dev*.log
 next-start*.log
 .next-ui-checks/
+.vercel/
+.neon/

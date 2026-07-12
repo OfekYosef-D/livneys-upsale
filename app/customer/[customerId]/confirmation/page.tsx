@@ -4,13 +4,14 @@ import { requireCustomerPage } from '@/lib/authorization';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Confirmation({
-  params,
-  searchParams,
-}: {
-  params: { customerId: string };
-  searchParams: { orderId?: string };
-}) {
+export default async function Confirmation(
+  props: {
+    params: Promise<{ customerId: string }>;
+    searchParams: Promise<{ orderId?: string }>;
+  },
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   await requireCustomerPage(params.customerId);
   const data = await getCustomerConfirmationData(params.customerId, searchParams.orderId);
 

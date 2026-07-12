@@ -2,6 +2,7 @@ import { getWhatsAppConfig } from '../../../../features/notifications/config';
 import { processDueNotifications } from '../../../../features/notifications/jobs';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   return handleCronRequest(request);

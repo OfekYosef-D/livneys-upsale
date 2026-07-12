@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
-export default function Catalog({ params }: { params: { customerId: string } }) {
+export default async function Catalog(props: { params: Promise<{ customerId: string }> }) {
+  const params = await props.params;
   redirect(`/customer/${params.customerId}`);
 }

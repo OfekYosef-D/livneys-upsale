@@ -15,6 +15,14 @@ export type ProductImageUploadResult = {
   secureUrl: string;
 };
 
+export function isCloudinaryConfigured(env: Record<string, string | undefined> = process.env): boolean {
+  return Boolean(
+    env.CLOUDINARY_CLOUD_NAME?.trim()
+    && env.CLOUDINARY_API_KEY?.trim()
+    && env.CLOUDINARY_API_SECRET?.trim(),
+  );
+}
+
 export function getCloudinaryConfig(env: NodeJS.ProcessEnv = process.env): CloudinaryConfig {
   const cloudName = env.CLOUDINARY_CLOUD_NAME?.trim();
   const apiKey = env.CLOUDINARY_API_KEY?.trim();

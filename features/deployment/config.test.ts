@@ -1,0 +1,28 @@
+import { describe, expect, it } from 'vitest';
+import { parseDeploymentEnv } from './config';
+
+const validEnv = {
+  DATABASE_URL: 'postgresql://user:pass@ep-example-pooler.eu-central-1.aws.neon.tech/app?sslmode=require',
+  DIRECT_URL: 'postgresql://user:pass@ep-example.eu-central-1.aws.neon.tech/app?sslmode=require',
+  NEXTAUTH_SECRET: 'a'.repeat(32),
+  NEXTAUTH_URL: 'https://livneys-upsale.vercel.app',
+  CRON_SECRET: 'b'.repeat(16),
+  WHATSAPP_SEND_ENABLED: 'false',
+};
+
+describe('parseDeploymentEnv', () => {
+  it('accepts the complete dry-run deployment environment', () => {
+    const result = parseDeploymentEnv(validEnv);
+
+    expect(result.whatsappSendEnabled).toBe(false);
+    expect(result.nextAuthUrl).toBe('https://livneys-upsale.vercel.app');
+  });
+
+  it('rejects missing core deployment secrets without including secret values', () => {
+    expect(() => parseDeploymentEnv({ ...validEnv, NEXTAUTH_SECRET: '' })).toThrow('NEXTAUTH_SECRET');
+  });
+
+  it('requires Meta credentials when live WhatsApp sending is enabled', () => {
+    expect(() => parseDeploymentEnv({ ...validEnv, WHATSAPP_SEND_ENABLED: 'true' })).toThrow('WHATSAPP_ACCESS_TOKEN');
+  });
+});

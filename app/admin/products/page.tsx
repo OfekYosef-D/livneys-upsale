@@ -1,6 +1,7 @@
 import { AdminShell } from '@/components/admin/AdminShell';
 import { AdminProductsManager } from '@/features/admin-crm/components/AdminCrmManagers';
 import { getProductManagementData } from '@/features/admin-crm/queries';
+import { isCloudinaryConfigured } from '@/features/product-images/cloudinary';
 import { requireAdmin } from '@/lib/admin-guard';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +12,7 @@ export default async function AdminProductsPage() {
 
   return (
     <AdminShell title="ניהול מוצרים" subtitle="מוצרים, מחירי בסיס, כמויות מינימום והפעלה ללא פגיעה בהיסטוריית הזמנות." activeHref="/admin/products">
-      <AdminProductsManager data={data} />
+      <AdminProductsManager data={data} imageUploadEnabled={isCloudinaryConfigured()} />
     </AdminShell>
   );
 }

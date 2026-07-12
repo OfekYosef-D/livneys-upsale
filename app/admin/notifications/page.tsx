@@ -5,7 +5,8 @@ import { requireAdmin } from '@/lib/admin-guard';
 
 export const dynamic = 'force-dynamic';
 
-export default async function NotificationsPage({ searchParams }: { searchParams?: { q?: string } }) {
+export default async function NotificationsPage(props: { searchParams?: Promise<{ q?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireAdmin('/admin/notifications');
   const data = await getNotificationManagementData();
   const initialSearch = typeof searchParams?.q === 'string' ? searchParams.q : '';

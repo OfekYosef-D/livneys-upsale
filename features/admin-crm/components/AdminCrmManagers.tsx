@@ -293,7 +293,7 @@ export function AdminPriceListsManager({ data }: { data: PriceListData }) {
   );
 }
 
-export function AdminProductsManager({ data }: { data: ProductData }) {
+export function AdminProductsManager({ data, imageUploadEnabled }: { data: ProductData; imageUploadEnabled: boolean }) {
   const [dialog, setDialog] = useState<DialogState>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<AdminStatusFilter>('all');
@@ -396,6 +396,7 @@ export function AdminProductsManager({ data }: { data: ProductData }) {
           key={editing?.id ?? 'new-product'}
           product={editing}
           priceLists={data.priceLists}
+          imageUploadEnabled={imageUploadEnabled}
           pending={action.pending}
           onCancel={() => setDialog(null)}
           onSubmit={(form) => {
@@ -1003,12 +1004,14 @@ function CustomerForm({
 function ProductForm({
   product,
   priceLists,
+  imageUploadEnabled,
   pending,
   onSubmit,
   onCancel,
 }: {
   product: ProductData['products'][number] | null;
   priceLists: ProductData['priceLists'];
+  imageUploadEnabled: boolean;
   pending: boolean;
   onSubmit: (form: FormData) => void;
   onCancel: () => void;
@@ -1029,7 +1032,7 @@ function ProductForm({
         <Input name="orderMultiple" label="כפולת הזמנה" defaultValue={product?.orderMultiple ?? product?.minQty ?? 1} type="number" min={1} step={1} inputMode="numeric" required hint="לדוגמה 6: הלקוח יכול להזמין 6, 12, 18 וכו׳." />
         <Input name="stockLabel" label="סטטוס מלאי" defaultValue={product?.stockLabel ?? ''} hint="טקסט קצר שמופיע לצוות ולקטלוג, למשל חסר זמנית." />
       </div>
-      <ProductImageUpload defaultValue={product?.imageUrl ?? ''} />
+      <ProductImageUpload defaultValue={product?.imageUrl ?? ''} uploadEnabled={imageUploadEnabled} />
       <details className="rounded-2xl border border-black/10 p-3">
         <summary className="cursor-pointer text-sm font-black">שדות תמונה מתקדמים</summary>
         <div className="mt-3">
@@ -1090,7 +1093,7 @@ function ProductPresetButtons({ priceLists }: { priceLists: ProductData['priceLi
   );
 }
 
-function ProductImageUpload({ defaultValue }: { defaultValue?: string | null }) {
+function ProductImageUpload({ defaultValue, uploadEnabled }: { defaultValue?: string | null; uploadEnabled: boolean }) {
   const initialImageUrl = defaultValue?.startsWith('http') ? defaultValue : '';
   const [imageUrl, setImageUrl] = useState(initialImageUrl);
   const [message, setMessage] = useState<string | null>(null);
@@ -1157,11 +1160,15 @@ function ProductImageUpload({ defaultValue }: { defaultValue?: string | null }) 
               className={fieldClass}
             />
           </label>
-          <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white hover:bg-black/85">
+          <label
+            aria-disabled={!uploadEnabled}
+            className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-4 text-sm font-black ${uploadEnabled ? 'cursor-pointer bg-black text-white hover:bg-black/85' : 'cursor-not-allowed bg-black/10 text-black/45'}`}
+          >
             <ImageUp aria-hidden="true" size={16} />
             {isUploading ? 'מעלה…' : 'העלאת תמונה'}
-            <input name="productImageFile" type="file" accept={productImageMimeTypes.join(',')} className="sr-only" disabled={isUploading} onChange={uploadFile} />
+            <input name="productImageFile" type="file" accept={productImageMimeTypes.join(',')} className="sr-only" disabled={isUploading || !uploadEnabled} onChange={uploadFile} />
           </label>
+          {!uploadEnabled && <p className="rounded-xl bg-[#fff1d6] p-2 text-xs font-black leading-5 text-black/65">העלאת תמונות אינה מוגדרת בסביבת ההערכה. אפשר עדיין להזין כתובת HTTPS או להשתמש בתמונה מקומית.</p>}
           <p className="text-xs font-bold leading-5 text-black/45">נשמר כקישור HTTPS. אפשר גם להדביק קישור קיים ולהמשיך להשתמש בתמונה מקומית בשדות המתקדמים.</p>
           {message && <p className="rounded-xl bg-[#e6e1d8] p-2 text-xs font-black text-black/65" aria-live="polite">{message}</p>}
         </div>

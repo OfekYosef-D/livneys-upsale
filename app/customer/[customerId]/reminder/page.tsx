@@ -5,7 +5,8 @@ import { requireCustomerPage } from '@/lib/authorization';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Reminder({ params }: { params: { customerId: string } }) {
+export default async function Reminder(props: { params: Promise<{ customerId: string }> }) {
+  const params = await props.params;
   await requireCustomerPage(params.customerId);
   const data = await getCustomerPortalData(params.customerId);
 
