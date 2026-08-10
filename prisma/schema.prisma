@@ -238,6 +238,7 @@ model Route {
 
 model Order {
   id                  String      @id @default(cuid())
+  orderNumber         Int         @unique @default(autoincrement())
   customerId          String
   routeId             String?
   status              OrderStatus
