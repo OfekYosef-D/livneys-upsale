@@ -41,6 +41,11 @@ export type AdminOrderSummary = {
   paymentDiscountPercent: number;
   paymentDiscountTotal: number;
   total: number;
+  vatRatePercent: number;
+  vatTotal: number;
+  totalIncludingVat: number;
+  commercialTermsVersion: string | null;
+  commercialTermsAcceptedAt: string | null;
   lineCount: number;
   hasUpsell: boolean;
 };

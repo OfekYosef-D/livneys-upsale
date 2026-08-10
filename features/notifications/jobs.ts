@@ -90,7 +90,7 @@ export async function enqueueOrderLifecycleWhatsApp({
     order: {
       orderNumber: order.orderNumber,
       status: order.status as OrderStatus,
-      total: Number(order.total),
+      totalIncludingVat: Number(order.totalIncludingVat),
       deliveryWindowStart: order.deliveryWindowStart,
     },
   });
@@ -496,7 +496,7 @@ async function buildRefreshedNotificationJobData(jobId: string, config: WhatsApp
     order: {
       orderNumber: job.order.orderNumber,
       status: job.order.status as OrderStatus,
-      total: Number(job.order.total),
+      totalIncludingVat: Number(job.order.totalIncludingVat),
       deliveryWindowStart: job.order.deliveryWindowStart,
     },
   });

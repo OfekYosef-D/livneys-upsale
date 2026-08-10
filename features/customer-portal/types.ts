@@ -62,6 +62,11 @@ export type PortalOrder = {
   paymentDiscountPercent: number;
   paymentDiscountTotal: number;
   total: number;
+  vatRatePercent: number;
+  vatTotal: number;
+  totalIncludingVat: number;
+  commercialTermsVersion: string | null;
+  commercialTermsAcceptedAt: string | null;
   items: {
     productId: string;
     productName?: string;

@@ -1,6 +1,9 @@
 export const MINIMUM_INSTITUTIONAL_ORDER_TOTAL = 700;
 
-export const PRICES_BEFORE_VAT_LABEL = 'המחירים לפני מע"מ';
+export const PRICES_BEFORE_VAT_LABEL = 'מחירי המחירון לפני מע״מ';
+
+export const INSTITUTIONAL_PRICING_NOTICE =
+  'המחירון מיועד ללקוחות עסקיים ומוסדיים. הסכום כולל מע״מ מוצג בסל ובסיכום ההזמנה.';
 
 export const institutionalBusinessTypes = [
   'מעדניות',

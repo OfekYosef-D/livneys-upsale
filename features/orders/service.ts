@@ -100,6 +100,7 @@ export async function createSubmittedOrder({
   items,
   source,
   paymentTerm,
+  commercialTermsAccepted = false,
   notes,
   internalNote,
   replaceDraftForDeliveryWindow = false,
@@ -109,6 +110,7 @@ export async function createSubmittedOrder({
   items: OrderWriteItem[];
   source: OrderSource;
   paymentTerm: PaymentTermValue;
+  commercialTermsAccepted?: boolean;
   notes?: string | null;
   internalNote?: string | null;
   replaceDraftForDeliveryWindow?: boolean;
@@ -120,6 +122,7 @@ export async function createSubmittedOrder({
     items,
     source,
     paymentTerm,
+    commercialTermsAccepted,
     now,
     notes,
     internalNote,
@@ -171,6 +174,11 @@ export async function createSubmittedOrder({
       paymentDiscountPercent: payload.order.paymentDiscountPercent,
       paymentDiscountTotal: payload.order.paymentDiscountTotal,
       total: payload.order.total,
+      vatRatePercent: payload.order.vatRatePercent,
+      vatTotal: payload.order.vatTotal,
+      totalIncludingVat: payload.order.totalIncludingVat,
+      commercialTermsVersion: payload.order.commercialTermsVersion,
+      commercialTermsAcceptedAt: payload.order.commercialTermsAcceptedAt,
       lines: {
         deleteMany: {},
         create: payload.lines.map((line) => ({

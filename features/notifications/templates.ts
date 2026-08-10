@@ -46,13 +46,13 @@ export function buildOrderTemplatePayload({
   order: {
     orderNumber: number;
     status: OrderStatus;
-    total: number;
+    totalIncludingVat: number;
     deliveryWindowStart: Date;
   };
 }): TemplatePayload {
   const customerUrl = buildCustomerUrl(baseUrl, customer.id);
   const deliveryDate = formatDate(order.deliveryWindowStart);
-  const total = formatCurrency(order.total);
+  const total = formatCurrency(order.totalIncludingVat);
   const displayOrderNumber = formatOrderNumber(order.orderNumber);
 
   if (templateKey === 'ORDER_RECEIVED') {

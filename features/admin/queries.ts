@@ -233,6 +233,11 @@ function mapOrderSummary(order: {
   paymentDiscountPercent: unknown;
   paymentDiscountTotal: unknown;
   total: unknown;
+  vatRatePercent: unknown;
+  vatTotal: unknown;
+  totalIncludingVat: unknown;
+  commercialTermsVersion: string | null;
+  commercialTermsAcceptedAt: Date | null;
   customer: { id: string; name: string };
   route: { id: string; name: string } | null;
   lines: { quantity: number; lineTotal: unknown }[];
@@ -254,6 +259,11 @@ function mapOrderSummary(order: {
     paymentDiscountPercent: Number(order.paymentDiscountPercent),
     paymentDiscountTotal: Number(order.paymentDiscountTotal),
     total: Number(order.total),
+    vatRatePercent: Number(order.vatRatePercent),
+    vatTotal: Number(order.vatTotal),
+    totalIncludingVat: Number(order.totalIncludingVat),
+    commercialTermsVersion: order.commercialTermsVersion,
+    commercialTermsAcceptedAt: order.commercialTermsAcceptedAt?.toISOString() ?? null,
     lineCount: order.lines.length,
     hasUpsell: order.lines.length >= 3,
   };
@@ -275,6 +285,11 @@ function mapDashboardOrder(order: {
   paymentDiscountPercent: unknown;
   paymentDiscountTotal: unknown;
   total: unknown;
+  vatRatePercent: unknown;
+  vatTotal: unknown;
+  totalIncludingVat: unknown;
+  commercialTermsVersion: string | null;
+  commercialTermsAcceptedAt: Date | null;
   customer: { id: string; name: string; contact: string; phone: string };
   route: { id: string; name: string } | null;
   lines: Array<{

@@ -28,6 +28,11 @@ type PortalOrderSnapshot = {
   paymentDiscountPercent?: unknown;
   paymentDiscountTotal?: unknown;
   total: unknown;
+  vatRatePercent?: unknown;
+  vatTotal?: unknown;
+  totalIncludingVat?: unknown;
+  commercialTermsVersion?: string | null;
+  commercialTermsAcceptedAt?: Date | null;
   lines: PortalOrderLineSnapshot[];
 };
 
@@ -45,6 +50,11 @@ export function mapPortalOrder(order: PortalOrderSnapshot | null, customerId: st
       paymentDiscountPercent: 0,
       paymentDiscountTotal: 0,
       total: 0,
+      vatRatePercent: 18,
+      vatTotal: 0,
+      totalIncludingVat: 0,
+      commercialTermsVersion: null,
+      commercialTermsAcceptedAt: null,
       items: [],
     };
   }
@@ -61,6 +71,11 @@ export function mapPortalOrder(order: PortalOrderSnapshot | null, customerId: st
     paymentDiscountPercent: Number(order.paymentDiscountPercent ?? 0),
     paymentDiscountTotal: Number(order.paymentDiscountTotal ?? 0),
     total: Number(order.total),
+    vatRatePercent: Number(order.vatRatePercent ?? 18),
+    vatTotal: Number(order.vatTotal ?? 0),
+    totalIncludingVat: Number(order.totalIncludingVat ?? order.total),
+    commercialTermsVersion: order.commercialTermsVersion ?? null,
+    commercialTermsAcceptedAt: order.commercialTermsAcceptedAt?.toISOString() ?? null,
     items: order.lines
       .filter((line) => line.productId)
       .map((line) => ({

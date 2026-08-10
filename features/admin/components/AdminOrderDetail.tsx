@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { getAdminOrderDetail } from '@/features/admin/queries';
+import { OrderFinancialSummary } from '@/features/orders/components/OrderFinancialSummary';
 import { formatOrderNumber } from '@/features/orders/order-number';
 import { paymentTermLabels } from '@/features/orders/payment-terms';
 import { money } from '@/lib/format';
@@ -59,27 +60,30 @@ export function AdminOrderDetail({ order }: { order: OrderData }) {
             <MiniMetric label="שורות" value={String(order.lineCount)} />
             <MiniMetric label="חלוקה" value={new Intl.DateTimeFormat('he-IL').format(new Date(order.deliveryWindowStart))} />
           </div>
-          <div className="mt-4 rounded-xl bg-[#e6e1d8] px-3 py-2">
-            <div className="flex items-center justify-between text-sm font-bold">
-              <span>סכום ביניים</span>
-              <span className="tabular-nums">{money(order.subtotal)}</span>
-            </div>
-            {order.discountTotal > 0 && (
-              <div className="mt-1 flex items-center justify-between text-sm font-black text-emerald-800">
-                <span>מבצעים והנחות מוצר</span>
-                <span className="tabular-nums">-{money(order.discountTotal)}</span>
-              </div>
+          <div className="mt-4 rounded-xl bg-[#e6e1d8] px-3 pb-3 pt-0.5">
+            <OrderFinancialSummary
+              subtotal={order.subtotal}
+              productDiscountTotal={order.discountTotal}
+              paymentDiscountPercent={order.paymentDiscountPercent}
+              paymentDiscountTotal={order.paymentDiscountTotal}
+              totalBeforeVat={order.total}
+              vatRatePercent={order.vatRatePercent}
+              vatTotal={order.vatTotal}
+              totalIncludingVat={order.totalIncludingVat}
+            />
+          </div>
+          <div className="mt-3 rounded-xl border border-black/10 p-3 text-xs font-bold leading-5">
+            <p className="font-black">תיעוד אישור מסחרי</p>
+            {order.commercialTermsAcceptedAt ? (
+              <p className="mt-1 text-black/60">
+                הלקוח אישר הצהרת B2B ב־{new Intl.DateTimeFormat('he-IL', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Jerusalem' }).format(new Date(order.commercialTermsAcceptedAt))}
+                {order.commercialTermsVersion ? ` · גרסה ${order.commercialTermsVersion}` : ''}.
+              </p>
+            ) : (
+              <p className="mt-1 text-black/60">
+                {order.source === 'ADMIN' ? 'הזמנה ידנית שהוזנה על ידי הצוות; לא נדרש אישור פורטל לקוח.' : 'לא נשמר אישור הצהרה להזמנה היסטורית זו.'}
+              </p>
             )}
-            {order.paymentDiscountTotal > 0 && (
-              <div className="mt-1 flex items-center justify-between text-sm font-black text-emerald-800">
-                <span>הנחת תשלום מיידי ({order.paymentDiscountPercent}%)</span>
-                <span className="tabular-nums">-{money(order.paymentDiscountTotal)}</span>
-              </div>
-            )}
-            <div className="mt-1 flex items-center justify-between border-t border-black/10 pt-2">
-              <span className="text-sm font-black">סה״כ לפני מע״מ</span>
-              <span className="text-xl font-black tabular-nums">{money(order.total)}</span>
-            </div>
           </div>
           {order.notes && <p className="mt-3 rounded-xl border border-black/10 p-3 text-sm font-bold">{order.notes}</p>}
           {order.internalNote && <p className="mt-3 rounded-xl bg-[#e6e1d8] p-3 text-xs font-black text-black/65">{order.internalNote}</p>}

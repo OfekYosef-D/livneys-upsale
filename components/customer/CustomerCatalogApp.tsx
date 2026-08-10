@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Search, ShoppingBag, Truck } from 'lucide-react';
+import { Building2, Search, ShoppingBag, Truck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { CartAdjustmentNotice } from '@/components/customer/CartAdjustmentNotice';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
@@ -20,7 +20,8 @@ import {
 } from '@/lib/order-utils';
 import { saveDraftOrderAction } from '@/features/customer-portal/actions';
 import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
-import { PRICES_BEFORE_VAT_LABEL } from '@/features/owner-rules/constants';
+import { calculateVatSummary } from '@/features/orders/vat';
+import { INSTITUTIONAL_PRICING_NOTICE, PRICES_BEFORE_VAT_LABEL } from '@/features/owner-rules/constants';
 
 export function CustomerCatalogApp({
   customer,
@@ -120,8 +121,9 @@ export function CustomerCatalogApp({
 
       <div className="mx-auto max-w-5xl px-3 py-3 md:px-6">
         <section className="space-y-3">
-          <div className="rounded-2xl border border-black/10 bg-[#e6e1d8] px-3 py-2 text-xs font-black text-black/65">
-            {PRICES_BEFORE_VAT_LABEL}
+          <div className="flex items-start gap-2 rounded-2xl border border-black/10 bg-[#e6e1d8] px-3 py-2.5 text-xs font-bold leading-5 text-black/65">
+            <Building2 size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <p><span className="font-black">{PRICES_BEFORE_VAT_LABEL}.</span> {INSTITUTIONAL_PRICING_NOTICE}</p>
           </div>
           <div className="sticky top-[61px] z-20 rounded-2xl border border-black/10 bg-white/96 p-2 shadow-sm backdrop-blur">
             <div className="flex h-10 items-center gap-2 rounded-full bg-[#e6e1d8] px-3 focus-within:ring-2 focus-within:ring-black/25">
@@ -239,6 +241,7 @@ function CartSummary({
   isSaving: boolean;
 }) {
   const cartTotal = pricing.total;
+  const vat = calculateVatSummary(cartTotal);
 
   return (
     <div className="rounded-2xl border border-black/10 bg-white p-2.5 shadow-[0_-10px_32px_rgba(0,0,0,0.08)]">
@@ -248,8 +251,8 @@ function CartSummary({
             <Truck size={13} />
             {itemCount === 0 ? 'הוסיפו מוצרים לסל' : 'מוכן לשליחה'}
           </p>
-          <p className="text-base font-black">{itemCount} יח׳ · {money(cartTotal)}</p>
-          <p className="text-[11px] font-bold text-black/45">{PRICES_BEFORE_VAT_LABEL}</p>
+          <p className="text-base font-black">{itemCount} יח׳ · {money(cartTotal)} <span className="text-xs text-black/45">לפני מע״מ</span></p>
+          <p className="text-[11px] font-bold text-black/55">כולל מע״מ: <span className="font-black tabular-nums">{money(vat.totalIncludingVat)}</span></p>
         </div>
         {pricing.discountTotal > 0 && <p className="text-[11px] font-black text-emerald-700">חיסכון {money(pricing.discountTotal)}</p>}
         <button

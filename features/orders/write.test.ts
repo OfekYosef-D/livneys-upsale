@@ -93,6 +93,11 @@ describe('shared order write utilities', () => {
       subtotal: 64,
       discountTotal: 0,
       total: 64,
+      vatRatePercent: 18,
+      vatTotal: 11.52,
+      totalIncludingVat: 75.52,
+      commercialTermsVersion: null,
+      commercialTermsAcceptedAt: null,
       notes: 'Customer asked for delivery confirmation.',
       internalNote: '[manual-order:intake=WHATSAPP] Sent by Shai.',
     });
@@ -146,6 +151,9 @@ describe('shared order write utilities', () => {
       paymentDiscountPercent: 5,
       paymentDiscountTotal: 1.8,
       total: 34.2,
+      vatRatePercent: 18,
+      vatTotal: 6.16,
+      totalIncludingVat: 40.36,
     });
     expect(result.lines[0]).toEqual(
       expect.objectContaining({
@@ -181,6 +189,7 @@ describe('shared order write utilities', () => {
       items: [{ productId: 'prod-minimum', quantity: 1 }],
       source: 'CUSTOMER',
       paymentTerm: 'IMMEDIATE_OR_CASH',
+      commercialTermsAccepted: true,
       now: new Date('2026-06-29T14:00:00.000Z'),
     });
 
@@ -188,7 +197,25 @@ describe('shared order write utilities', () => {
       subtotal: 700,
       paymentDiscountTotal: 35,
       total: 665,
+      vatRatePercent: 18,
+      vatTotal: 119.7,
+      totalIncludingVat: 784.7,
+      commercialTermsVersion: '2026-08-10',
+      commercialTermsAcceptedAt: new Date('2026-06-29T14:00:00.000Z'),
     });
+  });
+
+  it('rejects customer submission without the B2B commercial declaration', () => {
+    expect(() =>
+      buildSubmittedOrderPayload({
+        context: { customer, route, products, priceListItems, promotions: [] },
+        items: [{ productId: 'prod-a', quantity: 2 }],
+        source: 'CUSTOMER',
+        paymentTerm: 'NET_30',
+        commercialTermsAccepted: false,
+        now: new Date('2026-06-29T14:00:00.000Z'),
+      }),
+    ).toThrow('יש לאשר שההזמנה היא עסקית ואת פרטי ההזמנה לפני השליחה.');
   });
 
   it('marks submitted orders after cutoff as special requests', () => {

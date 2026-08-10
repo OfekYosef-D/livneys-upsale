@@ -26,6 +26,8 @@ import {
   updateRouteAction,
 } from '@/features/admin-crm/actions';
 import { orderStatusLabels } from '@/features/orders/utils';
+import { OrderFinancialSummary } from '@/features/orders/components/OrderFinancialSummary';
+import { calculateVatSummary } from '@/features/orders/vat';
 import { institutionalBusinessTypes, productPricePresets, promotionPresets } from '@/features/owner-rules/constants';
 import {
   AdminActionButtons,
@@ -749,6 +751,7 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
   const customer = useMemo(() => data.customers.find((item) => item.id === customerId) ?? null, [customerId, data.customers]);
   const selectedItems = customer?.products.filter((product) => (items[product.id] ?? 0) > 0) ?? [];
   const pricing = useMemo(() => getCartPricingSummary(items, customer?.products ?? []), [customer?.products, items]);
+  const vat = useMemo(() => calculateVatSummary(pricing.total), [pricing.total]);
   const productCategories = useMemo(() => getUniqueFilterValues(customer?.products ?? [], (product) => product.category), [customer?.products]);
   const visibleProducts = useMemo(() => {
     const normalizedSearch = productSearch.trim().toLowerCase();
@@ -834,17 +837,17 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
             <Select name="intakeChannel" label="מקור הזמנה" defaultValue="PHONE" options={[{ value: 'PHONE', label: 'טלפון' }, { value: 'WHATSAPP', label: 'WhatsApp' }, { value: 'ADMIN_MANUAL', label: 'הזנה פנימית' }]} />
             <Textarea name="notes" label="הערה ללקוח" />
             <Textarea name="internalNote" label="הערה פנימית" />
-            <div className="rounded-xl border border-black/10 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-black">סה״כ</span>
-                <span className="text-xl font-black tabular-nums">{money(pricing.total)}</span>
-              </div>
-              {pricing.discountTotal > 0 && (
-                <div className="mt-2 flex items-center justify-between gap-3 text-xs font-black text-emerald-700">
-                  <span>הנחות</span>
-                  <span>-{money(pricing.discountTotal)}</span>
-                </div>
-              )}
+            <div className="rounded-xl border border-black/10 px-3 pb-3 pt-0.5">
+              <OrderFinancialSummary
+                subtotal={pricing.subtotal}
+                productDiscountTotal={pricing.discountTotal}
+                paymentDiscountPercent={0}
+                paymentDiscountTotal={0}
+                totalBeforeVat={pricing.total}
+                vatRatePercent={vat.vatRatePercent}
+                vatTotal={vat.vatTotal}
+                totalIncludingVat={vat.totalIncludingVat}
+              />
               <p className="mt-1 text-xs font-bold text-black/45">{selectedItems.length} שורות בהזמנה</p>
               {selectedItems.length > 0 && (
                 <div className="mt-3 space-y-1 border-t border-black/10 pt-3">

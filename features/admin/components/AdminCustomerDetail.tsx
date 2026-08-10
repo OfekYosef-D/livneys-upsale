@@ -55,7 +55,10 @@ export function AdminCustomerDetail({ customer }: { customer: CustomerData }) {
                   <p className="text-xs font-bold text-black/45">{new Intl.DateTimeFormat('he-IL').format(new Date(order.deliveryWindowStart))}</p>
                 </div>
                 <OrderStatusPill status={order.status} />
-                <p className="text-sm font-black tabular-nums">{money(order.total)}</p>
+                <p className="text-left text-sm font-black tabular-nums">
+                  {money(order.totalIncludingVat)}
+                  <span className="block text-[10px] font-bold text-black/45">כולל מע״מ</span>
+                </p>
               </Link>
             ))
           )}

@@ -47,6 +47,11 @@ describe('admin dashboard queries', () => {
         paymentDiscountPercent: 5,
         paymentDiscountTotal: 5.5,
         total: 104.5,
+        vatRatePercent: 18,
+        vatTotal: 18.81,
+        totalIncludingVat: 123.31,
+        commercialTermsVersion: '2026-08-10',
+        commercialTermsAcceptedAt: new Date('2026-07-01T08:00:00.000Z'),
         notes: 'Call before delivery',
         internalNote: 'Customer asked for early delivery',
         customer: {
@@ -121,6 +126,11 @@ describe('admin dashboard queries', () => {
       paymentDiscountPercent: 5,
       paymentDiscountTotal: 5.5,
       total: 104.5,
+      vatRatePercent: 18,
+      vatTotal: 18.81,
+      totalIncludingVat: 123.31,
+      commercialTermsVersion: '2026-08-10',
+      commercialTermsAcceptedAt: '2026-07-01T08:00:00.000Z',
       latestNotification: {
         id: 'job-1',
         status: 'FAILED',

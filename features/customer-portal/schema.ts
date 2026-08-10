@@ -16,6 +16,9 @@ export const submitCustomerOrderSchema = z.object({
   items: z.array(orderItemInputSchema).min(1),
   notes: z.string().max(1000).optional(),
   paymentTerm: z.enum(paymentTermValues),
+  commercialTermsAccepted: z.boolean().refine((accepted) => accepted, {
+    message: 'יש לאשר שההזמנה היא עסקית ואת פרטי ההזמנה לפני השליחה.',
+  }),
 });
 
 export type SaveDraftOrderInput = z.infer<typeof saveDraftOrderSchema>;

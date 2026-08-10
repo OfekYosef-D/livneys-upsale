@@ -449,6 +449,7 @@ describe('notification jobs', () => {
         orderNumber: 1001,
         status: 'SUBMITTED',
         total: 123.5,
+        totalIncludingVat: 145.73,
         deliveryWindowStart: new Date('2026-07-01T08:00:00.000Z'),
       },
       customer: {
@@ -485,7 +486,7 @@ describe('notification jobs', () => {
             { name: 'delivery_date', text: '01/07/2026' },
           ],
         },
-        message: 'Cafe South: ORDER_RECEIVED #1001 01/07/2026 ₪123.50',
+        message: 'Cafe South: ORDER_RECEIVED #1001 01/07/2026 ₪145.73',
         scheduledAt: now,
         nextAttemptAt: now,
         lastAttemptAt: null,

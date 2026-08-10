@@ -21,6 +21,7 @@ import type { getAdminDashboardData } from '@/features/admin/queries';
 import { notificationJobStatusLabels, notificationTemplateLabels } from '@/features/notifications/ui-utils';
 import { formatOrderNumber } from '@/features/orders/order-number';
 import { paymentTermLabels } from '@/features/orders/payment-terms';
+import { OrderFinancialSummary } from '@/features/orders/components/OrderFinancialSummary';
 import type { OrderStatus } from '@/features/orders/utils';
 import { money } from '@/lib/format';
 
@@ -214,7 +215,10 @@ function OrderQueueButton({ order, selected, onSelect }: { order: DashboardOrder
         </span>
       </span>
       <OrderStatusPill status={order.status} />
-      <span className="text-sm font-black tabular-nums">{money(order.total)}</span>
+      <span className="text-left text-sm font-black tabular-nums">
+        {money(order.totalIncludingVat)}
+        <span className="block text-[10px] font-bold text-black/45">כולל מע״מ</span>
+      </span>
     </button>
   );
 }
@@ -275,17 +279,26 @@ function OrderReviewPanel({ order }: { order: DashboardOrder }) {
           </div>
         </div>
 
-        <div className="rounded-xl bg-[#e6e1d8] px-3 py-2">
-          <TotalRow label="סכום ביניים" value={money(order.subtotal)} />
-          {order.discountTotal > 0 && <TotalRow label="מבצעים והנחות מוצר" value={`-${money(order.discountTotal)}`} strong />}
-          {order.paymentDiscountTotal > 0 && (
-            <TotalRow label={`הנחת תשלום מיידי (${order.paymentDiscountPercent}%)`} value={`-${money(order.paymentDiscountTotal)}`} strong />
-          )}
-          <div className="mt-2 flex items-center justify-between border-t border-black/10 pt-2">
-            <span className="text-sm font-black">סה״כ לפני מע״מ</span>
-            <span className="text-xl font-black tabular-nums">{money(order.total)}</span>
-          </div>
+        <div className="rounded-xl bg-[#e6e1d8] px-3 pb-3 pt-0.5">
+          <OrderFinancialSummary
+            subtotal={order.subtotal}
+            productDiscountTotal={order.discountTotal}
+            paymentDiscountPercent={order.paymentDiscountPercent}
+            paymentDiscountTotal={order.paymentDiscountTotal}
+            totalBeforeVat={order.total}
+            vatRatePercent={order.vatRatePercent}
+            vatTotal={order.vatTotal}
+            totalIncludingVat={order.totalIncludingVat}
+          />
         </div>
+
+        <p className="rounded-xl border border-black/10 px-3 py-2 text-xs font-bold leading-5 text-black/60">
+          {order.commercialTermsAcceptedAt
+            ? `הצהרת B2B אושרה ב־${new Intl.DateTimeFormat('he-IL', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Jerusalem' }).format(new Date(order.commercialTermsAcceptedAt))}.`
+            : order.source === 'ADMIN'
+              ? 'הזמנה ידנית של הצוות — ללא אישור פורטל לקוח.'
+              : 'הזמנה היסטורית — ללא תיעוד הצהרת B2B.'}
+        </p>
 
         <AdminOrderStatusActions orderId={order.id} status={order.status} />
 
@@ -405,7 +418,7 @@ function AttentionPanel({ orders }: { orders: DashboardOrder[] }) {
             <Link key={order.id} href={`/admin/orders/${order.id}`} className="block rounded-xl border border-black/10 p-3 hover:bg-[#f7f5f1]">
               <p className="break-words text-sm font-black">{order.customerName}</p>
               <p className="mt-1 text-xs font-bold text-black/50">
-                {order.status === 'SPECIAL_REQUEST' ? 'בקשה מיוחדת' : 'תקלה בהודעת WhatsApp'} / {money(order.total)}
+                {order.status === 'SPECIAL_REQUEST' ? 'בקשה מיוחדת' : 'תקלה בהודעת WhatsApp'} / {money(order.totalIncludingVat)} כולל מע״מ
               </p>
             </Link>
           ))
@@ -470,15 +483,6 @@ function NoteBlock({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-black/10 p-3">
       <p className="text-xs font-black text-black/45">{label}</p>
       <p className="mt-1 whitespace-pre-wrap break-words text-sm font-bold leading-6">{value}</p>
-    </div>
-  );
-}
-
-function TotalRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className={`flex items-center justify-between gap-3 text-sm ${strong ? 'font-black text-emerald-800' : 'font-bold'}`}>
-      <span>{label}</span>
-      <span className="tabular-nums">{value}</span>
     </div>
   );
 }

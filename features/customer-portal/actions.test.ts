@@ -99,6 +99,7 @@ describe('customer portal actions', () => {
       items: [{ productId: 'prod-a', qty: 2 }],
       notes: 'Call before arrival',
       paymentTerm: 'IMMEDIATE_OR_CASH',
+      commercialTermsAccepted: true,
     });
 
     expect(result).toEqual({
@@ -106,9 +107,54 @@ describe('customer portal actions', () => {
       data: { orderId: 'ord-customer', status: 'SUBMITTED' },
     });
     expect(mockedCreateSubmittedOrder).toHaveBeenCalledWith(
-      expect.objectContaining({ paymentTerm: 'IMMEDIATE_OR_CASH' }),
+      expect.objectContaining({
+        paymentTerm: 'IMMEDIATE_OR_CASH',
+        commercialTermsAccepted: true,
+      }),
     );
     expect(mockedEnqueueOrderLifecycleWhatsApp).toHaveBeenCalledWith({ orderId: 'ord-customer' });
+  });
+
+  it('rejects a customer order when the B2B declaration was not accepted', async () => {
+    mockedAssertCustomerAction.mockResolvedValue({
+      user: { id: 'user-1', role: 'CUSTOMER', customerId: 'cust-001' },
+      expires: '2026-07-01T00:00:00.000Z',
+    });
+    mockedGetOrderWriteContext.mockResolvedValue({
+      customer: {
+        id: 'cust-001',
+        routeId: 'route-south',
+        priceListId: 'price-list-standard',
+        isActive: true,
+      },
+      route: {
+        id: 'route-south',
+        isActive: true,
+        nextDeliveryAt: new Date('2026-07-10T08:00:00.000Z'),
+        nextCutoffAt: new Date('2026-07-09T15:00:00.000Z'),
+      },
+      products: [{
+        id: 'prod-a',
+        name: 'Product A',
+        category: 'Spreads',
+        basePrice: 100,
+        isActive: true,
+        minQty: 1,
+        orderMultiple: 1,
+      }],
+      priceListItems: [{ productId: 'prod-a', price: 100 }],
+      promotions: [],
+    });
+
+    const result = await actions.submitCustomerOrderAction({
+      customerId: 'cust-001',
+      items: [{ productId: 'prod-a', qty: 2 }],
+      paymentTerm: 'NET_30',
+      commercialTermsAccepted: false,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(mockedCreateSubmittedOrder).not.toHaveBeenCalled();
   });
 
   it('rejects an unsupported payment term before creating an order', async () => {
@@ -153,6 +199,7 @@ describe('customer portal actions', () => {
       customerId: 'cust-001',
       items: [{ productId: 'prod-a', qty: 2 }],
       paymentTerm: 'INVALID' as 'NET_30',
+      commercialTermsAccepted: true,
     });
 
     expect(result.ok).toBe(false);

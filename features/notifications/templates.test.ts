@@ -24,7 +24,7 @@ describe('notification templates', () => {
       order: {
         orderNumber: 1001,
         status: 'SUBMITTED',
-        total: 123.5,
+        totalIncludingVat: 145.73,
         deliveryWindowStart: new Date('2026-07-01T08:00:00.000Z'),
       },
     });
@@ -47,7 +47,7 @@ describe('notification templates', () => {
       order: {
         orderNumber: 1001,
         status: 'APPROVED',
-        total: 123.5,
+        totalIncludingVat: 145.73,
         deliveryWindowStart: new Date('2026-07-01T08:00:00.000Z'),
       },
     });
@@ -57,7 +57,7 @@ describe('notification templates', () => {
       { name: 'business_name', text: 'Cafe South' },
       { name: 'order_id', text: '#1001' },
       { name: 'delivery_date', text: '01/07/2026' },
-      { name: 'order_total', text: '₪123.50' },
+      { name: 'order_total', text: '₪145.73' },
       { name: 'order_link', text: 'https://orders.example.com/customer/cust-001' },
     ]);
   });

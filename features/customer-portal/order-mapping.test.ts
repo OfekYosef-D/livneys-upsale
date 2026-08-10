@@ -20,6 +20,11 @@ describe('customer portal order mapping', () => {
         paymentDiscountPercent: 5,
         paymentDiscountTotal: 4.2,
         total: 79.8,
+        vatRatePercent: 18,
+        vatTotal: 14.36,
+        totalIncludingVat: 94.16,
+        commercialTermsVersion: '2026-08-10',
+        commercialTermsAcceptedAt: submittedAt,
         lines: [
           {
             productId: 'prod-old',
@@ -50,6 +55,11 @@ describe('customer portal order mapping', () => {
       paymentDiscountPercent: 5,
       paymentDiscountTotal: 4.2,
       total: 79.8,
+      vatRatePercent: 18,
+      vatTotal: 14.36,
+      totalIncludingVat: 94.16,
+      commercialTermsVersion: '2026-08-10',
+      commercialTermsAcceptedAt: submittedAt.toISOString(),
       items: [
         {
           productId: 'prod-old',

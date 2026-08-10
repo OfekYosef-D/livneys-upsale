@@ -2,18 +2,20 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Truck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ShieldCheck, Truck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { CartAdjustmentNotice } from '@/components/customer/CartAdjustmentNotice';
+import { OrderFinancialSummary } from '@/features/orders/components/OrderFinancialSummary';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { submitCustomerOrderAction } from '@/features/customer-portal/actions';
 import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
-import { PRICES_BEFORE_VAT_LABEL } from '@/features/owner-rules/constants';
+import { COMMERCIAL_ORDER_DECLARATION, COMMERCIAL_ORDER_NOTICE } from '@/features/orders/commercial-terms';
 import {
   calculatePaymentTermsSummary,
   paymentTermLabels,
   type PaymentTermValue,
 } from '@/features/orders/payment-terms';
+import { calculateVatSummary } from '@/features/orders/vat';
 import { money } from '@/lib/format';
 import {
   getAllowedProductIds,
@@ -43,6 +45,7 @@ export function ReviewOrderClient({
   const [cartNotice, setCartNotice] = useState('');
   const [notes, setNotes] = useState('');
   const [paymentTerm, setPaymentTerm] = useState<PaymentTermValue>('NET_30');
+  const [commercialTermsAccepted, setCommercialTermsAccepted] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -73,11 +76,18 @@ export function ReviewOrderClient({
     () => calculatePaymentTermsSummary(cartPricing.total, paymentTerm),
     [cartPricing.total, paymentTerm],
   );
+  const vatSummary = useMemo(() => calculateVatSummary(paymentSummary.total), [paymentSummary.total]);
 
   async function submitOrder() {
     setError('');
     setIsSubmitting(true);
-    const result = await submitCustomerOrderAction({ customerId: customer.id, items: cartItems, notes, paymentTerm });
+    const result = await submitCustomerOrderAction({
+      customerId: customer.id,
+      items: cartItems,
+      notes,
+      paymentTerm,
+      commercialTermsAccepted,
+    });
     setIsSubmitting(false);
 
     if (!result.ok) {
@@ -211,32 +221,38 @@ export function ReviewOrderClient({
                   className="min-h-20 w-full rounded-xl border border-black/12 bg-white p-2.5 text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-black/25"
                 />
               </label>
-              <div className="mt-3 space-y-1 border-t border-black/10 pt-3 text-sm font-bold">
-                <div className="flex items-center justify-between">
-                  <span>סכום ביניים</span>
-                  <span className="tabular-nums">{money(cartPricing.subtotal)}</span>
-                </div>
-                {cartPricing.discountTotal > 0 && (
-                  <div className="flex items-center justify-between text-emerald-700">
-                    <span>מבצעים והנחות מוצר</span>
-                    <span className="tabular-nums">-{money(cartPricing.discountTotal)}</span>
+              <OrderFinancialSummary
+                subtotal={cartPricing.subtotal}
+                productDiscountTotal={cartPricing.discountTotal}
+                paymentDiscountPercent={paymentSummary.paymentDiscountPercent}
+                paymentDiscountTotal={paymentSummary.paymentDiscountTotal}
+                totalBeforeVat={paymentSummary.total}
+                vatRatePercent={vatSummary.vatRatePercent}
+                vatTotal={vatSummary.vatTotal}
+                totalIncludingVat={vatSummary.totalIncludingVat}
+              />
+              <div className="mt-3 rounded-xl border border-black/10 bg-[#f7f5f1] p-3">
+                <div className="flex items-start gap-2">
+                  <ShieldCheck size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+                  <div>
+                    <p className="text-xs font-black">אישור הזמנה עסקית</p>
+                    <p id="commercial-order-notice" className="mt-1 text-[11px] font-bold leading-5 text-black/55">{COMMERCIAL_ORDER_NOTICE}</p>
                   </div>
-                )}
-                {paymentSummary.paymentDiscountTotal > 0 && (
-                  <div className="flex items-center justify-between text-emerald-700">
-                    <span>הנחת תשלום מיידי (5%)</span>
-                    <span className="tabular-nums">-{money(paymentSummary.paymentDiscountTotal)}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between pt-1 text-base font-black">
-                  <span>סה״כ לפני מע״מ</span>
-                  <span className="tabular-nums">{money(paymentSummary.total)}</span>
                 </div>
-                <p className="pt-1 text-[11px] font-bold text-black/45">{PRICES_BEFORE_VAT_LABEL}</p>
+                <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg bg-white p-2.5 text-xs font-bold leading-5 ring-1 ring-black/10 focus-within:ring-2 focus-within:ring-black/30">
+                  <input
+                    type="checkbox"
+                    checked={commercialTermsAccepted}
+                    onChange={(event) => setCommercialTermsAccepted(event.target.checked)}
+                    aria-describedby="commercial-order-notice"
+                    className="mt-1 h-4 w-4 shrink-0 accent-black"
+                  />
+                  <span>{COMMERCIAL_ORDER_DECLARATION}</span>
+                </label>
               </div>
               <button
                 onClick={submitOrder}
-                disabled={cartItems.length === 0 || isSubmitting}
+                disabled={cartItems.length === 0 || !commercialTermsAccepted || isSubmitting}
                 className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-not-allowed disabled:bg-black/30"
               >
                 {isSubmitting ? 'שולח...' : 'שלח הזמנה לאישור'}
