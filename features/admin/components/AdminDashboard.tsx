@@ -19,6 +19,7 @@ import { AdminOrderStatusActions } from '@/features/admin/components/AdminOrderS
 import { OrderStatusPill } from '@/features/admin/components/OrderStatusPill';
 import type { getAdminDashboardData } from '@/features/admin/queries';
 import { notificationJobStatusLabels, notificationTemplateLabels } from '@/features/notifications/ui-utils';
+import { paymentTermLabels } from '@/features/orders/payment-terms';
 import type { OrderStatus } from '@/features/orders/utils';
 import { money } from '@/lib/format';
 
@@ -236,6 +237,7 @@ function OrderReviewPanel({ order }: { order: DashboardOrder }) {
           <InfoPill label="טלפון" value={order.customerPhone} href={`tel:${order.customerPhone}`} icon={<Phone size={14} />} />
           <InfoPill label="קו" value={order.routeName} href={order.routeId ? `/admin/routes/${order.routeId}` : undefined} />
           <InfoPill label="חלוקה" value={formatDate(order.deliveryWindowStart)} />
+          <InfoPill label="תנאי תשלום" value={paymentTermLabels[order.paymentTerm]} />
         </div>
 
         <NotificationStatusCard order={order} />
@@ -273,9 +275,12 @@ function OrderReviewPanel({ order }: { order: DashboardOrder }) {
 
         <div className="rounded-xl bg-[#e6e1d8] px-3 py-2">
           <TotalRow label="סכום ביניים" value={money(order.subtotal)} />
-          {order.discountTotal > 0 && <TotalRow label="הנחות" value={`-${money(order.discountTotal)}`} strong />}
+          {order.discountTotal > 0 && <TotalRow label="מבצעים והנחות מוצר" value={`-${money(order.discountTotal)}`} strong />}
+          {order.paymentDiscountTotal > 0 && (
+            <TotalRow label={`הנחת תשלום מיידי (${order.paymentDiscountPercent}%)`} value={`-${money(order.paymentDiscountTotal)}`} strong />
+          )}
           <div className="mt-2 flex items-center justify-between border-t border-black/10 pt-2">
-            <span className="text-sm font-black">סה״כ</span>
+            <span className="text-sm font-black">סה״כ לפני מע״מ</span>
             <span className="text-xl font-black tabular-nums">{money(order.total)}</span>
           </div>
         </div>

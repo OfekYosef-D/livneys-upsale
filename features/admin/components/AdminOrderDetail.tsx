@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { getAdminOrderDetail } from '@/features/admin/queries';
+import { paymentTermLabels } from '@/features/orders/payment-terms';
 import { money } from '@/lib/format';
 import { AdminOrderStatusActions } from './AdminOrderStatusActions';
 import { OrderStatusPill } from './OrderStatusPill';
@@ -51,6 +52,7 @@ export function AdminOrderDetail({ order }: { order: OrderData }) {
           <Info label="לקוח" value={order.customerName} href={`/admin/customers/${order.customerId}`} />
           <Info label="קו" value={order.routeName} href={order.routeId ? `/admin/routes/${order.routeId}` : undefined} />
           <Info label="מקור" value={order.source === 'ADMIN' ? 'הזמנה ידנית' : 'פורטל לקוח'} />
+          <Info label="תנאי תשלום" value={paymentTermLabels[order.paymentTerm]} />
           <Info label="איש קשר" value={`${order.customerContact} · ${order.customerPhone}`} />
           <div className="mt-4 grid grid-cols-2 gap-2">
             <MiniMetric label="שורות" value={String(order.lineCount)} />
@@ -63,12 +65,18 @@ export function AdminOrderDetail({ order }: { order: OrderData }) {
             </div>
             {order.discountTotal > 0 && (
               <div className="mt-1 flex items-center justify-between text-sm font-black text-emerald-800">
-                <span>הנחות</span>
+                <span>מבצעים והנחות מוצר</span>
                 <span className="tabular-nums">-{money(order.discountTotal)}</span>
               </div>
             )}
+            {order.paymentDiscountTotal > 0 && (
+              <div className="mt-1 flex items-center justify-between text-sm font-black text-emerald-800">
+                <span>הנחת תשלום מיידי ({order.paymentDiscountPercent}%)</span>
+                <span className="tabular-nums">-{money(order.paymentDiscountTotal)}</span>
+              </div>
+            )}
             <div className="mt-1 flex items-center justify-between border-t border-black/10 pt-2">
-              <span className="text-sm font-black">סה״כ</span>
+              <span className="text-sm font-black">סה״כ לפני מע״מ</span>
               <span className="text-xl font-black tabular-nums">{money(order.total)}</span>
             </div>
           </div>
