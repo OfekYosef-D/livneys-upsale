@@ -22,19 +22,21 @@ describe('notification templates', () => {
       baseUrl: 'https://orders.example.com',
       customer: { id: 'cust-001', name: 'Cafe South', contact: 'Dana' },
       order: {
-        id: 'ord-1',
+        orderNumber: 1001,
         status: 'SUBMITTED',
-        total: 123.5,
+        totalIncludingVat: 145.73,
         deliveryWindowStart: new Date('2026-07-01T08:00:00.000Z'),
       },
     });
 
     expect(payload.bodyParameters).toEqual([
       { name: 'customer_name', text: 'Dana' },
-      { name: 'order_id', text: 'ord-1' },
+      { name: 'order_id', text: '#1001' },
       { name: 'delivery_date', text: '01/07/2026' },
     ]);
     expect(payload.previewMessage).toContain('Cafe South');
+    expect(payload.previewMessage).toContain('#1001');
+    expect(payload.previewMessage).not.toContain('ord-1');
   });
 
   it('builds extended order lifecycle variables for non-received statuses', () => {
@@ -43,9 +45,9 @@ describe('notification templates', () => {
       baseUrl: 'https://orders.example.com',
       customer: { id: 'cust-001', name: 'Cafe South', contact: 'Dana' },
       order: {
-        id: 'ord-1',
+        orderNumber: 1001,
         status: 'APPROVED',
-        total: 123.5,
+        totalIncludingVat: 145.73,
         deliveryWindowStart: new Date('2026-07-01T08:00:00.000Z'),
       },
     });
@@ -53,9 +55,9 @@ describe('notification templates', () => {
     expect(payload.bodyParameters).toEqual([
       { name: 'customer_name', text: 'Dana' },
       { name: 'business_name', text: 'Cafe South' },
-      { name: 'order_id', text: 'ord-1' },
+      { name: 'order_id', text: '#1001' },
       { name: 'delivery_date', text: '01/07/2026' },
-      { name: 'order_total', text: '₪123.50' },
+      { name: 'order_total', text: '₪145.73' },
       { name: 'order_link', text: 'https://orders.example.com/customer/cust-001' },
     ]);
   });

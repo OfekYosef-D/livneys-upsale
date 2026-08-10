@@ -35,6 +35,11 @@ enum OrderSource {
   ADMIN
 }
 
+enum PaymentTerm {
+  NET_30
+  IMMEDIATE_OR_CASH
+}
+
 enum NotificationChannel {
   EMAIL
   WHATSAPP
@@ -233,6 +238,7 @@ model Route {
 
 model Order {
   id                  String      @id @default(cuid())
+  orderNumber         Int         @unique @default(autoincrement())
   customerId          String
   routeId             String?
   status              OrderStatus
@@ -245,7 +251,15 @@ model Order {
   internalNote        String?
   subtotal            Decimal     @default(0) @db.Decimal(10, 2)
   discountTotal       Decimal     @default(0) @db.Decimal(10, 2)
+  paymentTerm         PaymentTerm @default(NET_30)
+  paymentDiscountPercent Decimal  @default(0) @db.Decimal(5, 2)
+  paymentDiscountTotal Decimal    @default(0) @db.Decimal(10, 2)
   total               Decimal     @db.Decimal(10, 2)
+  vatRatePercent      Decimal     @default(18) @db.Decimal(5, 2)
+  vatTotal            Decimal     @default(0) @db.Decimal(10, 2)
+  totalIncludingVat   Decimal     @default(0) @db.Decimal(10, 2)
+  commercialTermsVersion String?
+  commercialTermsAcceptedAt DateTime?
   customer            Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
   route               Route?      @relation(fields: [routeId], references: [id], onDelete: SetNull)
   lines               OrderLine[]

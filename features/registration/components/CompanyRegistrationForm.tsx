@@ -5,7 +5,8 @@ import { ArrowLeft, Building2, CheckCircle2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/Button';
 import { createCompanyRegistrationAction } from '@/features/registration/actions';
-import { institutionalBusinessTypes, MINIMUM_INSTITUTIONAL_ORDER_TOTAL, PRICES_BEFORE_VAT_LABEL } from '@/features/owner-rules/constants';
+import { calculateVatSummary } from '@/features/orders/vat';
+import { institutionalBusinessTypes, INSTITUTIONAL_PRICING_NOTICE, MINIMUM_INSTITUTIONAL_ORDER_TOTAL, PRICES_BEFORE_VAT_LABEL } from '@/features/owner-rules/constants';
 import { brand } from '@/lib/brand';
 import { brandLogo } from '@/lib/product-assets';
 
@@ -13,6 +14,7 @@ export function CompanyRegistrationForm() {
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const minimumOrderVat = calculateVatSummary(MINIMUM_INSTITUTIONAL_ORDER_TOTAL);
 
   return (
     <main className="app-surface min-h-screen px-3 py-4 text-black md:px-6">
@@ -119,8 +121,9 @@ export function CompanyRegistrationForm() {
           </div>
           <h2 className="text-xl font-black">מה חשוב לדעת</h2>
           <div className="space-y-2 text-sm font-bold leading-6 text-black/62">
-            <p>מינימום הזמנה מוסדית: {MINIMUM_INSTITUTIONAL_ORDER_TOTAL} ₪.</p>
-            <p>{PRICES_BEFORE_VAT_LABEL}. המחירון באתר מיועד ללקוחות מוסדיים בלבד.</p>
+            <p>מינימום הזמנה מוסדית: {MINIMUM_INSTITUTIONAL_ORDER_TOTAL} ₪ לפני מע״מ ({minimumOrderVat.totalIncludingVat.toFixed(2)} ₪ כולל מע״מ).</p>
+            <p><span className="font-black">{PRICES_BEFORE_VAT_LABEL}.</span> {INSTITUTIONAL_PRICING_NOTICE}</p>
+            <p>ההרשמה והמחירון מיועדים לעסקים ולמוסדות הרוכשים במסגרת פעילותם העסקית בלבד.</p>
             <p>הכמויות נקבעות לפי ארגזים, ולכן הצוות עשוי לעדכן כמות לפני אישור סופי.</p>
           </div>
         </aside>

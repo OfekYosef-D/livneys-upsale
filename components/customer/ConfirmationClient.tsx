@@ -2,10 +2,15 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, ShieldCheck } from 'lucide-react';
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/Button';
+import { OrderFinancialSummary } from '@/features/orders/components/OrderFinancialSummary';
 import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
+import { COMMERCIAL_ORDER_NOTICE } from '@/features/orders/commercial-terms';
+import { formatOrderNumber } from '@/features/orders/order-number';
+import { paymentTermLabels } from '@/features/orders/payment-terms';
+import { calculateVatSummary } from '@/features/orders/vat';
 import { money } from '@/lib/format';
 import { brandLogo } from '@/lib/product-assets';
 import { brand } from '@/lib/brand';
@@ -29,7 +34,12 @@ export function ConfirmationClient({
   const orderItems: PortalOrder['items'] = lastOrder.items.length > 0 ? lastOrder.items : cartItems;
   const orderSubtotal = lastOrder.items.length > 0 ? lastOrder.subtotal : fallbackPricing.subtotal;
   const orderDiscountTotal = lastOrder.items.length > 0 ? lastOrder.discountTotal : fallbackPricing.discountTotal;
+  const orderPaymentDiscountTotal = lastOrder.items.length > 0 ? lastOrder.paymentDiscountTotal : 0;
   const orderTotal = lastOrder.items.length > 0 ? lastOrder.total : fallbackPricing.total;
+  const fallbackVat = useMemo(() => calculateVatSummary(orderTotal), [orderTotal]);
+  const orderVatRatePercent = lastOrder.items.length > 0 ? lastOrder.vatRatePercent : fallbackVat.vatRatePercent;
+  const orderVatTotal = lastOrder.items.length > 0 ? lastOrder.vatTotal : fallbackVat.vatTotal;
+  const orderTotalIncludingVat = lastOrder.items.length > 0 ? lastOrder.totalIncludingVat : fallbackVat.totalIncludingVat;
 
   return (
     <main className="app-surface min-h-screen px-3 py-4 text-black md:px-6">
@@ -51,6 +61,13 @@ export function ConfirmationClient({
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-lg font-black">סיכום הזמנה</h2>
                 <p className="text-xs font-bold text-black/55">חלוקה {new Intl.DateTimeFormat('he-IL').format(new Date(route.nextDelivery))}</p>
+              </div>
+              {lastOrder.orderNumber !== null && (
+                <p className="mt-2 text-xs font-black text-black/55">הזמנה {formatOrderNumber(lastOrder.orderNumber)}</p>
+              )}
+              <div className="mt-2 rounded-xl bg-[#f7f5f1] px-3 py-2 text-xs font-bold">
+                <span className="text-black/50">תנאי תשלום: </span>
+                <span className="font-black">{paymentTermLabels[lastOrder.paymentTerm]}</span>
               </div>
               <div className="mt-2 divide-y divide-black/10">
                 {orderItems.map((item) => {
@@ -74,20 +91,30 @@ export function ConfirmationClient({
                   );
                 })}
               </div>
-              <div className="mt-3 space-y-1 border-t border-black/10 pt-3 text-sm font-bold">
-                <div className="flex items-center justify-between">
-                  <span>סכום ביניים</span>
-                  <span className="tabular-nums">{money(orderSubtotal)}</span>
-                </div>
-                {orderDiscountTotal > 0 && (
-                  <div className="flex items-center justify-between text-emerald-700">
-                    <span>הנחות</span>
-                    <span className="tabular-nums">-{money(orderDiscountTotal)}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between pt-1 text-base font-black">
-                  <span>סה״כ משוער</span>
-                  <span className="tabular-nums">{money(orderTotal)}</span>
+              <OrderFinancialSummary
+                subtotal={orderSubtotal}
+                productDiscountTotal={orderDiscountTotal}
+                paymentDiscountPercent={lastOrder.paymentDiscountPercent}
+                paymentDiscountTotal={orderPaymentDiscountTotal}
+                totalBeforeVat={orderTotal}
+                vatRatePercent={orderVatRatePercent}
+                vatTotal={orderVatTotal}
+                totalIncludingVat={orderTotalIncludingVat}
+              />
+              <div className="mt-3 flex items-start gap-2 rounded-xl bg-[#f7f5f1] p-3 text-[11px] font-bold leading-5 text-black/60">
+                <ShieldCheck size={17} className="mt-0.5 shrink-0 text-black" aria-hidden="true" />
+                <div>
+                  <p>{COMMERCIAL_ORDER_NOTICE}</p>
+                  {lastOrder.commercialTermsAcceptedAt && (
+                    <p className="mt-1 font-black text-black/75">
+                      אישור ההצהרה העסקית נשמר בתאריך{' '}
+                      {new Intl.DateTimeFormat('he-IL', {
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                        timeZone: 'Asia/Jerusalem',
+                      }).format(new Date(lastOrder.commercialTermsAcceptedAt))}.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

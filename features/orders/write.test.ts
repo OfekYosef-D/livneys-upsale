@@ -75,6 +75,7 @@ describe('shared order write utilities', () => {
         { productId: 'prod-b', quantity: 4 },
       ],
       source: 'ADMIN',
+      paymentTerm: 'NET_30',
       now: new Date('2026-06-29T14:00:00.000Z'),
       notes: 'Customer asked for delivery confirmation.',
       internalNote: formatManualOrderInternalNote({
@@ -88,9 +89,15 @@ describe('shared order write utilities', () => {
       routeId: 'route-south',
       status: 'SUBMITTED',
       source: 'ADMIN',
+      paymentTerm: 'NET_30',
       subtotal: 64,
       discountTotal: 0,
       total: 64,
+      vatRatePercent: 18,
+      vatTotal: 11.52,
+      totalIncludingVat: 75.52,
+      commercialTermsVersion: null,
+      commercialTermsAcceptedAt: null,
       notes: 'Customer asked for delivery confirmation.',
       internalNote: '[manual-order:intake=WHATSAPP] Sent by Shai.',
     });
@@ -133,13 +140,20 @@ describe('shared order write utilities', () => {
       },
       items: [{ productId: 'prod-a', quantity: 4 }],
       source: 'ADMIN',
+      paymentTerm: 'IMMEDIATE_OR_CASH',
       now: new Date('2026-06-29T14:00:00.000Z'),
     });
 
     expect(result.order).toMatchObject({
       subtotal: 48,
       discountTotal: 12,
-      total: 36,
+      paymentTerm: 'IMMEDIATE_OR_CASH',
+      paymentDiscountPercent: 5,
+      paymentDiscountTotal: 1.8,
+      total: 34.2,
+      vatRatePercent: 18,
+      vatTotal: 6.16,
+      totalIncludingVat: 40.36,
     });
     expect(result.lines[0]).toEqual(
       expect.objectContaining({
@@ -154,11 +168,62 @@ describe('shared order write utilities', () => {
     );
   });
 
+  it('checks the customer minimum before the immediate payment discount', () => {
+    const result = buildSubmittedOrderPayload({
+      context: {
+        customer,
+        route,
+        products: [
+          {
+            id: 'prod-minimum',
+            name: 'Minimum order product',
+            category: 'Category A',
+            basePrice: 700,
+            isActive: true,
+            minQty: 1,
+          },
+        ],
+        priceListItems: [{ productId: 'prod-minimum', price: 700 }],
+        promotions: [],
+      },
+      items: [{ productId: 'prod-minimum', quantity: 1 }],
+      source: 'CUSTOMER',
+      paymentTerm: 'IMMEDIATE_OR_CASH',
+      commercialTermsAccepted: true,
+      now: new Date('2026-06-29T14:00:00.000Z'),
+    });
+
+    expect(result.order).toMatchObject({
+      subtotal: 700,
+      paymentDiscountTotal: 35,
+      total: 665,
+      vatRatePercent: 18,
+      vatTotal: 119.7,
+      totalIncludingVat: 784.7,
+      commercialTermsVersion: '2026-08-10',
+      commercialTermsAcceptedAt: new Date('2026-06-29T14:00:00.000Z'),
+    });
+  });
+
+  it('rejects customer submission without the B2B commercial declaration', () => {
+    expect(() =>
+      buildSubmittedOrderPayload({
+        context: { customer, route, products, priceListItems, promotions: [] },
+        items: [{ productId: 'prod-a', quantity: 2 }],
+        source: 'CUSTOMER',
+        paymentTerm: 'NET_30',
+        commercialTermsAccepted: false,
+        now: new Date('2026-06-29T14:00:00.000Z'),
+      }),
+    ).toThrow('יש לאשר שההזמנה היא עסקית ואת פרטי ההזמנה לפני השליחה.');
+  });
+
   it('marks submitted orders after cutoff as special requests', () => {
     const result = buildSubmittedOrderPayload({
       context: { customer, route, products, priceListItems, promotions: [] },
       items: [{ productId: 'prod-a', quantity: 2 }],
       source: 'ADMIN',
+      paymentTerm: 'NET_30',
       now: new Date('2026-06-29T16:00:00.000Z'),
     });
 
@@ -177,6 +242,7 @@ describe('shared order write utilities', () => {
         },
         items: [{ productId: 'prod-a', quantity: 2 }],
         source: 'ADMIN',
+        paymentTerm: 'NET_30',
         now: new Date('2026-06-29T14:00:00.000Z'),
       }),
     ).toThrow('Customer is inactive');
@@ -192,6 +258,7 @@ describe('shared order write utilities', () => {
         },
         items: [{ productId: 'prod-a', quantity: 2 }],
         source: 'ADMIN',
+        paymentTerm: 'NET_30',
         now: new Date('2026-06-29T14:00:00.000Z'),
       }),
     ).toThrow('Route is inactive');
@@ -205,6 +272,7 @@ describe('shared order write utilities', () => {
         { productId: 'prod-disabled', quantity: 4 },
       ],
       source: 'ADMIN',
+      paymentTerm: 'NET_30',
       now: new Date('2026-06-29T14:00:00.000Z'),
     });
 

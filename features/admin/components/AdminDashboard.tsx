@@ -19,6 +19,9 @@ import { AdminOrderStatusActions } from '@/features/admin/components/AdminOrderS
 import { OrderStatusPill } from '@/features/admin/components/OrderStatusPill';
 import type { getAdminDashboardData } from '@/features/admin/queries';
 import { notificationJobStatusLabels, notificationTemplateLabels } from '@/features/notifications/ui-utils';
+import { formatOrderNumber } from '@/features/orders/order-number';
+import { paymentTermLabels } from '@/features/orders/payment-terms';
+import { OrderFinancialSummary } from '@/features/orders/components/OrderFinancialSummary';
 import type { OrderStatus } from '@/features/orders/utils';
 import { money } from '@/lib/format';
 
@@ -66,6 +69,7 @@ export function AdminDashboard({ data }: { data: DashboardData }) {
       const matchesRoute = routeId === 'all' || order.routeId === routeId;
       const haystack = [
         order.id,
+        String(order.orderNumber),
         order.customerName,
         order.customerContact,
         order.customerPhone,
@@ -207,11 +211,14 @@ function OrderQueueButton({ order, selected, onSelect }: { order: DashboardOrder
           {hasMessageFailure && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-black text-red-800">הודעה נכשלה</span>}
         </span>
         <span className="mt-1 block break-words text-xs font-bold leading-5 text-black/50">
-          קו {order.routeName} / {formatDate(order.deliveryWindowStart)} / {order.source === 'ADMIN' ? 'הזמנה ידנית' : 'פורטל לקוח'}
+          {formatOrderNumber(order.orderNumber)} / קו {order.routeName} / {formatDate(order.deliveryWindowStart)} / {order.source === 'ADMIN' ? 'הזמנה ידנית' : 'פורטל לקוח'}
         </span>
       </span>
       <OrderStatusPill status={order.status} />
-      <span className="text-sm font-black tabular-nums">{money(order.total)}</span>
+      <span className="text-left text-sm font-black tabular-nums">
+        {money(order.totalIncludingVat)}
+        <span className="block text-[10px] font-bold text-black/45">כולל מע״מ</span>
+      </span>
     </button>
   );
 }
@@ -224,7 +231,7 @@ function OrderReviewPanel({ order }: { order: DashboardOrder }) {
           <div className="min-w-0">
             <p className="text-xs font-black text-black/45">בדיקת הזמנה</p>
             <h2 className="mt-1 break-words text-xl font-black">{order.customerName}</h2>
-            <p className="mt-1 break-words text-xs font-bold leading-5 text-black/50">הזמנה {order.id}</p>
+            <p className="mt-1 break-words text-xs font-bold leading-5 text-black/50">הזמנה {formatOrderNumber(order.orderNumber)}</p>
           </div>
           <OrderStatusPill status={order.status} />
         </div>
@@ -236,6 +243,7 @@ function OrderReviewPanel({ order }: { order: DashboardOrder }) {
           <InfoPill label="טלפון" value={order.customerPhone} href={`tel:${order.customerPhone}`} icon={<Phone size={14} />} />
           <InfoPill label="קו" value={order.routeName} href={order.routeId ? `/admin/routes/${order.routeId}` : undefined} />
           <InfoPill label="חלוקה" value={formatDate(order.deliveryWindowStart)} />
+          <InfoPill label="תנאי תשלום" value={paymentTermLabels[order.paymentTerm]} />
         </div>
 
         <NotificationStatusCard order={order} />
@@ -271,14 +279,26 @@ function OrderReviewPanel({ order }: { order: DashboardOrder }) {
           </div>
         </div>
 
-        <div className="rounded-xl bg-[#e6e1d8] px-3 py-2">
-          <TotalRow label="סכום ביניים" value={money(order.subtotal)} />
-          {order.discountTotal > 0 && <TotalRow label="הנחות" value={`-${money(order.discountTotal)}`} strong />}
-          <div className="mt-2 flex items-center justify-between border-t border-black/10 pt-2">
-            <span className="text-sm font-black">סה״כ</span>
-            <span className="text-xl font-black tabular-nums">{money(order.total)}</span>
-          </div>
+        <div className="rounded-xl bg-[#e6e1d8] px-3 pb-3 pt-0.5">
+          <OrderFinancialSummary
+            subtotal={order.subtotal}
+            productDiscountTotal={order.discountTotal}
+            paymentDiscountPercent={order.paymentDiscountPercent}
+            paymentDiscountTotal={order.paymentDiscountTotal}
+            totalBeforeVat={order.total}
+            vatRatePercent={order.vatRatePercent}
+            vatTotal={order.vatTotal}
+            totalIncludingVat={order.totalIncludingVat}
+          />
         </div>
+
+        <p className="rounded-xl border border-black/10 px-3 py-2 text-xs font-bold leading-5 text-black/60">
+          {order.commercialTermsAcceptedAt
+            ? `הצהרת B2B אושרה ב־${new Intl.DateTimeFormat('he-IL', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Jerusalem' }).format(new Date(order.commercialTermsAcceptedAt))}.`
+            : order.source === 'ADMIN'
+              ? 'הזמנה ידנית של הצוות — ללא אישור פורטל לקוח.'
+              : 'הזמנה היסטורית — ללא תיעוד הצהרת B2B.'}
+        </p>
 
         <AdminOrderStatusActions orderId={order.id} status={order.status} />
 
@@ -398,7 +418,7 @@ function AttentionPanel({ orders }: { orders: DashboardOrder[] }) {
             <Link key={order.id} href={`/admin/orders/${order.id}`} className="block rounded-xl border border-black/10 p-3 hover:bg-[#f7f5f1]">
               <p className="break-words text-sm font-black">{order.customerName}</p>
               <p className="mt-1 text-xs font-bold text-black/50">
-                {order.status === 'SPECIAL_REQUEST' ? 'בקשה מיוחדת' : 'תקלה בהודעת WhatsApp'} / {money(order.total)}
+                {order.status === 'SPECIAL_REQUEST' ? 'בקשה מיוחדת' : 'תקלה בהודעת WhatsApp'} / {money(order.totalIncludingVat)} כולל מע״מ
               </p>
             </Link>
           ))
@@ -463,15 +483,6 @@ function NoteBlock({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-black/10 p-3">
       <p className="text-xs font-black text-black/45">{label}</p>
       <p className="mt-1 whitespace-pre-wrap break-words text-sm font-bold leading-6">{value}</p>
-    </div>
-  );
-}
-
-function TotalRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className={`flex items-center justify-between gap-3 text-sm ${strong ? 'font-black text-emerald-800' : 'font-bold'}`}>
-      <span>{label}</span>
-      <span className="tabular-nums">{value}</span>
     </div>
   );
 }

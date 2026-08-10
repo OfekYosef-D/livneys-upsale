@@ -58,6 +58,7 @@ describe('notification jobs', () => {
   it('queues order lifecycle WhatsApp jobs for eligible customers in dry-run mode', async () => {
     mockedOrderFindUnique.mockResolvedValue({
       id: 'ord-1',
+      orderNumber: 1001,
       status: 'SUBMITTED',
       total: 123.5,
       deliveryWindowStart: new Date('2026-07-01T08:00:00.000Z'),
@@ -96,7 +97,7 @@ describe('notification jobs', () => {
             languageCode: 'en_US',
             bodyParameters: [
               { name: 'customer_name', text: 'Dana' },
-              { name: 'order_id', text: 'ord-1' },
+              { name: 'order_id', text: '#1001' },
               { name: 'delivery_date', text: '01/07/2026' },
             ],
           }),
@@ -109,6 +110,7 @@ describe('notification jobs', () => {
   it('does not queue WhatsApp jobs for customers without WhatsApp preference enabled', async () => {
     mockedOrderFindUnique.mockResolvedValue({
       id: 'ord-1',
+      orderNumber: 1001,
       status: 'SUBMITTED',
       total: 123.5,
       deliveryWindowStart: new Date('2026-07-01T08:00:00.000Z'),
@@ -134,6 +136,7 @@ describe('notification jobs', () => {
   it('does not queue live WhatsApp jobs when the required template is missing', async () => {
     mockedOrderFindUnique.mockResolvedValue({
       id: 'ord-1',
+      orderNumber: 1001,
       status: 'APPROVED',
       total: 123.5,
       deliveryWindowStart: new Date('2026-07-01T08:00:00.000Z'),
@@ -443,8 +446,10 @@ describe('notification jobs', () => {
       templateKey: 'ORDER_RECEIVED',
       order: {
         id: 'ord-1',
+        orderNumber: 1001,
         status: 'SUBMITTED',
         total: 123.5,
+        totalIncludingVat: 145.73,
         deliveryWindowStart: new Date('2026-07-01T08:00:00.000Z'),
       },
       customer: {
@@ -477,11 +482,11 @@ describe('notification jobs', () => {
           languageCode: 'en_US',
           bodyParameters: [
             { name: 'customer_name', text: 'Dana' },
-            { name: 'order_id', text: 'ord-1' },
+            { name: 'order_id', text: '#1001' },
             { name: 'delivery_date', text: '01/07/2026' },
           ],
         },
-        message: 'Cafe South: ORDER_RECEIVED ord-1 01/07/2026 ₪123.50',
+        message: 'Cafe South: ORDER_RECEIVED #1001 01/07/2026 ₪145.73',
         scheduledAt: now,
         nextAttemptAt: now,
         lastAttemptAt: null,

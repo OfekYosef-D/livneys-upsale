@@ -2,7 +2,8 @@ export function money(value: number): string {
   return new Intl.NumberFormat('he-IL', {
     style: 'currency',
     currency: 'ILS',
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 

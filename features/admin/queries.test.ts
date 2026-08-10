@@ -35,6 +35,7 @@ describe('admin dashboard queries', () => {
     mockedOrderFindMany.mockResolvedValue([
       {
         id: 'ord-1',
+        orderNumber: 1001,
         customerId: 'cust-1',
         status: 'SUBMITTED',
         source: 'CUSTOMER',
@@ -42,7 +43,15 @@ describe('admin dashboard queries', () => {
         deliveryWindowStart: new Date('2026-07-02T08:00:00.000Z'),
         subtotal: 120,
         discountTotal: 10,
-        total: 110,
+        paymentTerm: 'IMMEDIATE_OR_CASH',
+        paymentDiscountPercent: 5,
+        paymentDiscountTotal: 5.5,
+        total: 104.5,
+        vatRatePercent: 18,
+        vatTotal: 18.81,
+        totalIncludingVat: 123.31,
+        commercialTermsVersion: '2026-08-10',
+        commercialTermsAcceptedAt: new Date('2026-07-01T08:00:00.000Z'),
         notes: 'Call before delivery',
         internalNote: 'Customer asked for early delivery',
         customer: {
@@ -108,10 +117,20 @@ describe('admin dashboard queries', () => {
     expect(mockedOrderFindMany).toHaveBeenCalledWith(expect.not.objectContaining({ take: expect.any(Number) }));
     expect(data.orders[0]).toMatchObject({
       id: 'ord-1',
+      orderNumber: 1001,
       customerContact: 'Dana',
       customerPhone: '050-111-2222',
       notes: 'Call before delivery',
       internalNote: 'Customer asked for early delivery',
+      paymentTerm: 'IMMEDIATE_OR_CASH',
+      paymentDiscountPercent: 5,
+      paymentDiscountTotal: 5.5,
+      total: 104.5,
+      vatRatePercent: 18,
+      vatTotal: 18.81,
+      totalIncludingVat: 123.31,
+      commercialTermsVersion: '2026-08-10',
+      commercialTermsAcceptedAt: '2026-07-01T08:00:00.000Z',
       latestNotification: {
         id: 'job-1',
         status: 'FAILED',

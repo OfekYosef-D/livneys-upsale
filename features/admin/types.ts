@@ -1,4 +1,5 @@
 import type { OrderStatus } from '@/features/orders/utils';
+import type { PaymentTermValue } from '@/features/orders/payment-terms';
 
 export type AdminOrderSource = 'CUSTOMER' | 'ADMIN';
 
@@ -25,6 +26,7 @@ export type AdminOrderNotificationSummary = {
 
 export type AdminOrderSummary = {
   id: string;
+  orderNumber: number;
   customerId: string;
   customerName: string;
   routeId: string | null;
@@ -35,7 +37,15 @@ export type AdminOrderSummary = {
   deliveryWindowStart: string;
   subtotal: number;
   discountTotal: number;
+  paymentTerm: PaymentTermValue;
+  paymentDiscountPercent: number;
+  paymentDiscountTotal: number;
   total: number;
+  vatRatePercent: number;
+  vatTotal: number;
+  totalIncludingVat: number;
+  commercialTermsVersion: string | null;
+  commercialTermsAcceptedAt: string | null;
   lineCount: number;
   hasUpsell: boolean;
 };

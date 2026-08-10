@@ -9,13 +9,22 @@ describe('customer portal order mapping', () => {
     const order = mapPortalOrder(
       {
         id: 'ord-history',
+        orderNumber: 1001,
         customerId: 'cust-001',
         createdAt,
         submittedAt,
         status: 'SUBMITTED',
         subtotal: 100,
         discountTotal: 16,
-        total: 84,
+        paymentTerm: 'IMMEDIATE_OR_CASH',
+        paymentDiscountPercent: 5,
+        paymentDiscountTotal: 4.2,
+        total: 79.8,
+        vatRatePercent: 18,
+        vatTotal: 14.36,
+        totalIncludingVat: 94.16,
+        commercialTermsVersion: '2026-08-10',
+        commercialTermsAcceptedAt: submittedAt,
         lines: [
           {
             productId: 'prod-old',
@@ -36,12 +45,21 @@ describe('customer portal order mapping', () => {
 
     expect(order).toEqual({
       id: 'ord-history',
+      orderNumber: 1001,
       customerId: 'cust-001',
       date: submittedAt.toISOString(),
       status: 'SUBMITTED',
       subtotal: 100,
       discountTotal: 16,
-      total: 84,
+      paymentTerm: 'IMMEDIATE_OR_CASH',
+      paymentDiscountPercent: 5,
+      paymentDiscountTotal: 4.2,
+      total: 79.8,
+      vatRatePercent: 18,
+      vatTotal: 14.36,
+      totalIncludingVat: 94.16,
+      commercialTermsVersion: '2026-08-10',
+      commercialTermsAcceptedAt: submittedAt.toISOString(),
       items: [
         {
           productId: 'prod-old',

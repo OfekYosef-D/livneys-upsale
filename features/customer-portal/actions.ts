@@ -7,6 +7,7 @@ import { assertCustomerAction } from '@/lib/authorization';
 import { prisma } from '@/lib/db';
 import { enqueueOrderLifecycleWhatsApp } from '../notifications/jobs';
 import { normalizeCustomerOrderItems } from '../orders/utils';
+import { calculateVatSummary } from '../orders/vat';
 import { calculateOrderPricing } from '../pricing/engine';
 import { saveDraftOrderSchema, submitCustomerOrderSchema, type SaveDraftOrderInput, type SubmitCustomerOrderInput } from './schema';
 
@@ -30,6 +31,7 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
       promotions: context.promotions,
     });
     const snapshotLines = pricing.lines;
+    const vat = calculateVatSummary(pricing.total);
     const existingDraft = await prisma.order.findFirst({
       where: {
         customerId: parsed.customerId,
@@ -51,7 +53,13 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
         deadlineAt: context.route.nextCutoffAt,
         subtotal: pricing.subtotal,
         discountTotal: pricing.discountTotal,
+        paymentTerm: 'NET_30',
+        paymentDiscountPercent: 0,
+        paymentDiscountTotal: 0,
         total: pricing.total,
+        vatRatePercent: vat.vatRatePercent,
+        vatTotal: vat.vatTotal,
+        totalIncludingVat: vat.totalIncludingVat,
         lines: {
           create: snapshotLines.map((line) => ({
             productId: line.productId,
@@ -73,7 +81,13 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
         deadlineAt: context.route.nextCutoffAt,
         subtotal: pricing.subtotal,
         discountTotal: pricing.discountTotal,
+        paymentTerm: 'NET_30',
+        paymentDiscountPercent: 0,
+        paymentDiscountTotal: 0,
         total: pricing.total,
+        vatRatePercent: vat.vatRatePercent,
+        vatTotal: vat.vatTotal,
+        totalIncludingVat: vat.totalIncludingVat,
         lines: {
           deleteMany: {},
           create: snapshotLines.map((line) => ({
@@ -114,6 +128,8 @@ export async function submitCustomerOrderAction(input: SubmitCustomerOrderInput)
       customerId: parsed.customerId,
       items: normalizedItems,
       source: 'CUSTOMER',
+      paymentTerm: parsed.paymentTerm,
+      commercialTermsAccepted: parsed.commercialTermsAccepted,
       notes: parsed.notes,
       replaceDraftForDeliveryWindow: true,
     });

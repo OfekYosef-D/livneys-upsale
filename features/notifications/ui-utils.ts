@@ -37,6 +37,7 @@ export type OperatorNotificationJob = {
   templateKey: string;
   templateName: string | null;
   orderId: string | null;
+  orderNumber: number | null;
   providerMessageId: string | null;
   message: string | null;
   errorMessage: string | null;
@@ -75,6 +76,7 @@ export function filterNotificationJobsForOperator<T extends OperatorNotification
         job.templateKey,
         job.templateName,
         job.orderId,
+        job.orderNumber,
         job.providerMessageId,
         job.message,
         job.errorMessage,

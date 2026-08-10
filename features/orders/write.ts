@@ -1,6 +1,9 @@
 import type { OrderSource } from '@prisma/client';
 import { calculateOrderPricing, type PricingPriceListItem, type PricingProduct, type PricingPromotion } from '../pricing/engine';
 import { validateInstitutionalOrderRules } from './business-rules';
+import { COMMERCIAL_TERMS_VERSION } from './commercial-terms';
+import { calculatePaymentTermsSummary, type PaymentTermValue } from './payment-terms';
+import { calculateVatSummary } from './vat';
 import {
   getSubmissionStatus,
   normalizeCustomerOrderItems,
@@ -40,7 +43,15 @@ export type SubmittedOrderPayload = {
     internalNote: string | null;
     subtotal: number;
     discountTotal: number;
+    paymentTerm: PaymentTermValue;
+    paymentDiscountPercent: number;
+    paymentDiscountTotal: number;
     total: number;
+    vatRatePercent: number;
+    vatTotal: number;
+    totalIncludingVat: number;
+    commercialTermsVersion: string | null;
+    commercialTermsAcceptedAt: Date | null;
   };
   lines: OrderSnapshotLine[];
 };
@@ -51,6 +62,8 @@ export function buildSubmittedOrderPayload({
   context,
   items,
   source,
+  paymentTerm,
+  commercialTermsAccepted = false,
   now,
   notes,
   internalNote,
@@ -58,10 +71,16 @@ export function buildSubmittedOrderPayload({
   context: OrderWriteContext;
   items: SnapshotItem[];
   source: OrderSource;
+  paymentTerm: PaymentTermValue;
+  commercialTermsAccepted?: boolean;
   now: Date;
   notes?: string | null;
   internalNote?: string | null;
 }): SubmittedOrderPayload {
+  if (source === 'CUSTOMER' && !commercialTermsAccepted) {
+    throw new Error('יש לאשר שההזמנה היא עסקית ואת פרטי ההזמנה לפני השליחה.');
+  }
+
   if (!context.customer.isActive) {
     throw new Error('Customer is inactive');
   }
@@ -94,6 +113,8 @@ export function buildSubmittedOrderPayload({
     items: lines.map((line) => ({ productId: line.productId, quantity: line.quantity })),
     products: context.products,
   });
+  const payment = calculatePaymentTermsSummary(pricing.total, paymentTerm);
+  const vat = calculateVatSummary(payment.total);
 
   return {
     order: {
@@ -111,7 +132,15 @@ export function buildSubmittedOrderPayload({
       internalNote: normalizeNullableText(internalNote),
       subtotal: pricing.subtotal,
       discountTotal: pricing.discountTotal,
-      total: pricing.total,
+      paymentTerm,
+      paymentDiscountPercent: payment.paymentDiscountPercent,
+      paymentDiscountTotal: payment.paymentDiscountTotal,
+      total: payment.total,
+      vatRatePercent: vat.vatRatePercent,
+      vatTotal: vat.vatTotal,
+      totalIncludingVat: vat.totalIncludingVat,
+      commercialTermsVersion: source === 'CUSTOMER' ? COMMERCIAL_TERMS_VERSION : null,
+      commercialTermsAcceptedAt: source === 'CUSTOMER' ? now : null,
     },
     lines,
   };

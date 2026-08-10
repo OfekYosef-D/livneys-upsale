@@ -1,6 +1,9 @@
 export const MINIMUM_INSTITUTIONAL_ORDER_TOTAL = 700;
 
-export const PRICES_BEFORE_VAT_LABEL = 'המחירים לפני מע"מ';
+export const PRICES_BEFORE_VAT_LABEL = 'מחירי המחירון לפני מע״מ';
+
+export const INSTITUTIONAL_PRICING_NOTICE =
+  'המחירון מיועד ללקוחות עסקיים ומוסדיים. הסכום כולל מע״מ מוצג בסל ובסיכום ההזמנה.';
 
 export const institutionalBusinessTypes = [
   'מעדניות',
@@ -64,15 +67,6 @@ export const productPricePresets = [
 ] as const;
 
 export const promotionPresets = [
-  {
-    id: 'cash-5',
-    label: '5% הנחת מזומן',
-    title: 'הנחת מזומן',
-    tag: '5% מזומן',
-    description: 'הנחה ללקוחות שמשלמים במזומן. יש להפעיל רק אחרי אישור בעלים.',
-    effectType: 'PERCENT_OFF',
-    discountValue: 5,
-  },
   {
     id: 'winery-volume',
     label: 'הנחת כמות ליקבים',

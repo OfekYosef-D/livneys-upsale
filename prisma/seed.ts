@@ -6,6 +6,7 @@ import products from '../data/products.json';
 import promotions from '../data/promotions.json';
 import routes from '../data/routes.json';
 import { createOrderSnapshotLines } from '../features/orders/utils';
+import { calculateVatSummary } from '../features/orders/vat';
 import { defaultInstitutionalRouteNames, productPricePresets } from '../features/owner-rules/constants';
 import { assertDemoSeedAllowed } from '../features/deployment/database-safety';
 
@@ -316,6 +317,7 @@ async function seedPromotionsRecommendationsAndOrders() {
       })),
     });
     const total = snapshotLines.reduce((sum, line) => sum + line.lineTotal, 0);
+    const vat = calculateVatSummary(total);
     const status = normalizeOrderStatus(order.status, order.id);
     const orderDate = new Date(`${order.date}T09:00:00.000Z`);
 
@@ -332,6 +334,9 @@ async function seedPromotionsRecommendationsAndOrders() {
         subtotal: total,
         discountTotal: 0,
         total,
+        vatRatePercent: vat.vatRatePercent,
+        vatTotal: vat.vatTotal,
+        totalIncludingVat: vat.totalIncludingVat,
         lines: {
           create: snapshotLines.map((line) => ({
             productId: line.productId,

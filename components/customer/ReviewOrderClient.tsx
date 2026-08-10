@@ -2,12 +2,20 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Truck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ShieldCheck, Truck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { CartAdjustmentNotice } from '@/components/customer/CartAdjustmentNotice';
+import { OrderFinancialSummary } from '@/features/orders/components/OrderFinancialSummary';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { submitCustomerOrderAction } from '@/features/customer-portal/actions';
 import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
+import { COMMERCIAL_ORDER_DECLARATION, COMMERCIAL_ORDER_NOTICE } from '@/features/orders/commercial-terms';
+import {
+  calculatePaymentTermsSummary,
+  paymentTermLabels,
+  type PaymentTermValue,
+} from '@/features/orders/payment-terms';
+import { calculateVatSummary } from '@/features/orders/vat';
 import { money } from '@/lib/format';
 import {
   getAllowedProductIds,
@@ -36,6 +44,8 @@ export function ReviewOrderClient({
   const [cart, setCart] = useState<Cart>(() => preparedCart.cart);
   const [cartNotice, setCartNotice] = useState('');
   const [notes, setNotes] = useState('');
+  const [paymentTerm, setPaymentTerm] = useState<PaymentTermValue>('NET_30');
+  const [commercialTermsAccepted, setCommercialTermsAccepted] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -62,11 +72,22 @@ export function ReviewOrderClient({
 
   const cartItems = useMemo(() => getCartItems(cart, allowedProductIds), [allowedProductIds, cart]);
   const cartPricing = useMemo(() => getCartPricingSummary(cart, products), [cart, products]);
+  const paymentSummary = useMemo(
+    () => calculatePaymentTermsSummary(cartPricing.total, paymentTerm),
+    [cartPricing.total, paymentTerm],
+  );
+  const vatSummary = useMemo(() => calculateVatSummary(paymentSummary.total), [paymentSummary.total]);
 
   async function submitOrder() {
     setError('');
     setIsSubmitting(true);
-    const result = await submitCustomerOrderAction({ customerId: customer.id, items: cartItems, notes });
+    const result = await submitCustomerOrderAction({
+      customerId: customer.id,
+      items: cartItems,
+      notes,
+      paymentTerm,
+      commercialTermsAccepted,
+    });
     setIsSubmitting(false);
 
     if (!result.ok) {
@@ -155,6 +176,42 @@ export function ReviewOrderClient({
                 <p>{customer.name} · {customer.contact}</p>
                 <p>חלוקה {new Intl.DateTimeFormat('he-IL').format(new Date(route.nextDelivery))}</p>
               </div>
+              <fieldset className="mt-3 border-t border-black/10 pt-3">
+                <legend className="text-xs font-black">תנאי תשלום</legend>
+                <div className="mt-2 grid gap-2">
+                  {(['NET_30', 'IMMEDIATE_OR_CASH'] as const).map((option) => {
+                    const selected = paymentTerm === option;
+                    return (
+                      <label
+                        key={option}
+                        className={`cursor-pointer rounded-xl border p-3 transition focus-within:ring-2 focus-within:ring-black/25 ${
+                          selected ? 'border-black bg-black text-white' : 'border-black/10 bg-[#f7f5f1] text-black'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="paymentTerm"
+                          value={option}
+                          checked={selected}
+                          onChange={() => setPaymentTerm(option)}
+                          className="sr-only"
+                        />
+                        <span className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-black">{paymentTermLabels[option]}</span>
+                          {option === 'IMMEDIATE_OR_CASH' && (
+                            <span className={`rounded-full px-2 py-1 text-[11px] font-black ${selected ? 'bg-white text-black' : 'bg-emerald-100 text-emerald-800'}`}>
+                              5% הנחה
+                            </span>
+                          )}
+                        </span>
+                        <span className={`mt-1 block text-[11px] font-bold ${selected ? 'text-white/70' : 'text-black/50'}`}>
+                          {option === 'NET_30' ? 'ללא הנחת תשלום' : 'ההנחה מחושבת לאחר מבצעי המוצר'}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
               <label className="mt-3 block">
                 <span className="mb-1.5 block text-xs font-black">הערות להזמנה</span>
                 <textarea
@@ -164,25 +221,38 @@ export function ReviewOrderClient({
                   className="min-h-20 w-full rounded-xl border border-black/12 bg-white p-2.5 text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-black/25"
                 />
               </label>
-              <div className="mt-3 space-y-1 border-t border-black/10 pt-3 text-sm font-bold">
-                <div className="flex items-center justify-between">
-                  <span>סכום ביניים</span>
-                  <span className="tabular-nums">{money(cartPricing.subtotal)}</span>
-                </div>
-                {cartPricing.discountTotal > 0 && (
-                  <div className="flex items-center justify-between text-emerald-700">
-                    <span>הנחות</span>
-                    <span className="tabular-nums">-{money(cartPricing.discountTotal)}</span>
+              <OrderFinancialSummary
+                subtotal={cartPricing.subtotal}
+                productDiscountTotal={cartPricing.discountTotal}
+                paymentDiscountPercent={paymentSummary.paymentDiscountPercent}
+                paymentDiscountTotal={paymentSummary.paymentDiscountTotal}
+                totalBeforeVat={paymentSummary.total}
+                vatRatePercent={vatSummary.vatRatePercent}
+                vatTotal={vatSummary.vatTotal}
+                totalIncludingVat={vatSummary.totalIncludingVat}
+              />
+              <div className="mt-3 rounded-xl border border-black/10 bg-[#f7f5f1] p-3">
+                <div className="flex items-start gap-2">
+                  <ShieldCheck size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+                  <div>
+                    <p className="text-xs font-black">אישור הזמנה עסקית</p>
+                    <p id="commercial-order-notice" className="mt-1 text-[11px] font-bold leading-5 text-black/55">{COMMERCIAL_ORDER_NOTICE}</p>
                   </div>
-                )}
-                <div className="flex items-center justify-between pt-1 text-base font-black">
-                  <span>סה״כ משוער</span>
-                  <span className="tabular-nums">{money(cartPricing.total)}</span>
                 </div>
+                <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg bg-white p-2.5 text-xs font-bold leading-5 ring-1 ring-black/10 focus-within:ring-2 focus-within:ring-black/30">
+                  <input
+                    type="checkbox"
+                    checked={commercialTermsAccepted}
+                    onChange={(event) => setCommercialTermsAccepted(event.target.checked)}
+                    aria-describedby="commercial-order-notice"
+                    className="mt-1 h-4 w-4 shrink-0 accent-black"
+                  />
+                  <span>{COMMERCIAL_ORDER_DECLARATION}</span>
+                </label>
               </div>
               <button
                 onClick={submitOrder}
-                disabled={cartItems.length === 0 || isSubmitting}
+                disabled={cartItems.length === 0 || !commercialTermsAccepted || isSubmitting}
                 className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-not-allowed disabled:bg-black/30"
               >
                 {isSubmitting ? 'שולח...' : 'שלח הזמנה לאישור'}

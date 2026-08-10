@@ -1,4 +1,5 @@
 import type { OrderStatus } from '@prisma/client';
+import type { PaymentTermValue } from '../orders/payment-terms';
 import type { PortalOrder } from './types';
 
 type PortalOrderLineSnapshot = {
@@ -16,13 +17,22 @@ type PortalOrderLineSnapshot = {
 
 type PortalOrderSnapshot = {
   id: string;
+  orderNumber: number;
   customerId: string;
   submittedAt: Date | null;
   createdAt: Date;
   status: OrderStatus;
   subtotal?: unknown;
   discountTotal?: unknown;
+  paymentTerm: PaymentTermValue;
+  paymentDiscountPercent?: unknown;
+  paymentDiscountTotal?: unknown;
   total: unknown;
+  vatRatePercent?: unknown;
+  vatTotal?: unknown;
+  totalIncludingVat?: unknown;
+  commercialTermsVersion?: string | null;
+  commercialTermsAcceptedAt?: Date | null;
   lines: PortalOrderLineSnapshot[];
 };
 
@@ -30,24 +40,42 @@ export function mapPortalOrder(order: PortalOrderSnapshot | null, customerId: st
   if (!order) {
     return {
       id: 'empty',
+      orderNumber: null,
       customerId,
       date: new Date().toISOString(),
       status: 'DRAFT',
       subtotal: 0,
       discountTotal: 0,
+      paymentTerm: 'NET_30',
+      paymentDiscountPercent: 0,
+      paymentDiscountTotal: 0,
       total: 0,
+      vatRatePercent: 18,
+      vatTotal: 0,
+      totalIncludingVat: 0,
+      commercialTermsVersion: null,
+      commercialTermsAcceptedAt: null,
       items: [],
     };
   }
 
   return {
     id: order.id,
+    orderNumber: order.orderNumber,
     customerId: order.customerId,
     date: (order.submittedAt ?? order.createdAt).toISOString(),
     status: order.status,
     subtotal: Number(order.subtotal ?? order.total),
     discountTotal: Number(order.discountTotal ?? 0),
+    paymentTerm: order.paymentTerm,
+    paymentDiscountPercent: Number(order.paymentDiscountPercent ?? 0),
+    paymentDiscountTotal: Number(order.paymentDiscountTotal ?? 0),
     total: Number(order.total),
+    vatRatePercent: Number(order.vatRatePercent ?? 18),
+    vatTotal: Number(order.vatTotal ?? 0),
+    totalIncludingVat: Number(order.totalIncludingVat ?? order.total),
+    commercialTermsVersion: order.commercialTermsVersion ?? null,
+    commercialTermsAcceptedAt: order.commercialTermsAcceptedAt?.toISOString() ?? null,
     items: order.lines
       .filter((line) => line.productId)
       .map((line) => ({

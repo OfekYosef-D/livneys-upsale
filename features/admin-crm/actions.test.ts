@@ -103,6 +103,7 @@ describe('admin CRM actions', () => {
       customerId: 'cust-001',
       items: [{ productId: 'prod-a', quantity: 3 }],
       source: 'ADMIN',
+      paymentTerm: 'NET_30',
       notes: 'Call before delivery',
       internalNote: '[manual-order:intake=PHONE] Ordered with Shai',
     });

@@ -1,4 +1,5 @@
 import type { OrderSource, OrderStatus } from '@prisma/client';
+import type { PaymentTermValue } from '@/features/orders/payment-terms';
 import { activeOrderStatuses } from '@/features/orders/utils';
 import { prisma } from '@/lib/db';
 import type { AdminDashboardOrder, AdminOrderLine, AdminOrderSummary, AdminRouteSummary } from './types';
@@ -220,6 +221,7 @@ export async function getAdminOrderDetail(orderId: string) {
 
 function mapOrderSummary(order: {
   id: string;
+  orderNumber: number;
   customerId: string;
   status: OrderStatus;
   source: OrderSource;
@@ -227,13 +229,22 @@ function mapOrderSummary(order: {
   deliveryWindowStart: Date;
   subtotal: unknown;
   discountTotal: unknown;
+  paymentTerm: PaymentTermValue;
+  paymentDiscountPercent: unknown;
+  paymentDiscountTotal: unknown;
   total: unknown;
+  vatRatePercent: unknown;
+  vatTotal: unknown;
+  totalIncludingVat: unknown;
+  commercialTermsVersion: string | null;
+  commercialTermsAcceptedAt: Date | null;
   customer: { id: string; name: string };
   route: { id: string; name: string } | null;
   lines: { quantity: number; lineTotal: unknown }[];
 }): AdminOrderSummary {
   return {
     id: order.id,
+    orderNumber: order.orderNumber,
     customerId: order.customerId,
     customerName: order.customer.name,
     routeId: order.route?.id ?? null,
@@ -244,7 +255,15 @@ function mapOrderSummary(order: {
     deliveryWindowStart: order.deliveryWindowStart.toISOString(),
     subtotal: Number(order.subtotal),
     discountTotal: Number(order.discountTotal),
+    paymentTerm: order.paymentTerm,
+    paymentDiscountPercent: Number(order.paymentDiscountPercent),
+    paymentDiscountTotal: Number(order.paymentDiscountTotal),
     total: Number(order.total),
+    vatRatePercent: Number(order.vatRatePercent),
+    vatTotal: Number(order.vatTotal),
+    totalIncludingVat: Number(order.totalIncludingVat),
+    commercialTermsVersion: order.commercialTermsVersion,
+    commercialTermsAcceptedAt: order.commercialTermsAcceptedAt?.toISOString() ?? null,
     lineCount: order.lines.length,
     hasUpsell: order.lines.length >= 3,
   };
@@ -252,6 +271,7 @@ function mapOrderSummary(order: {
 
 function mapDashboardOrder(order: {
   id: string;
+  orderNumber: number;
   customerId: string;
   status: OrderStatus;
   source: OrderSource;
@@ -261,7 +281,15 @@ function mapDashboardOrder(order: {
   internalNote: string | null;
   subtotal: unknown;
   discountTotal: unknown;
+  paymentTerm: PaymentTermValue;
+  paymentDiscountPercent: unknown;
+  paymentDiscountTotal: unknown;
   total: unknown;
+  vatRatePercent: unknown;
+  vatTotal: unknown;
+  totalIncludingVat: unknown;
+  commercialTermsVersion: string | null;
+  commercialTermsAcceptedAt: Date | null;
   customer: { id: string; name: string; contact: string; phone: string };
   route: { id: string; name: string } | null;
   lines: Array<{

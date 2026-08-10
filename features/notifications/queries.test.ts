@@ -49,7 +49,7 @@ describe('notification management queries', () => {
         providerMessageId: 'wamid.123',
         errorMessage: 'Previous timeout',
         customer: { id: 'cust-001', name: 'Cafe South', contact: 'Dana', phone: '050-123-4567' },
-        order: { id: 'ord-1', status: 'SUBMITTED', total: 123.5 },
+        order: { id: 'ord-1', orderNumber: 1001, status: 'SUBMITTED', total: 123.5 },
         reminderJob: null,
       },
     ] as never);
@@ -88,6 +88,7 @@ describe('notification management queries', () => {
       templateKey: 'ORDER_RECEIVED',
       status: 'DRY_RUN',
       orderId: 'ord-1',
+      orderNumber: 1001,
       attempts: 1,
       maxAttempts: 3,
       nextAttemptAt: '2026-07-01T10:05:00.000Z',
