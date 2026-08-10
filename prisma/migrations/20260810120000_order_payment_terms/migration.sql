@@ -1,0 +1,6 @@
+CREATE TYPE "PaymentTerm" AS ENUM ('NET_30', 'IMMEDIATE_OR_CASH');
+
+ALTER TABLE "Order"
+  ADD COLUMN "paymentTerm" "PaymentTerm" NOT NULL DEFAULT 'NET_30',
+  ADD COLUMN "paymentDiscountPercent" DECIMAL(5,2) NOT NULL DEFAULT 0,
+  ADD COLUMN "paymentDiscountTotal" DECIMAL(10,2) NOT NULL DEFAULT 0;
