@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { getAdminOrderDetail } from '@/features/admin/queries';
+import { formatOrderNumber } from '@/features/orders/order-number';
 import { paymentTermLabels } from '@/features/orders/payment-terms';
 import { money } from '@/lib/format';
 import { AdminOrderStatusActions } from './AdminOrderStatusActions';
@@ -45,7 +46,7 @@ export function AdminOrderDetail({ order }: { order: OrderData }) {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-black text-black/45">הזמנה</p>
-              <h2 className="text-xl font-black">{order.id}</h2>
+              <h2 className="text-xl font-black">{formatOrderNumber(order.orderNumber)}</h2>
             </div>
             <OrderStatusPill status={order.status} />
           </div>

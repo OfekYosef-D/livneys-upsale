@@ -221,6 +221,7 @@ export async function getAdminOrderDetail(orderId: string) {
 
 function mapOrderSummary(order: {
   id: string;
+  orderNumber: number;
   customerId: string;
   status: OrderStatus;
   source: OrderSource;
@@ -238,6 +239,7 @@ function mapOrderSummary(order: {
 }): AdminOrderSummary {
   return {
     id: order.id,
+    orderNumber: order.orderNumber,
     customerId: order.customerId,
     customerName: order.customer.name,
     routeId: order.route?.id ?? null,
@@ -259,6 +261,7 @@ function mapOrderSummary(order: {
 
 function mapDashboardOrder(order: {
   id: string;
+  orderNumber: number;
   customerId: string;
   status: OrderStatus;
   source: OrderSource;

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { getAdminCustomerDetail } from '@/features/admin/queries';
+import { formatOrderNumber } from '@/features/orders/order-number';
 import { money } from '@/lib/format';
 import { OrderStatusPill } from './OrderStatusPill';
 
@@ -50,7 +51,7 @@ export function AdminCustomerDetail({ customer }: { customer: CustomerData }) {
             customer.orders.map((order) => (
               <Link key={order.id} href={`/admin/orders/${order.id}`} className="grid gap-2 px-4 py-4 hover:bg-[#e6e1d8] sm:grid-cols-[minmax(0,1fr)_8rem_7rem] sm:items-center">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-black">{order.id}</p>
+                  <p className="truncate text-sm font-black">הזמנה {formatOrderNumber(order.orderNumber)}</p>
                   <p className="text-xs font-bold text-black/45">{new Intl.DateTimeFormat('he-IL').format(new Date(order.deliveryWindowStart))}</p>
                 </div>
                 <OrderStatusPill status={order.status} />

@@ -35,6 +35,7 @@ describe('admin dashboard queries', () => {
     mockedOrderFindMany.mockResolvedValue([
       {
         id: 'ord-1',
+        orderNumber: 1001,
         customerId: 'cust-1',
         status: 'SUBMITTED',
         source: 'CUSTOMER',
@@ -111,6 +112,7 @@ describe('admin dashboard queries', () => {
     expect(mockedOrderFindMany).toHaveBeenCalledWith(expect.not.objectContaining({ take: expect.any(Number) }));
     expect(data.orders[0]).toMatchObject({
       id: 'ord-1',
+      orderNumber: 1001,
       customerContact: 'Dana',
       customerPhone: '050-111-2222',
       notes: 'Call before delivery',

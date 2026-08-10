@@ -26,6 +26,7 @@ export type AdminOrderNotificationSummary = {
 
 export type AdminOrderSummary = {
   id: string;
+  orderNumber: number;
   customerId: string;
   customerName: string;
   routeId: string | null;
