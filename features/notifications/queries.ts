@@ -20,6 +20,7 @@ export async function getNotificationManagementData() {
         order: {
           select: {
             id: true,
+            orderNumber: true,
             status: true,
             total: true,
           },
@@ -84,6 +85,7 @@ export async function getNotificationManagementData() {
       customerContact: job.customer.contact,
       customerPhone: job.customer.phone,
       orderId: job.orderId,
+      orderNumber: job.order?.orderNumber ?? null,
       orderStatus: job.order?.status ?? null,
       orderTotal: job.order ? Number(job.order.total) : null,
       reminderJobId: job.reminderJobId,

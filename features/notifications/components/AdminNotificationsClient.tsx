@@ -17,6 +17,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { sendNotificationJobNowAction, updateReminderRuleAction } from '@/features/notifications/actions';
+import { formatOrderNumber } from '@/features/orders/order-number';
 import type { getNotificationManagementData } from '@/features/notifications/queries';
 import {
   compareJobsForOperator,
@@ -285,7 +286,7 @@ function NotificationJobRow({
           <InfoCell label="סוג הודעה">{notificationTemplateLabels[job.templateKey] ?? job.templateName ?? 'הודעת WhatsApp'}</InfoCell>
           <InfoCell label="תוזמנה">{formatDateTime(job.scheduledAt)}</InfoCell>
           <InfoCell label="עובד">{job.processedAt ? formatDateTime(job.processedAt) : 'טרם עובד'}</InfoCell>
-          {job.orderId && <InfoCell label="הזמנה">{job.orderId}</InfoCell>}
+          {job.orderNumber !== null && <InfoCell label="הזמנה">{formatOrderNumber(job.orderNumber)}</InfoCell>}
           {job.nextAttemptAt && <InfoCell label="ניסיון הבא">{formatDateTime(job.nextAttemptAt)}</InfoCell>}
           {job.lastAttemptAt && <InfoCell label="ניסיון אחרון">{formatDateTime(job.lastAttemptAt)}</InfoCell>}
         </div>

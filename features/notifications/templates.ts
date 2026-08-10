@@ -1,4 +1,5 @@
 import type { OrderStatus } from '@/features/orders/utils';
+import { formatOrderNumber } from '../orders/order-number';
 import type { WhatsAppTemplateKey } from './config';
 import type { WhatsAppTemplateBodyParameter } from './sender';
 
@@ -43,7 +44,7 @@ export function buildOrderTemplatePayload({
   baseUrl: string;
   customer: CustomerTemplateContext;
   order: {
-    id: string;
+    orderNumber: number;
     status: OrderStatus;
     total: number;
     deliveryWindowStart: Date;
@@ -52,16 +53,17 @@ export function buildOrderTemplatePayload({
   const customerUrl = buildCustomerUrl(baseUrl, customer.id);
   const deliveryDate = formatDate(order.deliveryWindowStart);
   const total = formatCurrency(order.total);
+  const displayOrderNumber = formatOrderNumber(order.orderNumber);
 
   if (templateKey === 'ORDER_RECEIVED') {
     return {
       languageCode: 'he',
       bodyParameters: [
         { name: 'customer_name', text: customer.contact },
-        { name: 'order_id', text: order.id },
+        { name: 'order_id', text: displayOrderNumber },
         { name: 'delivery_date', text: deliveryDate },
       ],
-      previewMessage: `${customer.name}: ${templateKey} ${order.id} ${deliveryDate} ${total}`,
+      previewMessage: `${customer.name}: ${templateKey} ${displayOrderNumber} ${deliveryDate} ${total}`,
     };
   }
 
@@ -70,12 +72,12 @@ export function buildOrderTemplatePayload({
     bodyParameters: [
       { name: 'customer_name', text: customer.contact },
       { name: 'business_name', text: customer.name },
-      { name: 'order_id', text: order.id },
+      { name: 'order_id', text: displayOrderNumber },
       { name: 'delivery_date', text: deliveryDate },
       { name: 'order_total', text: total },
       { name: 'order_link', text: customerUrl },
     ],
-    previewMessage: `${customer.name}: ${templateKey} ${order.id} ${deliveryDate} ${total}`,
+    previewMessage: `${customer.name}: ${templateKey} ${displayOrderNumber} ${deliveryDate} ${total}`,
   };
 }
 

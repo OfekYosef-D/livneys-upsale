@@ -88,7 +88,7 @@ export async function enqueueOrderLifecycleWhatsApp({
       contact: order.customer.contact,
     },
     order: {
-      id: order.id,
+      orderNumber: order.orderNumber,
       status: order.status as OrderStatus,
       total: Number(order.total),
       deliveryWindowStart: order.deliveryWindowStart,
@@ -494,7 +494,7 @@ async function buildRefreshedNotificationJobData(jobId: string, config: WhatsApp
       contact: job.customer.contact,
     },
     order: {
-      id: job.order.id,
+      orderNumber: job.order.orderNumber,
       status: job.order.status as OrderStatus,
       total: Number(job.order.total),
       deliveryWindowStart: job.order.deliveryWindowStart,
