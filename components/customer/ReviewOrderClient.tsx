@@ -8,6 +8,12 @@ import { CartAdjustmentNotice } from '@/components/customer/CartAdjustmentNotice
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { submitCustomerOrderAction } from '@/features/customer-portal/actions';
 import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
+import { PRICES_BEFORE_VAT_LABEL } from '@/features/owner-rules/constants';
+import {
+  calculatePaymentTermsSummary,
+  paymentTermLabels,
+  type PaymentTermValue,
+} from '@/features/orders/payment-terms';
 import { money } from '@/lib/format';
 import {
   getAllowedProductIds,
@@ -36,6 +42,7 @@ export function ReviewOrderClient({
   const [cart, setCart] = useState<Cart>(() => preparedCart.cart);
   const [cartNotice, setCartNotice] = useState('');
   const [notes, setNotes] = useState('');
+  const [paymentTerm, setPaymentTerm] = useState<PaymentTermValue>('NET_30');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -62,11 +69,15 @@ export function ReviewOrderClient({
 
   const cartItems = useMemo(() => getCartItems(cart, allowedProductIds), [allowedProductIds, cart]);
   const cartPricing = useMemo(() => getCartPricingSummary(cart, products), [cart, products]);
+  const paymentSummary = useMemo(
+    () => calculatePaymentTermsSummary(cartPricing.total, paymentTerm),
+    [cartPricing.total, paymentTerm],
+  );
 
   async function submitOrder() {
     setError('');
     setIsSubmitting(true);
-    const result = await submitCustomerOrderAction({ customerId: customer.id, items: cartItems, notes });
+    const result = await submitCustomerOrderAction({ customerId: customer.id, items: cartItems, notes, paymentTerm });
     setIsSubmitting(false);
 
     if (!result.ok) {
@@ -155,6 +166,42 @@ export function ReviewOrderClient({
                 <p>{customer.name} · {customer.contact}</p>
                 <p>חלוקה {new Intl.DateTimeFormat('he-IL').format(new Date(route.nextDelivery))}</p>
               </div>
+              <fieldset className="mt-3 border-t border-black/10 pt-3">
+                <legend className="text-xs font-black">תנאי תשלום</legend>
+                <div className="mt-2 grid gap-2">
+                  {(['NET_30', 'IMMEDIATE_OR_CASH'] as const).map((option) => {
+                    const selected = paymentTerm === option;
+                    return (
+                      <label
+                        key={option}
+                        className={`cursor-pointer rounded-xl border p-3 transition focus-within:ring-2 focus-within:ring-black/25 ${
+                          selected ? 'border-black bg-black text-white' : 'border-black/10 bg-[#f7f5f1] text-black'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="paymentTerm"
+                          value={option}
+                          checked={selected}
+                          onChange={() => setPaymentTerm(option)}
+                          className="sr-only"
+                        />
+                        <span className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-black">{paymentTermLabels[option]}</span>
+                          {option === 'IMMEDIATE_OR_CASH' && (
+                            <span className={`rounded-full px-2 py-1 text-[11px] font-black ${selected ? 'bg-white text-black' : 'bg-emerald-100 text-emerald-800'}`}>
+                              5% הנחה
+                            </span>
+                          )}
+                        </span>
+                        <span className={`mt-1 block text-[11px] font-bold ${selected ? 'text-white/70' : 'text-black/50'}`}>
+                          {option === 'NET_30' ? 'ללא הנחת תשלום' : 'ההנחה מחושבת לאחר מבצעי המוצר'}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
               <label className="mt-3 block">
                 <span className="mb-1.5 block text-xs font-black">הערות להזמנה</span>
                 <textarea
@@ -171,14 +218,21 @@ export function ReviewOrderClient({
                 </div>
                 {cartPricing.discountTotal > 0 && (
                   <div className="flex items-center justify-between text-emerald-700">
-                    <span>הנחות</span>
+                    <span>מבצעים והנחות מוצר</span>
                     <span className="tabular-nums">-{money(cartPricing.discountTotal)}</span>
                   </div>
                 )}
+                {paymentSummary.paymentDiscountTotal > 0 && (
+                  <div className="flex items-center justify-between text-emerald-700">
+                    <span>הנחת תשלום מיידי (5%)</span>
+                    <span className="tabular-nums">-{money(paymentSummary.paymentDiscountTotal)}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between pt-1 text-base font-black">
-                  <span>סה״כ משוער</span>
-                  <span className="tabular-nums">{money(cartPricing.total)}</span>
+                  <span>סה״כ לפני מע״מ</span>
+                  <span className="tabular-nums">{money(paymentSummary.total)}</span>
                 </div>
+                <p className="pt-1 text-[11px] font-bold text-black/45">{PRICES_BEFORE_VAT_LABEL}</p>
               </div>
               <button
                 onClick={submitOrder}

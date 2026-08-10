@@ -20,6 +20,7 @@ import {
 } from '@/lib/order-utils';
 import { saveDraftOrderAction } from '@/features/customer-portal/actions';
 import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
+import { PRICES_BEFORE_VAT_LABEL } from '@/features/owner-rules/constants';
 
 export function CustomerCatalogApp({
   customer,
@@ -119,6 +120,9 @@ export function CustomerCatalogApp({
 
       <div className="mx-auto max-w-5xl px-3 py-3 md:px-6">
         <section className="space-y-3">
+          <div className="rounded-2xl border border-black/10 bg-[#e6e1d8] px-3 py-2 text-xs font-black text-black/65">
+            {PRICES_BEFORE_VAT_LABEL}
+          </div>
           <div className="sticky top-[61px] z-20 rounded-2xl border border-black/10 bg-white/96 p-2 shadow-sm backdrop-blur">
             <div className="flex h-10 items-center gap-2 rounded-full bg-[#e6e1d8] px-3 focus-within:ring-2 focus-within:ring-black/25">
               <Search size={16} aria-hidden="true" />
@@ -245,6 +249,7 @@ function CartSummary({
             {itemCount === 0 ? 'הוסיפו מוצרים לסל' : 'מוכן לשליחה'}
           </p>
           <p className="text-base font-black">{itemCount} יח׳ · {money(cartTotal)}</p>
+          <p className="text-[11px] font-bold text-black/45">{PRICES_BEFORE_VAT_LABEL}</p>
         </div>
         {pricing.discountTotal > 0 && <p className="text-[11px] font-black text-emerald-700">חיסכון {money(pricing.discountTotal)}</p>}
         <button

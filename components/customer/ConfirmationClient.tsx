@@ -6,6 +6,8 @@ import { CheckCircle2 } from 'lucide-react';
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/Button';
 import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
+import { paymentTermLabels } from '@/features/orders/payment-terms';
+import { PRICES_BEFORE_VAT_LABEL } from '@/features/owner-rules/constants';
 import { money } from '@/lib/format';
 import { brandLogo } from '@/lib/product-assets';
 import { brand } from '@/lib/brand';
@@ -29,6 +31,7 @@ export function ConfirmationClient({
   const orderItems: PortalOrder['items'] = lastOrder.items.length > 0 ? lastOrder.items : cartItems;
   const orderSubtotal = lastOrder.items.length > 0 ? lastOrder.subtotal : fallbackPricing.subtotal;
   const orderDiscountTotal = lastOrder.items.length > 0 ? lastOrder.discountTotal : fallbackPricing.discountTotal;
+  const orderPaymentDiscountTotal = lastOrder.items.length > 0 ? lastOrder.paymentDiscountTotal : 0;
   const orderTotal = lastOrder.items.length > 0 ? lastOrder.total : fallbackPricing.total;
 
   return (
@@ -51,6 +54,10 @@ export function ConfirmationClient({
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-lg font-black">סיכום הזמנה</h2>
                 <p className="text-xs font-bold text-black/55">חלוקה {new Intl.DateTimeFormat('he-IL').format(new Date(route.nextDelivery))}</p>
+              </div>
+              <div className="mt-2 rounded-xl bg-[#f7f5f1] px-3 py-2 text-xs font-bold">
+                <span className="text-black/50">תנאי תשלום: </span>
+                <span className="font-black">{paymentTermLabels[lastOrder.paymentTerm]}</span>
               </div>
               <div className="mt-2 divide-y divide-black/10">
                 {orderItems.map((item) => {
@@ -81,14 +88,21 @@ export function ConfirmationClient({
                 </div>
                 {orderDiscountTotal > 0 && (
                   <div className="flex items-center justify-between text-emerald-700">
-                    <span>הנחות</span>
+                    <span>מבצעים והנחות מוצר</span>
                     <span className="tabular-nums">-{money(orderDiscountTotal)}</span>
                   </div>
                 )}
+                {orderPaymentDiscountTotal > 0 && (
+                  <div className="flex items-center justify-between text-emerald-700">
+                    <span>הנחת תשלום מיידי ({lastOrder.paymentDiscountPercent}%)</span>
+                    <span className="tabular-nums">-{money(orderPaymentDiscountTotal)}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between pt-1 text-base font-black">
-                  <span>סה״כ משוער</span>
+                  <span>סה״כ לפני מע״מ</span>
                   <span className="tabular-nums">{money(orderTotal)}</span>
                 </div>
+                <p className="pt-1 text-[11px] font-bold text-black/45">{PRICES_BEFORE_VAT_LABEL}</p>
               </div>
             </div>
           </div>
