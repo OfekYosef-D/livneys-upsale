@@ -750,6 +750,7 @@ export async function createManualOrderAction(input: unknown): Promise<ActionRes
       customerId: parsed.customerId,
       items: parsed.items,
       source: 'ADMIN',
+      paymentTerm: 'NET_30',
       notes: parsed.notes,
       internalNote,
     });

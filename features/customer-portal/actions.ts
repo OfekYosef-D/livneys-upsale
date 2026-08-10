@@ -51,6 +51,9 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
         deadlineAt: context.route.nextCutoffAt,
         subtotal: pricing.subtotal,
         discountTotal: pricing.discountTotal,
+        paymentTerm: 'NET_30',
+        paymentDiscountPercent: 0,
+        paymentDiscountTotal: 0,
         total: pricing.total,
         lines: {
           create: snapshotLines.map((line) => ({
@@ -73,6 +76,9 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
         deadlineAt: context.route.nextCutoffAt,
         subtotal: pricing.subtotal,
         discountTotal: pricing.discountTotal,
+        paymentTerm: 'NET_30',
+        paymentDiscountPercent: 0,
+        paymentDiscountTotal: 0,
         total: pricing.total,
         lines: {
           deleteMany: {},
@@ -114,6 +120,7 @@ export async function submitCustomerOrderAction(input: SubmitCustomerOrderInput)
       customerId: parsed.customerId,
       items: normalizedItems,
       source: 'CUSTOMER',
+      paymentTerm: parsed.paymentTerm,
       notes: parsed.notes,
       replaceDraftForDeliveryWindow: true,
     });

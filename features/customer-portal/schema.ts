@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paymentTermValues } from '../orders/payment-terms';
 
 export const orderItemInputSchema = z.object({
   productId: z.string().min(1),
@@ -14,6 +15,7 @@ export const submitCustomerOrderSchema = z.object({
   customerId: z.string().min(1),
   items: z.array(orderItemInputSchema).min(1),
   notes: z.string().max(1000).optional(),
+  paymentTerm: z.enum(paymentTermValues),
 });
 
 export type SaveDraftOrderInput = z.infer<typeof saveDraftOrderSchema>;

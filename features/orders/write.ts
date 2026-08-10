@@ -1,6 +1,7 @@
 import type { OrderSource } from '@prisma/client';
 import { calculateOrderPricing, type PricingPriceListItem, type PricingProduct, type PricingPromotion } from '../pricing/engine';
 import { validateInstitutionalOrderRules } from './business-rules';
+import { calculatePaymentTermsSummary, type PaymentTermValue } from './payment-terms';
 import {
   getSubmissionStatus,
   normalizeCustomerOrderItems,
@@ -40,6 +41,9 @@ export type SubmittedOrderPayload = {
     internalNote: string | null;
     subtotal: number;
     discountTotal: number;
+    paymentTerm: PaymentTermValue;
+    paymentDiscountPercent: number;
+    paymentDiscountTotal: number;
     total: number;
   };
   lines: OrderSnapshotLine[];
@@ -51,6 +55,7 @@ export function buildSubmittedOrderPayload({
   context,
   items,
   source,
+  paymentTerm,
   now,
   notes,
   internalNote,
@@ -58,6 +63,7 @@ export function buildSubmittedOrderPayload({
   context: OrderWriteContext;
   items: SnapshotItem[];
   source: OrderSource;
+  paymentTerm: PaymentTermValue;
   now: Date;
   notes?: string | null;
   internalNote?: string | null;
@@ -94,6 +100,7 @@ export function buildSubmittedOrderPayload({
     items: lines.map((line) => ({ productId: line.productId, quantity: line.quantity })),
     products: context.products,
   });
+  const payment = calculatePaymentTermsSummary(pricing.total, paymentTerm);
 
   return {
     order: {
@@ -111,7 +118,10 @@ export function buildSubmittedOrderPayload({
       internalNote: normalizeNullableText(internalNote),
       subtotal: pricing.subtotal,
       discountTotal: pricing.discountTotal,
-      total: pricing.total,
+      paymentTerm,
+      paymentDiscountPercent: payment.paymentDiscountPercent,
+      paymentDiscountTotal: payment.paymentDiscountTotal,
+      total: payment.total,
     },
     lines,
   };

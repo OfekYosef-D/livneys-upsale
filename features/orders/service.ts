@@ -1,5 +1,6 @@
 import type { OrderSource } from '@prisma/client';
 import { prisma } from '@/lib/db';
+import type { PaymentTermValue } from './payment-terms';
 import { buildSubmittedOrderPayload, type OrderWriteContext } from './write';
 
 export type OrderWriteItem = {
@@ -98,6 +99,7 @@ export async function createSubmittedOrder({
   customerId,
   items,
   source,
+  paymentTerm,
   notes,
   internalNote,
   replaceDraftForDeliveryWindow = false,
@@ -106,6 +108,7 @@ export async function createSubmittedOrder({
   customerId: string;
   items: OrderWriteItem[];
   source: OrderSource;
+  paymentTerm: PaymentTermValue;
   notes?: string | null;
   internalNote?: string | null;
   replaceDraftForDeliveryWindow?: boolean;
@@ -116,6 +119,7 @@ export async function createSubmittedOrder({
     context,
     items,
     source,
+    paymentTerm,
     now,
     notes,
     internalNote,
@@ -163,6 +167,9 @@ export async function createSubmittedOrder({
       internalNote: payload.order.internalNote,
       subtotal: payload.order.subtotal,
       discountTotal: payload.order.discountTotal,
+      paymentTerm: payload.order.paymentTerm,
+      paymentDiscountPercent: payload.order.paymentDiscountPercent,
+      paymentDiscountTotal: payload.order.paymentDiscountTotal,
       total: payload.order.total,
       lines: {
         deleteMany: {},
