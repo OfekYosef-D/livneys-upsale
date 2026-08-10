@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Building2, Search, ShoppingBag, Truck } from 'lucide-react';
+import { Building2, History, Search, ShoppingBag, Truck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { CartAdjustmentNotice } from '@/components/customer/CartAdjustmentNotice';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
@@ -19,6 +19,7 @@ import {
   type Cart,
 } from '@/lib/order-utils';
 import { saveDraftOrderAction } from '@/features/customer-portal/actions';
+import { getPreloadedCartNotice } from '@/features/customer-portal/cart-origin';
 import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
 import { calculateVatSummary } from '@/features/orders/vat';
 import { INSTITUTIONAL_PRICING_NOTICE, PRICES_BEFORE_VAT_LABEL } from '@/features/owner-rules/constants';
@@ -79,6 +80,11 @@ export function CustomerCatalogApp({
   const cartItems = useMemo(() => getCartItems(cart, allowedProductIds), [allowedProductIds, cart]);
   const cartPricing = useMemo(() => getCartPricingSummary(cart, products), [cart, products]);
   const itemCount = cartItems.reduce((sum, item) => sum + item.qty, 0);
+  const preloadedCartNotice = getPreloadedCartNotice({
+    status: lastOrder.status,
+    orderNumber: lastOrder.orderNumber,
+    itemCount: lastOrder.items.reduce((sum, item) => sum + item.qty, 0),
+  });
   const deliveryDate = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'long' }).format(new Date(route.nextDelivery));
 
   async function reviewOrder() {
@@ -152,6 +158,13 @@ export function CustomerCatalogApp({
           </div>
 
           {cartNotice && <CartAdjustmentNotice message={cartNotice} />}
+
+          {preloadedCartNotice && (
+            <div className="flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs font-bold leading-5 text-sky-950">
+              <History size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <p>{preloadedCartNotice}</p>
+            </div>
+          )}
 
           <section className="space-y-2">
             {visibleProducts.map((product) => (
