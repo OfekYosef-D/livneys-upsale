@@ -65,15 +65,6 @@ export const productPricePresets = [
 
 export const promotionPresets = [
   {
-    id: 'cash-5',
-    label: '5% הנחת מזומן',
-    title: 'הנחת מזומן',
-    tag: '5% מזומן',
-    description: 'הנחה ללקוחות שמשלמים במזומן. יש להפעיל רק אחרי אישור בעלים.',
-    effectType: 'PERCENT_OFF',
-    discountValue: 5,
-  },
-  {
     id: 'winery-volume',
     label: 'הנחת כמות ליקבים',
     title: 'הנחת כמות ליקבים',

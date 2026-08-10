@@ -1346,7 +1346,7 @@ function PromotionPresetButtons() {
               setNamedFormValue(form, 'discountValue', String(preset.discountValue));
               setNamedFormValue(form, 'buyQuantity', '');
               setNamedFormValue(form, 'freeQuantity', '');
-              setNamedFormValue(form, 'priority', preset.id === 'cash-5' ? '30' : '20');
+              setNamedFormValue(form, 'priority', '20');
             }}
           >
             <span className="block">{preset.label}</span>
