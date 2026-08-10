@@ -9,6 +9,7 @@
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
+    "db:audit:critical": "tsx scripts/audit-critical-data.ts",
     "db:seed:demo": "prisma db seed",
     "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts"
   },
