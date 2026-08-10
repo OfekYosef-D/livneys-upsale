@@ -52,6 +52,7 @@ export type PortalProduct = {
 
 export type PortalOrder = {
   id: string;
+  orderNumber: number | null;
   customerId: string;
   date: string;
   status: string;

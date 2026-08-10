@@ -6,6 +6,7 @@ import { CheckCircle2 } from 'lucide-react';
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/Button';
 import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
+import { formatOrderNumber } from '@/features/orders/order-number';
 import { paymentTermLabels } from '@/features/orders/payment-terms';
 import { PRICES_BEFORE_VAT_LABEL } from '@/features/owner-rules/constants';
 import { money } from '@/lib/format';
@@ -55,6 +56,9 @@ export function ConfirmationClient({
                 <h2 className="text-lg font-black">סיכום הזמנה</h2>
                 <p className="text-xs font-bold text-black/55">חלוקה {new Intl.DateTimeFormat('he-IL').format(new Date(route.nextDelivery))}</p>
               </div>
+              {lastOrder.orderNumber !== null && (
+                <p className="mt-2 text-xs font-black text-black/55">הזמנה {formatOrderNumber(lastOrder.orderNumber)}</p>
+              )}
               <div className="mt-2 rounded-xl bg-[#f7f5f1] px-3 py-2 text-xs font-bold">
                 <span className="text-black/50">תנאי תשלום: </span>
                 <span className="font-black">{paymentTermLabels[lastOrder.paymentTerm]}</span>

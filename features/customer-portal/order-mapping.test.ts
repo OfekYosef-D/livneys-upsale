@@ -9,6 +9,7 @@ describe('customer portal order mapping', () => {
     const order = mapPortalOrder(
       {
         id: 'ord-history',
+        orderNumber: 1001,
         customerId: 'cust-001',
         createdAt,
         submittedAt,
@@ -39,6 +40,7 @@ describe('customer portal order mapping', () => {
 
     expect(order).toEqual({
       id: 'ord-history',
+      orderNumber: 1001,
       customerId: 'cust-001',
       date: submittedAt.toISOString(),
       status: 'SUBMITTED',

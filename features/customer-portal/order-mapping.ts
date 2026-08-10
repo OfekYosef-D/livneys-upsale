@@ -17,6 +17,7 @@ type PortalOrderLineSnapshot = {
 
 type PortalOrderSnapshot = {
   id: string;
+  orderNumber: number;
   customerId: string;
   submittedAt: Date | null;
   createdAt: Date;
@@ -34,6 +35,7 @@ export function mapPortalOrder(order: PortalOrderSnapshot | null, customerId: st
   if (!order) {
     return {
       id: 'empty',
+      orderNumber: null,
       customerId,
       date: new Date().toISOString(),
       status: 'DRAFT',
@@ -49,6 +51,7 @@ export function mapPortalOrder(order: PortalOrderSnapshot | null, customerId: st
 
   return {
     id: order.id,
+    orderNumber: order.orderNumber,
     customerId: order.customerId,
     date: (order.submittedAt ?? order.createdAt).toISOString(),
     status: order.status,
