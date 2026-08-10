@@ -1,3 +1,5 @@
+import type { PaymentTermValue } from '../orders/payment-terms';
+
 export type PortalCustomer = {
   id: string;
   name: string;
@@ -55,6 +57,9 @@ export type PortalOrder = {
   status: string;
   subtotal: number;
   discountTotal: number;
+  paymentTerm: PaymentTermValue;
+  paymentDiscountPercent: number;
+  paymentDiscountTotal: number;
   total: number;
   items: {
     productId: string;

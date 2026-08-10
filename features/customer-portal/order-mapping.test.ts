@@ -15,7 +15,10 @@ describe('customer portal order mapping', () => {
         status: 'SUBMITTED',
         subtotal: 100,
         discountTotal: 16,
-        total: 84,
+        paymentTerm: 'IMMEDIATE_OR_CASH',
+        paymentDiscountPercent: 5,
+        paymentDiscountTotal: 4.2,
+        total: 79.8,
         lines: [
           {
             productId: 'prod-old',
@@ -41,7 +44,10 @@ describe('customer portal order mapping', () => {
       status: 'SUBMITTED',
       subtotal: 100,
       discountTotal: 16,
-      total: 84,
+      paymentTerm: 'IMMEDIATE_OR_CASH',
+      paymentDiscountPercent: 5,
+      paymentDiscountTotal: 4.2,
+      total: 79.8,
       items: [
         {
           productId: 'prod-old',

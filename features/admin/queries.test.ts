@@ -42,7 +42,10 @@ describe('admin dashboard queries', () => {
         deliveryWindowStart: new Date('2026-07-02T08:00:00.000Z'),
         subtotal: 120,
         discountTotal: 10,
-        total: 110,
+        paymentTerm: 'IMMEDIATE_OR_CASH',
+        paymentDiscountPercent: 5,
+        paymentDiscountTotal: 5.5,
+        total: 104.5,
         notes: 'Call before delivery',
         internalNote: 'Customer asked for early delivery',
         customer: {
@@ -112,6 +115,10 @@ describe('admin dashboard queries', () => {
       customerPhone: '050-111-2222',
       notes: 'Call before delivery',
       internalNote: 'Customer asked for early delivery',
+      paymentTerm: 'IMMEDIATE_OR_CASH',
+      paymentDiscountPercent: 5,
+      paymentDiscountTotal: 5.5,
+      total: 104.5,
       latestNotification: {
         id: 'job-1',
         status: 'FAILED',

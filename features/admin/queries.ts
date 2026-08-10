@@ -1,4 +1,5 @@
 import type { OrderSource, OrderStatus } from '@prisma/client';
+import type { PaymentTermValue } from '@/features/orders/payment-terms';
 import { activeOrderStatuses } from '@/features/orders/utils';
 import { prisma } from '@/lib/db';
 import type { AdminDashboardOrder, AdminOrderLine, AdminOrderSummary, AdminRouteSummary } from './types';
@@ -227,6 +228,9 @@ function mapOrderSummary(order: {
   deliveryWindowStart: Date;
   subtotal: unknown;
   discountTotal: unknown;
+  paymentTerm: PaymentTermValue;
+  paymentDiscountPercent: unknown;
+  paymentDiscountTotal: unknown;
   total: unknown;
   customer: { id: string; name: string };
   route: { id: string; name: string } | null;
@@ -244,6 +248,9 @@ function mapOrderSummary(order: {
     deliveryWindowStart: order.deliveryWindowStart.toISOString(),
     subtotal: Number(order.subtotal),
     discountTotal: Number(order.discountTotal),
+    paymentTerm: order.paymentTerm,
+    paymentDiscountPercent: Number(order.paymentDiscountPercent),
+    paymentDiscountTotal: Number(order.paymentDiscountTotal),
     total: Number(order.total),
     lineCount: order.lines.length,
     hasUpsell: order.lines.length >= 3,
@@ -261,6 +268,9 @@ function mapDashboardOrder(order: {
   internalNote: string | null;
   subtotal: unknown;
   discountTotal: unknown;
+  paymentTerm: PaymentTermValue;
+  paymentDiscountPercent: unknown;
+  paymentDiscountTotal: unknown;
   total: unknown;
   customer: { id: string; name: string; contact: string; phone: string };
   route: { id: string; name: string } | null;

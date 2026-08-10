@@ -1,4 +1,5 @@
 import type { OrderStatus } from '@prisma/client';
+import type { PaymentTermValue } from '../orders/payment-terms';
 import type { PortalOrder } from './types';
 
 type PortalOrderLineSnapshot = {
@@ -22,6 +23,9 @@ type PortalOrderSnapshot = {
   status: OrderStatus;
   subtotal?: unknown;
   discountTotal?: unknown;
+  paymentTerm: PaymentTermValue;
+  paymentDiscountPercent?: unknown;
+  paymentDiscountTotal?: unknown;
   total: unknown;
   lines: PortalOrderLineSnapshot[];
 };
@@ -35,6 +39,9 @@ export function mapPortalOrder(order: PortalOrderSnapshot | null, customerId: st
       status: 'DRAFT',
       subtotal: 0,
       discountTotal: 0,
+      paymentTerm: 'NET_30',
+      paymentDiscountPercent: 0,
+      paymentDiscountTotal: 0,
       total: 0,
       items: [],
     };
@@ -47,6 +54,9 @@ export function mapPortalOrder(order: PortalOrderSnapshot | null, customerId: st
     status: order.status,
     subtotal: Number(order.subtotal ?? order.total),
     discountTotal: Number(order.discountTotal ?? 0),
+    paymentTerm: order.paymentTerm,
+    paymentDiscountPercent: Number(order.paymentDiscountPercent ?? 0),
+    paymentDiscountTotal: Number(order.paymentDiscountTotal ?? 0),
     total: Number(order.total),
     items: order.lines
       .filter((line) => line.productId)
