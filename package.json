@@ -3,6 +3,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "pretest": "prisma generate",
     "test": "vitest run",
     "deploy:check": "tsx scripts/check-deployment-env.ts",
     "db:generate": "prisma generate",
