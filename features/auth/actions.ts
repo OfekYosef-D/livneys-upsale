@@ -11,6 +11,7 @@ import { consumeRateLimit } from './rate-limit';
 import { assertPasswordTokenUsable, consumePasswordToken, issueAuthToken, issueAuthTokenInTransaction } from './tokens';
 import { assertAccountAccessDeliveryConfigured, sendAccountAccessNotifications } from './notifications';
 import { encryptMfaSecret, generateMfaSecret, generateRecoveryCodes, hashRecoveryCode, verifyTotpCode } from './mfa';
+import { updateCustomerUserAccess } from './user-access';
 
 const genericResetMessage = 'אם קיים חשבון פעיל עבור הכתובת, נשלח אליו קישור מאובטח לאיפוס סיסמה.';
 const dummyPasswordHash = '$2b$12$lyBsPWU.S81FtafGOY3Or.lwCiOJSeIFoQAVRLMFCma6qvYPCK2Zy';
@@ -113,11 +114,7 @@ export async function setCustomerUserActiveAction(input: unknown): Promise<Actio
   try {
     const parsed = setCustomerUserActiveSchema.parse(input);
     await assertAdminAction();
-    const changed = await prisma.user.updateMany({
-      where: { id: parsed.userId, customerId: parsed.customerId, role: 'CUSTOMER' },
-      data: { isActive: parsed.isActive, sessionVersion: { increment: 1 } },
-    });
-    if (changed.count !== 1) throw new Error('המשתמש לא נמצא בחברה זו.');
+    await prisma.$transaction((tx) => updateCustomerUserAccess(tx, { ...parsed, now: new Date() }));
     return actionOk({ userId: parsed.userId });
   } catch (error) {
     return actionError(error);
@@ -130,7 +127,13 @@ export async function resendCustomerUserSetupAction(input: unknown): Promise<Act
     await assertAdminAction();
     assertAccountAccessDeliveryConfigured();
     const user = await prisma.user.findFirst({
-      where: { id: parsed.userId, customerId: parsed.customerId, role: 'CUSTOMER', isActive: true },
+      where: {
+        id: parsed.userId,
+        customerId: parsed.customerId,
+        role: 'CUSTOMER',
+        isActive: true,
+        customer: { is: { isActive: true } },
+      },
     });
     if (!user || user.passwordHash) throw new Error('ניתן לשלוח קישור רק למשתמש פעיל שטרם הגדיר סיסמה.');
     const token = await issueAuthToken({

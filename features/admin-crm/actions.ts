@@ -161,6 +161,7 @@ export async function updateCustomerAction(input: unknown): Promise<ActionResult
         customerId: parsed.id,
         wasActive: existing.isActive,
         isActive: parsed.isActive,
+        now: new Date(),
       });
     });
 
@@ -191,6 +192,7 @@ export async function toggleCustomerActiveAction(input: { id: string; isActive: 
         customerId: parsed.id,
         wasActive: existing.isActive,
         isActive: parsed.isActive,
+        now: new Date(),
       });
     });
 
