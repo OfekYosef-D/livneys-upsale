@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { confirmMfaEnrollmentAction, startMfaEnrollmentAction } from '../actions';
+import { getMfaEnrollmentCopy } from './mfa-enrollment-copy';
 
 export function MfaEnrollmentClient({ alreadyEnabled }: { alreadyEnabled: boolean }) {
   const [secret, setSecret] = useState('');
@@ -9,13 +10,16 @@ export function MfaEnrollmentClient({ alreadyEnabled }: { alreadyEnabled: boolea
   const [codes, setCodes] = useState<string[]>([]);
   const [message, setMessage] = useState('');
   const [pending, startTransition] = useTransition();
-
-  if (alreadyEnabled && codes.length === 0) {
-    return <p className="rounded-xl bg-emerald-50 p-4 text-sm font-black text-emerald-900">האימות הדו-שלבי פעיל בחשבון זה.</p>;
-  }
+  const copy = getMfaEnrollmentCopy(alreadyEnabled);
 
   return (
     <div className="space-y-4">
+      {codes.length === 0 && (
+        <div className={`rounded-xl p-4 ${alreadyEnabled ? 'bg-emerald-50 text-emerald-950' : 'bg-amber-50 text-amber-950'}`}>
+          <p className="text-sm font-black">{copy.title}</p>
+          <p className="mt-1 text-xs font-bold leading-5">{copy.description}</p>
+        </div>
+      )}
       {!secret && codes.length === 0 && (
         <button
           disabled={pending}
@@ -26,7 +30,7 @@ export function MfaEnrollmentClient({ alreadyEnabled }: { alreadyEnabled: boolea
           })}
           className="min-h-11 rounded-full bg-black px-5 text-sm font-black text-white disabled:bg-black/30"
         >
-          התחלת הגדרה מאובטחת
+          {copy.button}
         </button>
       )}
 

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState, useTransition } from 'react';
 import { inviteCustomerUserAction, resendCustomerUserSetupAction, setCustomerUserActiveAction } from '../actions';
+import { completeSuccessfulInvite } from './customer-users-manager-helpers';
 
 type Account = { id: string; name: string; email: string; isActive: boolean; setupComplete: boolean };
 
@@ -53,7 +54,10 @@ export function CustomerUsersManager({ customerId, accounts }: { customerId: str
         const values = new FormData(form);
         startTransition(async () => {
           const result = await inviteCustomerUserAction({ customerId, name: values.get('name'), email: values.get('email') });
-          if (result.ok) { setMessage('המשתמש נוסף ונשלח אליו קישור להגדרת סיסמה.'); form.reset(); }
+          if (result.ok) {
+            setMessage('המשתמש נוסף ונשלח אליו קישור להגדרת סיסמה.');
+            completeSuccessfulInvite(form, router);
+          }
           else setMessage(result.error);
         });
       }} className="mt-4 space-y-2 border-t border-black/10 pt-4">

@@ -101,6 +101,7 @@ model User {
   passwordChangedAt        DateTime?
   mfaEnabled               Boolean                @default(false)
   mfaSecretEncrypted       String?
+  mfaPendingSecretEncrypted String?
   customerId               String?
   customer                 Customer?              @relation(fields: [customerId], references: [id], onDelete: SetNull)
   authTokens               AuthToken[]

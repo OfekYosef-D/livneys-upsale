@@ -156,7 +156,7 @@ export async function startMfaEnrollmentAction(input: unknown): Promise<ActionRe
     const secret = generateMfaSecret();
     await prisma.user.update({
       where: { id: session.user.id },
-      data: { mfaSecretEncrypted: encryptMfaSecret(secret), mfaEnabled: false },
+      data: { mfaPendingSecretEncrypted: encryptMfaSecret(secret) },
     });
     const label = encodeURIComponent(`Livneys:${session.user.email ?? session.user.id}`);
     const uri = `otpauth://totp/${label}?secret=${secret}&issuer=Livneys&algorithm=SHA1&digits=6&period=30`;
@@ -171,10 +171,10 @@ export async function confirmMfaEnrollmentAction(input: unknown): Promise<Action
     const parsed = confirmMfaSchema.parse(input);
     const session = await assertAdminEnrollmentAction();
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user?.mfaSecretEncrypted) throw new Error('יש להתחיל מחדש את הגדרת האימות הדו-שלבי.');
+    if (!user?.mfaPendingSecretEncrypted) throw new Error('יש להתחיל מחדש את הגדרת האימות הדו-שלבי.');
 
     const { decryptMfaSecret } = await import('./mfa');
-    if (!verifyTotpCode(decryptMfaSecret(user.mfaSecretEncrypted), parsed.code)) {
+    if (!verifyTotpCode(decryptMfaSecret(user.mfaPendingSecretEncrypted), parsed.code)) {
       throw new Error('קוד האימות אינו תקין.');
     }
 
@@ -186,7 +186,12 @@ export async function confirmMfaEnrollmentAction(input: unknown): Promise<Action
       });
       await tx.user.update({
         where: { id: user.id },
-        data: { mfaEnabled: true, sessionVersion: { increment: 1 } },
+        data: {
+          mfaEnabled: true,
+          mfaSecretEncrypted: user.mfaPendingSecretEncrypted,
+          mfaPendingSecretEncrypted: null,
+          sessionVersion: { increment: 1 },
+        },
       });
     });
     return actionOk({ recoveryCodes });
