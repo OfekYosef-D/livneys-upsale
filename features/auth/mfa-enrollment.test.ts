@@ -11,6 +11,8 @@ const generateRecoveryCodes = vi.hoisted(() => vi.fn());
 const hashRecoveryCode = vi.hoisted(() => vi.fn());
 const verifyTotpCode = vi.hoisted(() => vi.fn());
 const comparePassword = vi.hoisted(() => vi.fn());
+const getRequestIp = vi.hoisted(() => vi.fn());
+const consumeRateLimit = vi.hoisted(() => vi.fn());
 
 vi.mock('bcryptjs', () => ({ default: { compare: comparePassword, hash: vi.fn() } }));
 
@@ -22,8 +24,8 @@ vi.mock('@/lib/authorization', () => ({ assertAdminAction: vi.fn(), assertAdminE
 vi.mock('@/lib/db', () => ({
   prisma: { user: { findUnique: userFindUnique, update: userUpdate }, $transaction: transaction },
 }));
-vi.mock('./request', () => ({ getRequestIp: vi.fn(), getRequestBaseUrl: vi.fn() }));
-vi.mock('./rate-limit', () => ({ consumeRateLimit: vi.fn() }));
+vi.mock('./request', () => ({ getRequestIp, getRequestBaseUrl: vi.fn() }));
+vi.mock('./rate-limit', () => ({ consumeRateLimit }));
 vi.mock('./tokens', () => ({
   assertPasswordTokenUsable: vi.fn(), consumePasswordToken: vi.fn(), issueAuthToken: vi.fn(), issueAuthTokenInTransaction: vi.fn(),
 }));
@@ -47,6 +49,7 @@ describe('MFA re-enrollment', () => {
     assertAdminEnrollmentAction.mockResolvedValue({ user: { id: 'admin-1', email: 'admin@example.com' } });
     generateMfaSecret.mockReturnValue('NEWSECRET');
     encryptMfaSecret.mockReturnValue('encrypted-new');
+    getRequestIp.mockResolvedValue('203.0.113.12');
     userFindUnique.mockResolvedValue({
       id: 'admin-1', role: 'ADMIN', isActive: true, mfaEnabled: false, passwordHash: 'password-hash',
     });
@@ -61,6 +64,12 @@ describe('MFA re-enrollment', () => {
     await expect(startMfaEnrollmentAction({ intent: 'start', password: 'wrong-password' })).resolves.toMatchObject({ ok: false });
 
     expect(comparePassword).toHaveBeenCalledWith('wrong-password', 'password-hash');
+    expect(consumeRateLimit).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      scope: 'mfa-replacement-ip', identifier: '203.0.113.12',
+    }));
+    expect(consumeRateLimit).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      scope: 'mfa-replacement-account', identifier: 'admin-1',
+    }));
     expect(userUpdate).not.toHaveBeenCalled();
   });
 

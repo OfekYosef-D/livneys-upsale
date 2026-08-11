@@ -18,6 +18,11 @@ describe('production admin bootstrap', () => {
       name: 'Admin',
       password: 'livneys-admin',
     })).toThrow();
+    expect(() => parseBootstrapAdminInput({
+      email: 'owner@livneys.co.il',
+      name: 'Admin',
+      password: `Aa1!${'א'.repeat(35)}`,
+    })).toThrow('72 UTF-8 bytes');
   });
 
   it('upserts only the requested administrator record', async () => {

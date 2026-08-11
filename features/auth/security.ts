@@ -1,13 +1,20 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 
+export const BCRYPT_MAX_PASSWORD_BYTES = 72;
+
+export function isBcryptPasswordLengthSafe(value: string): boolean {
+  return Buffer.byteLength(value, 'utf8') <= BCRYPT_MAX_PASSWORD_BYTES;
+}
+
 export const passwordSchema = z.string()
   .min(12, 'הסיסמה חייבת להכיל לפחות 12 תווים.')
   .max(128, 'הסיסמה ארוכה מדי.')
   .regex(/[a-z]/, 'הסיסמה חייבת לכלול אות קטנה באנגלית.')
   .regex(/[A-Z]/, 'הסיסמה חייבת לכלול אות גדולה באנגלית.')
   .regex(/[0-9]/, 'הסיסמה חייבת לכלול ספרה.')
-  .regex(/[^A-Za-z0-9]/, 'הסיסמה חייבת לכלול תו מיוחד.');
+  .regex(/[^A-Za-z0-9]/, 'הסיסמה חייבת לכלול תו מיוחד.')
+  .refine(isBcryptPasswordLengthSafe, 'הסיסמה ארוכה מ-72 בתים ואינה נתמכת באופן בטוח.');
 
 export function createRawAuthToken(): string {
   return randomBytes(32).toString('base64url');

@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { isBcryptPasswordLengthSafe } from '../auth/security';
 
 const bootstrapAdminSchema = z.object({
   email: z.string().trim().email().transform((value) => value.toLowerCase()).refine(
@@ -13,7 +14,8 @@ const bootstrapAdminSchema = z.object({
     .regex(/[a-z]/, 'Password must include a lowercase letter.')
     .regex(/[A-Z]/, 'Password must include an uppercase letter.')
     .regex(/[0-9]/, 'Password must include a number.')
-    .regex(/[^A-Za-z0-9]/, 'Password must include a symbol.'),
+    .regex(/[^A-Za-z0-9]/, 'Password must include a symbol.')
+    .refine(isBcryptPasswordLengthSafe, 'Password must not exceed 72 UTF-8 bytes.'),
 });
 
 export type BootstrapAdminInput = {

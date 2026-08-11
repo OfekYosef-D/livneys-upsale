@@ -6,6 +6,7 @@ describe('authentication security helpers', () => {
     expect(passwordSchema.safeParse('StrongPass!2026').success).toBe(true);
     expect(passwordSchema.safeParse('livneys-demo').success).toBe(false);
     expect(passwordSchema.safeParse('alllowercasepassword1!').success).toBe(false);
+    expect(passwordSchema.safeParse(`Aa1!${'א'.repeat(35)}`).success).toBe(false);
   });
 
   it('hashes raw authentication tokens before persistence', () => {

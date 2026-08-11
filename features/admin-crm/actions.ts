@@ -15,6 +15,7 @@ import { enqueueOrderLifecycleWhatsApp } from '../notifications/jobs';
 import { getTemplateKeyForOrderStatus } from '../notifications/templates';
 import { revokeCustomerSessionsOnDeactivation } from './customer-access';
 import { syncCustomerLoginIdentity } from './customer-login-sync';
+import { lockCustomerAccessState } from '../auth/customer-access-lock';
 import {
   createCustomerSchema,
   createPriceListSchema,
@@ -100,6 +101,9 @@ export async function updateCustomerAction(input: unknown): Promise<ActionResult
     await assertRouteAndPriceList(parsed.routeId, parsed.priceListId, true);
 
     await prisma.$transaction(async (tx) => {
+      const lockedCustomer = await lockCustomerAccessState(tx, parsed.id);
+      if (!lockedCustomer) throw new Error('הלקוח לא נמצא.');
+
       const existing = await tx.customer.findUnique({
         where: { id: parsed.id },
         include: { users: true },
@@ -172,10 +176,7 @@ export async function toggleCustomerActiveAction(input: { id: string; isActive: 
     const parsed = activeToggleSchema.parse(input);
     await assertAdminAction();
     await prisma.$transaction(async (tx) => {
-      const existing = await tx.customer.findUnique({
-        where: { id: parsed.id },
-        select: { isActive: true },
-      });
+      const existing = await lockCustomerAccessState(tx, parsed.id);
       if (!existing) throw new Error('הלקוח לא נמצא.');
 
       await tx.customer.update({

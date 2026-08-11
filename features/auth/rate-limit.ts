@@ -9,6 +9,8 @@ type RateLimitScope =
   | 'login-account'
   | 'password-reset-ip'
   | 'password-reset-account'
+  | 'mfa-replacement-ip'
+  | 'mfa-replacement-account'
   | 'registration-ip'
   | 'registration-account';
 

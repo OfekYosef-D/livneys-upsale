@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { passwordSchema } from './security';
+import { isBcryptPasswordLengthSafe, passwordSchema } from './security';
 
 export const credentialsSchema = z.object({
   email: z.string().trim().email(),
-  password: z.string().min(1),
+  password: z.string().min(1).max(128).refine(isBcryptPasswordLengthSafe),
   mfaCode: z.string().trim().max(32).optional().default(''),
 });
 
@@ -34,7 +34,7 @@ export const setCustomerUserActiveSchema = z.object({
 
 export const startMfaSchema = z.object({
   intent: z.literal('start'),
-  password: z.string().max(200).optional().default(''),
+  password: z.string().max(200).refine(isBcryptPasswordLengthSafe).optional().default(''),
 });
 
 export const confirmMfaSchema = z.object({

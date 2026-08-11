@@ -12,6 +12,7 @@ import { assertPasswordTokenUsable, consumePasswordToken, issueAuthToken, issueA
 import { assertAccountAccessDeliveryConfigured, sendAccountAccessNotifications } from './notifications';
 import { encryptMfaSecret, generateMfaSecret, generateRecoveryCodes, hashRecoveryCode, verifyTotpCode } from './mfa';
 import { updateCustomerUserAccess } from './user-access';
+import { lockCustomerAccessState } from './customer-access-lock';
 
 const genericResetMessage = 'אם קיים חשבון פעיל עבור הכתובת, נשלח אליו קישור מאובטח לאיפוס סיסמה.';
 const dummyPasswordHash = '$2b$12$lyBsPWU.S81FtafGOY3Or.lwCiOJSeIFoQAVRLMFCma6qvYPCK2Zy';
@@ -77,11 +78,11 @@ export async function inviteCustomerUserAction(input: unknown): Promise<ActionRe
     const parsed = inviteCustomerUserSchema.parse(input);
     await assertAdminAction();
     assertAccountAccessDeliveryConfigured();
-    const customer = await prisma.customer.findUnique({ where: { id: parsed.customerId } });
-    if (!customer?.isActive) throw new Error('הלקוח אינו פעיל.');
-
     const baseUrl = await getRequestBaseUrl();
     const created = await prisma.$transaction(async (tx) => {
+      const customer = await lockCustomerAccessState(tx, parsed.customerId);
+      if (!customer?.isActive) throw new Error('הלקוח אינו פעיל.');
+
       const user = await tx.user.create({
         data: {
           customerId: parsed.customerId,
@@ -114,7 +115,12 @@ export async function setCustomerUserActiveAction(input: unknown): Promise<Actio
   try {
     const parsed = setCustomerUserActiveSchema.parse(input);
     await assertAdminAction();
-    await prisma.$transaction((tx) => updateCustomerUserAccess(tx, { ...parsed, now: new Date() }));
+    await prisma.$transaction(async (tx) => {
+      const customer = await lockCustomerAccessState(tx, parsed.customerId);
+      if (!customer) throw new Error('הלקוח לא נמצא.');
+      if (parsed.isActive && !customer.isActive) throw new Error('לא ניתן להפעיל משתמש בחברה שאינה פעילה.');
+      return updateCustomerUserAccess(tx, { ...parsed, now: new Date() });
+    });
     return actionOk({ userId: parsed.userId });
   } catch (error) {
     return actionError(error);
@@ -161,11 +167,25 @@ export async function startMfaEnrollmentAction(input: unknown): Promise<ActionRe
       select: { role: true, isActive: true, mfaEnabled: true, passwordHash: true },
     });
     if (!user || user.role !== 'ADMIN' || !user.isActive) throw new Error('אין הרשאה לבצע פעולה זו.');
-    if (
-      user.mfaEnabled
-      && (!parsed.password || !user.passwordHash || !(await bcrypt.compare(parsed.password, user.passwordHash)))
-    ) {
-      throw new Error('יש לאמת מחדש את הסיסמה הנוכחית לפני החלפת האימות הדו-שלבי.');
+    if (user.mfaEnabled) {
+      const ip = await getRequestIp();
+      await consumeRateLimit({
+        scope: 'mfa-replacement-ip',
+        identifier: ip,
+        limit: 20,
+        windowMs: 30 * 60 * 1000,
+        blockMs: 60 * 60 * 1000,
+      });
+      await consumeRateLimit({
+        scope: 'mfa-replacement-account',
+        identifier: session.user.id,
+        limit: 8,
+        windowMs: 30 * 60 * 1000,
+        blockMs: 60 * 60 * 1000,
+      });
+      if (!parsed.password || !user.passwordHash || !(await bcrypt.compare(parsed.password, user.passwordHash))) {
+        throw new Error('יש לאמת מחדש את הסיסמה הנוכחית לפני החלפת האימות הדו-שלבי.');
+      }
     }
 
     const secret = generateMfaSecret();

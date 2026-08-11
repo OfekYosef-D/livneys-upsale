@@ -37,6 +37,16 @@ describe('credential authentication', () => {
     expect(clear).not.toHaveBeenCalled();
   });
 
+  it('rejects bcrypt inputs longer than 72 UTF-8 bytes before querying credentials', async () => {
+    await expect(authenticateCredentials({
+      email: 'buyer@example.com',
+      password: `Aa1!${'א'.repeat(35)}`,
+    })).resolves.toBeNull();
+
+    expect(userFindUnique).not.toHaveBeenCalled();
+    expect(compare).not.toHaveBeenCalled();
+  });
+
   it('rejects disabled users and inactive customer companies', async () => {
     userFindUnique.mockResolvedValue({
       id: 'user-1', email: 'buyer@example.com', name: 'Buyer', passwordHash: 'hash', role: 'CUSTOMER',
