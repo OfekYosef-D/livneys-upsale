@@ -119,18 +119,20 @@ describe('admin dashboard queries', () => {
       where: {
         status: { in: ['SUBMITTED', 'SPECIAL_REQUEST', 'APPROVED', 'PACKED'] },
         customer: {
-          users: {
-            none: { email: { endsWith: '@livneys.local', mode: 'insensitive' } },
-          },
+          OR: [
+            { email: null },
+            { NOT: { email: { endsWith: '@livneys.local', mode: 'insensitive' } } },
+          ],
         },
       },
     }));
     expect(mockedReminderJobFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: {
         customer: {
-          users: {
-            none: { email: { endsWith: '@livneys.local', mode: 'insensitive' } },
-          },
+          OR: [
+            { email: null },
+            { NOT: { email: { endsWith: '@livneys.local', mode: 'insensitive' } } },
+          ],
         },
       },
     }));

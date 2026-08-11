@@ -1,10 +1,16 @@
-import type { OrderSource, OrderStatus } from '@prisma/client';
+import type { OrderSource, OrderStatus, Prisma } from '@prisma/client';
 import type { PaymentTermValue } from '@/features/orders/payment-terms';
 import { activeOrderStatuses } from '@/features/orders/utils';
 import { prisma } from '@/lib/db';
 import type { AdminDashboardOrder, AdminOrderLine, AdminOrderSummary, AdminRouteSummary } from './types';
 
 const activeStatuses = activeOrderStatuses as OrderStatus[];
+const nonDemoCustomerFilter: Prisma.CustomerWhereInput = {
+  OR: [
+    { email: null },
+    { NOT: { email: { endsWith: '@livneys.local', mode: 'insensitive' } } },
+  ],
+};
 
 export async function getAdminDashboardData() {
   const [orders, routes, reminderJobs] = await Promise.all([
@@ -13,11 +19,7 @@ export async function getAdminDashboardData() {
         status: {
           in: activeStatuses,
         },
-        customer: {
-          users: {
-            none: { email: { endsWith: '@livneys.local', mode: 'insensitive' } },
-          },
-        },
+        customer: nonDemoCustomerFilter,
       },
       include: {
         customer: true,
@@ -60,11 +62,7 @@ export async function getAdminDashboardData() {
     }),
     prisma.reminderJob.findMany({
       where: {
-        customer: {
-          users: {
-            none: { email: { endsWith: '@livneys.local', mode: 'insensitive' } },
-          },
-        },
+        customer: nonDemoCustomerFilter,
       },
       include: {
         customer: true,
