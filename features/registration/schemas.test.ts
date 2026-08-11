@@ -36,11 +36,9 @@ describe('company registration schemas', () => {
         requestId: 'lead-1',
         routeId: 'route-south',
         priceListId: 'price-list-standard',
-        temporaryPassword: 'livneys-demo',
       }),
     ).toMatchObject({
       requestId: 'lead-1',
-      temporaryPassword: 'livneys-demo',
     });
   });
 

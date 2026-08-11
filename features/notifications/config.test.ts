@@ -21,6 +21,8 @@ describe('WhatsApp notification config', () => {
       'ORDER_SPECIAL_REQUEST',
       'ORDER_ADDITION_APPROVED',
       'ORDER_ADDITION_REJECTED',
+      'PASSWORD_SETUP',
+      'PASSWORD_RESET',
     ]);
   });
 

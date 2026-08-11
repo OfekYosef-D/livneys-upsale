@@ -1,12 +1,12 @@
-import bcrypt from 'bcryptjs';
 import type { NextAuthOptions, User } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { credentialsSchema } from '@/features/auth/schema';
-import { prisma } from '@/lib/db';
+import { authenticateCredentials } from '@/features/auth/authenticate';
 
 type AuthorizedUser = User & {
   role: 'ADMIN' | 'CUSTOMER';
   customerId: string | null;
+  sessionVersion: number;
+  mfaEnabled: boolean;
 };
 
 export const authOptions: NextAuthOptions = {
@@ -22,40 +22,13 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
+        mfaCode: { label: 'MFA code', type: 'text' },
       },
-      async authorize(rawCredentials) {
-        const parsed = credentialsSchema.safeParse(rawCredentials);
-
-        if (!parsed.success) {
-          return null;
-        }
-
-        const user = await prisma.user.findUnique({
-          where: { email: parsed.data.email.toLowerCase() },
-          include: { customer: true },
-        });
-
-        if (!user) {
-          return null;
-        }
-
-        if (user.role === 'CUSTOMER' && (!user.customer || !user.customer.isActive)) {
-          return null;
-        }
-
-        const isValidPassword = await bcrypt.compare(parsed.data.password, user.passwordHash);
-
-        if (!isValidPassword) {
-          return null;
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          customerId: user.customerId,
-        } satisfies AuthorizedUser;
+      async authorize(rawCredentials, request) {
+        const forwarded = request.headers?.['x-forwarded-for'];
+        const ip = Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(',')[0]?.trim();
+        const user = await authenticateCredentials(rawCredentials, { ip: ip || 'unknown' });
+        return user satisfies AuthorizedUser | null;
       },
     }),
   ],
@@ -66,6 +39,8 @@ export const authOptions: NextAuthOptions = {
         token.id = authorizedUser.id;
         token.role = authorizedUser.role;
         token.customerId = authorizedUser.customerId;
+        token.sessionVersion = authorizedUser.sessionVersion;
+        token.mfaEnabled = authorizedUser.mfaEnabled;
       }
 
       return token;
@@ -75,6 +50,8 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.role = token.role as 'ADMIN' | 'CUSTOMER';
         session.user.customerId = (token.customerId as string | null | undefined) ?? null;
+        session.user.sessionVersion = token.sessionVersion as number;
+        session.user.mfaEnabled = Boolean(token.mfaEnabled);
       }
 
       return session;

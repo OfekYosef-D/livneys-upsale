@@ -55,4 +55,24 @@ describe('Prisma migration files', () => {
     expect(sql).toContain('CREATE UNIQUE INDEX "OrderLine_additionRequestLineId_key"');
     expect(sql).not.toMatch(/^\s*(?:DELETE\s+FROM|TRUNCATE\s+)/im);
   });
+
+  it('adds production authentication without deleting business data', () => {
+    const migrationFile = path.join(
+      process.cwd(),
+      'prisma',
+      'migrations',
+      '20260811210000_production_auth',
+      'migration.sql',
+    );
+    const sql = fs.readFileSync(migrationFile, 'utf8');
+
+    expect(sql).toContain('CREATE TYPE "AuthTokenType"');
+    expect(sql).toContain('CREATE TABLE "AuthToken"');
+    expect(sql).toContain('CREATE TABLE "MfaRecoveryCode"');
+    expect(sql).toContain('CREATE TABLE "RateLimitBucket"');
+    expect(sql).toContain('DROP CONSTRAINT IF EXISTS "User_customerId_key"');
+    expect(sql).toContain('DROP INDEX IF EXISTS "User_customerId_key"');
+    expect(sql).toContain("WHERE LOWER(\"email\") LIKE '%@livneys.local'");
+    expect(sql).not.toMatch(/^\s*(?:DELETE\s+FROM|TRUNCATE\s+)/im);
+  });
 });

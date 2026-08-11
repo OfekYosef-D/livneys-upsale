@@ -1,10 +1,16 @@
-import type { OrderSource, OrderStatus } from '@prisma/client';
+import type { OrderSource, OrderStatus, Prisma } from '@prisma/client';
 import type { PaymentTermValue } from '@/features/orders/payment-terms';
 import { activeOrderStatuses } from '@/features/orders/utils';
 import { prisma } from '@/lib/db';
 import type { AdminDashboardOrder, AdminOrderLine, AdminOrderSummary, AdminRouteSummary } from './types';
 
 const activeStatuses = activeOrderStatuses as OrderStatus[];
+const nonDemoCustomerFilter: Prisma.CustomerWhereInput = {
+  OR: [
+    { email: null },
+    { NOT: { email: { endsWith: '@livneys.local', mode: 'insensitive' } } },
+  ],
+};
 
 export async function getAdminDashboardData() {
   const [orders, routes, reminderJobs] = await Promise.all([
@@ -13,6 +19,7 @@ export async function getAdminDashboardData() {
         status: {
           in: activeStatuses,
         },
+        customer: nonDemoCustomerFilter,
       },
       include: {
         customer: true,
@@ -54,6 +61,9 @@ export async function getAdminDashboardData() {
       orderBy: { name: 'asc' },
     }),
     prisma.reminderJob.findMany({
+      where: {
+        customer: nonDemoCustomerFilter,
+      },
       include: {
         customer: true,
         route: true,
@@ -164,6 +174,10 @@ export async function getAdminCustomerDetail(customerId: string) {
         include: { product: true },
         take: 8,
       },
+      users: {
+        select: { id: true, name: true, email: true, isActive: true, passwordHash: true },
+        orderBy: { createdAt: 'asc' },
+      },
     },
   });
 
@@ -179,6 +193,13 @@ export async function getAdminCustomerDetail(customerId: string) {
     notes: customer.notes,
     routeName: customer.route.name,
     routeId: customer.route.id,
+    users: customer.users.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      isActive: user.isActive,
+      setupComplete: Boolean(user.passwordHash),
+    })),
     orders: customer.orders.map(mapOrderSummary),
     recommendations: customer.recommendations.map((recommendation) => ({
       productName: recommendation.product.name,

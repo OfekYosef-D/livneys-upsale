@@ -34,6 +34,8 @@ export const companyRegistrationSchema = z.object({
   address: requiredText(240),
   deliveryNotes: nullableText(1000),
   openingOrderNotes: nullableText(1000),
+  website: z.string().max(0).optional().default(''),
+  challengeToken: z.string().max(2048).optional().default(''),
 });
 
 export const updateRegistrationStatusSchema = z.object({
@@ -46,9 +48,8 @@ export const convertRegistrationSchema = z.object({
   requestId: requiredText(120),
   routeId: requiredText(120),
   priceListId: requiredText(120),
-  temporaryPassword: requiredText(80).min(8),
 });
 
-export type CompanyRegistrationInput = z.infer<typeof companyRegistrationSchema>;
+export type CompanyRegistrationInput = z.input<typeof companyRegistrationSchema>;
 export type UpdateRegistrationStatusInput = z.infer<typeof updateRegistrationStatusSchema>;
 export type ConvertRegistrationInput = z.infer<typeof convertRegistrationSchema>;

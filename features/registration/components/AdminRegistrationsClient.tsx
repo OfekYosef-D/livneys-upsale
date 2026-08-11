@@ -9,6 +9,7 @@ import {
   updateRegistrationStatusAction,
 } from '@/features/registration/actions';
 import type { getRegistrationManagementData } from '@/features/registration/queries';
+import { refreshAfterRegistrationMutation } from './registration-admin-refresh';
 
 type RegistrationData = Awaited<ReturnType<typeof getRegistrationManagementData>>;
 type StatusFilter = 'all' | RegistrationData['requests'][number]['status'];
@@ -39,10 +40,10 @@ export function AdminRegistrationsClient({ data }: { data: RegistrationData }) {
       setPendingId(null);
       if (result.ok) {
         setMessage(success);
-        router.refresh();
       } else {
         setMessage(result.error);
       }
+      refreshAfterRegistrationMutation(router);
     });
   }
 
@@ -129,7 +130,7 @@ export function AdminRegistrationsClient({ data }: { data: RegistrationData }) {
                   </div>
 
                   <form
-                    className="grid min-w-0 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_9rem] md:items-end"
+                    className="grid min-w-0 gap-2 md:grid-cols-2 md:items-end"
                     onSubmit={(event) => {
                       event.preventDefault();
                       const form = new FormData(event.currentTarget);
@@ -140,7 +141,6 @@ export function AdminRegistrationsClient({ data }: { data: RegistrationData }) {
                             requestId: request.id,
                             routeId: stringValue(form, 'routeId'),
                             priceListId: stringValue(form, 'priceListId'),
-                            temporaryPassword: stringValue(form, 'temporaryPassword') || 'livneys-demo',
                           }),
                         'הבקשה הומרה ללקוח פעיל.',
                       );
@@ -148,12 +148,8 @@ export function AdminRegistrationsClient({ data }: { data: RegistrationData }) {
                   >
                     <Select name="routeId" label="קו חלוקה" options={data.routes.map((route) => ({ value: route.id, label: route.name }))} />
                     <Select name="priceListId" label="מחירון" options={data.priceLists.map((priceList) => ({ value: priceList.id, label: `${priceList.name}${priceList.isDefault ? ' · ברירת מחדל' : ''}` }))} />
-                    <label className="block">
-                      <span className="mb-1 block text-xs font-black text-black/50">סיסמה זמנית</span>
-                      <input name="temporaryPassword" defaultValue="livneys-demo" autoComplete="new-password" spellCheck={false} className={fieldClass} />
-                    </label>
-                    <button type="submit" disabled={isPending && pendingId === request.id} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-full bg-black px-3 text-xs font-black text-white focus-visible:ring-2 focus-visible:ring-black/25 disabled:bg-black/30 md:col-span-3">
-                      <UserPlus aria-hidden="true" size={14} /> פתיחת לקוח וחשבון
+                    <button type="submit" disabled={isPending && pendingId === request.id} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-full bg-black px-3 text-xs font-black text-white focus-visible:ring-2 focus-visible:ring-black/25 disabled:bg-black/30 md:col-span-2">
+                      <UserPlus aria-hidden="true" size={14} /> פתיחת לקוח ושליחת קישור מאובטח
                     </button>
                   </form>
                 </div>

@@ -3,6 +3,7 @@ import type { getAdminCustomerDetail } from '@/features/admin/queries';
 import { formatOrderNumber } from '@/features/orders/order-number';
 import { money } from '@/lib/format';
 import { OrderStatusPill } from './OrderStatusPill';
+import { CustomerUsersManager } from '@/features/auth/components/CustomerUsersManager';
 
 type CustomerData = NonNullable<Awaited<ReturnType<typeof getAdminCustomerDetail>>>;
 
@@ -22,6 +23,8 @@ export function AdminCustomerDetail({ customer }: { customer: CustomerData }) {
             הזמנה ידנית
           </Link>
         </section>
+
+        <CustomerUsersManager customerId={customer.id} accounts={customer.users} />
 
         <section className="rounded-2xl border border-black/10 bg-white p-4 shadow-[0_18px_54px_rgba(0,0,0,0.05)]">
           <h2 className="text-base font-black">המלצות אפסייל</h2>

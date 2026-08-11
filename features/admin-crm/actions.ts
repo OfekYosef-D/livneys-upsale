@@ -13,6 +13,9 @@ import { assertAdminAction } from '@/lib/authorization';
 import { prisma } from '@/lib/db';
 import { enqueueOrderLifecycleWhatsApp } from '../notifications/jobs';
 import { getTemplateKeyForOrderStatus } from '../notifications/templates';
+import { revokeCustomerSessionsOnDeactivation } from './customer-access';
+import { syncCustomerLoginIdentity } from './customer-login-sync';
+import { lockCustomerAccessState } from '../auth/customer-access-lock';
 import {
   createCustomerSchema,
   createPriceListSchema,
@@ -98,28 +101,25 @@ export async function updateCustomerAction(input: unknown): Promise<ActionResult
     await assertRouteAndPriceList(parsed.routeId, parsed.priceListId, true);
 
     await prisma.$transaction(async (tx) => {
+      const lockedCustomer = await lockCustomerAccessState(tx, parsed.id);
+      if (!lockedCustomer) throw new Error('הלקוח לא נמצא.');
+
       const existing = await tx.customer.findUnique({
         where: { id: parsed.id },
-        include: { user: true },
+        include: { users: true },
       });
 
       if (!existing) {
         throw new Error('הלקוח לא נמצא.');
       }
 
-      if (existing.user && existing.email !== parsed.email) {
-        if (!parsed.email) {
-          throw new Error('לא ניתן להסיר אימייל מלקוח עם חשבון התחברות.');
-        }
-
-        await tx.user.update({
-          where: { id: existing.user.id },
-          data: {
-            email: parsed.email,
-            name: parsed.contact,
-          },
-        });
-      }
+      await syncCustomerLoginIdentity(tx, {
+        currentEmail: existing.email,
+        nextEmail: parsed.email,
+        nextContactName: parsed.contact,
+        users: existing.users,
+        now: new Date(),
+      });
 
       await tx.customer.update({
         where: { id: parsed.id },
@@ -155,6 +155,12 @@ export async function updateCustomerAction(input: unknown): Promise<ActionResult
           },
         },
       });
+      await revokeCustomerSessionsOnDeactivation(tx, {
+        customerId: parsed.id,
+        wasActive: existing.isActive,
+        isActive: parsed.isActive,
+        now: new Date(),
+      });
     });
 
     revalidateAdminCrm();
@@ -169,9 +175,20 @@ export async function toggleCustomerActiveAction(input: { id: string; isActive: 
   try {
     const parsed = activeToggleSchema.parse(input);
     await assertAdminAction();
-    await prisma.customer.update({
-      where: { id: parsed.id },
-      data: { isActive: parsed.isActive },
+    await prisma.$transaction(async (tx) => {
+      const existing = await lockCustomerAccessState(tx, parsed.id);
+      if (!existing) throw new Error('הלקוח לא נמצא.');
+
+      await tx.customer.update({
+        where: { id: parsed.id },
+        data: { isActive: parsed.isActive },
+      });
+      await revokeCustomerSessionsOnDeactivation(tx, {
+        customerId: parsed.id,
+        wasActive: existing.isActive,
+        isActive: parsed.isActive,
+        now: new Date(),
+      });
     });
 
     revalidateAdminCrm();

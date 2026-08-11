@@ -1,10 +1,15 @@
 'use server';
 
-import bcrypt from 'bcryptjs';
+import { AuthTokenType } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { assertAdminAction } from '@/lib/authorization';
 import { prisma } from '@/lib/db';
+import { verifyRegistrationChallenge } from '../auth/captcha';
+import { assertAccountAccessDeliveryConfigured, sendAccountAccessNotifications } from '../auth/notifications';
+import { consumeRateLimit } from '../auth/rate-limit';
+import { getRequestBaseUrl, getRequestIp } from '../auth/request';
+import { issueAuthTokenInTransaction } from '../auth/tokens';
 import {
   companyRegistrationSchema,
   convertRegistrationSchema,
@@ -17,10 +22,32 @@ import {
 export async function createCompanyRegistrationAction(input: CompanyRegistrationInput): Promise<ActionResult<{ requestId: string }>> {
   try {
     const parsed = companyRegistrationSchema.parse(input);
+    const ip = await getRequestIp();
+    await consumeRateLimit({
+      scope: 'registration-ip',
+      identifier: ip,
+      limit: 10,
+      windowMs: 60 * 60 * 1000,
+      blockMs: 6 * 60 * 60 * 1000,
+    });
+    const challengeValid = await verifyRegistrationChallenge({
+      token: parsed.challengeToken,
+      honeypot: parsed.website,
+      ip,
+    });
+    if (!challengeValid) throw new Error('לא ניתן לאמת את הבקשה. נסו שוב.');
+    await consumeRateLimit({
+      scope: 'registration-account',
+      identifier: parsed.email,
+      limit: 3,
+      windowMs: 60 * 60 * 1000,
+      blockMs: 6 * 60 * 60 * 1000,
+    });
+    const { website: _website, challengeToken: _challengeToken, ...registration } = parsed;
 
     const request = await prisma.companyRegistrationRequest.create({
       data: {
-        ...parsed,
+        ...registration,
         status: 'PENDING',
       },
     });
@@ -53,14 +80,15 @@ export async function updateRegistrationStatusAction(input: UpdateRegistrationSt
 }
 
 export async function convertRegistrationToCustomerAction(input: ConvertRegistrationInput): Promise<ActionResult<{ customerId: string }>> {
+  let committedCustomerId: string | null = null;
   try {
     const parsed = convertRegistrationSchema.parse(input);
     await assertAdminAction();
+    assertAccountAccessDeliveryConfigured();
     await assertRouteAndPriceList(parsed.routeId, parsed.priceListId);
 
-    const passwordHash = await bcrypt.hash(parsed.temporaryPassword, 12);
-
-    const customerId = await prisma.$transaction(async (tx) => {
+    const baseUrl = await getRequestBaseUrl();
+    const converted = await prisma.$transaction(async (tx) => {
       const request = await tx.companyRegistrationRequest.findUnique({
         where: { id: parsed.requestId },
       });
@@ -104,11 +132,11 @@ export async function convertRegistrationToCustomerAction(input: ConvertRegistra
         },
       });
 
-      await tx.user.create({
+      const user = await tx.user.create({
         data: {
           email: request.email,
           name: request.contactName,
-          passwordHash,
+          passwordHash: null,
           role: 'CUSTOMER',
           customerId: nextCustomerId,
         },
@@ -122,16 +150,34 @@ export async function convertRegistrationToCustomerAction(input: ConvertRegistra
         },
       });
 
-      return nextCustomerId;
+      const setupToken = await issueAuthTokenInTransaction(tx, {
+        userId: user.id,
+        type: AuthTokenType.PASSWORD_SETUP,
+        baseUrl,
+      });
+      return { customerId: nextCustomerId, userId: user.id, setupUrl: setupToken.url };
+    });
+    committedCustomerId = converted.customerId;
+    await sendAccountAccessNotifications({
+      userId: converted.userId,
+      type: AuthTokenType.PASSWORD_SETUP,
+      url: converted.setupUrl,
     });
 
-    revalidatePath('/admin/registrations');
-    revalidatePath('/admin/customers');
-    revalidatePath(`/admin/customers/${customerId}`);
+    const customerId = converted.customerId;
+
+    revalidateRegistrationConversion(customerId);
     return actionOk({ customerId });
   } catch (error) {
+    if (committedCustomerId) revalidateRegistrationConversion(committedCustomerId);
     return actionError(error);
   }
+}
+
+function revalidateRegistrationConversion(customerId: string) {
+  revalidatePath('/admin/registrations');
+  revalidatePath('/admin/customers');
+  revalidatePath(`/admin/customers/${customerId}`);
 }
 
 async function assertRouteAndPriceList(routeId: string, priceListId: string) {
