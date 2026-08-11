@@ -18,6 +18,8 @@ const deploymentEnvSchema = z.object({
   }, 'must be a base64-encoded 32-byte key'),
   TURNSTILE_SECRET_KEY: z.string().trim().min(1),
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().trim().min(1),
+  RESEND_API_KEY: z.string().trim().min(1),
+  EMAIL_FROM: z.string().trim().min(3),
   WHATSAPP_SEND_ENABLED: z.enum(['true', 'false', '1', '0']).default('false'),
   WHATSAPP_ACCESS_TOKEN: z.string().trim().optional(),
   WHATSAPP_PHONE_NUMBER_ID: z.string().trim().optional(),
@@ -45,6 +47,7 @@ export type DeploymentEnv = {
   whatsappSendEnabled: boolean;
   mfaEncryptionKey: string;
   turnstileConfigured: boolean;
+  emailDeliveryConfigured: boolean;
 };
 
 export function parseDeploymentEnv(env: EnvLike): DeploymentEnv {
@@ -59,5 +62,6 @@ export function parseDeploymentEnv(env: EnvLike): DeploymentEnv {
     whatsappSendEnabled: parsed.WHATSAPP_SEND_ENABLED === 'true' || parsed.WHATSAPP_SEND_ENABLED === '1',
     mfaEncryptionKey: parsed.MFA_ENCRYPTION_KEY,
     turnstileConfigured: Boolean(parsed.TURNSTILE_SECRET_KEY && parsed.NEXT_PUBLIC_TURNSTILE_SITE_KEY),
+    emailDeliveryConfigured: Boolean(parsed.RESEND_API_KEY && parsed.EMAIL_FROM),
   };
 }

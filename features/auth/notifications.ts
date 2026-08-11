@@ -5,6 +5,18 @@ import { getWhatsAppConfig, resolveWhatsAppTemplateName } from '@/features/notif
 import { normalizePhoneToE164 } from '@/features/notifications/phone';
 import { sendWhatsAppTemplate } from '@/features/notifications/sender';
 
+export class AccountAccessDeliveryError extends Error {
+  constructor() {
+    super('לא מוגדר ערוץ מסירה פעיל לקישורי גישה. יש להגדיר Resend לפני פתיחת החשבון.');
+    this.name = 'AccountAccessDeliveryError';
+  }
+}
+
+export function assertAccountAccessDeliveryConfigured() {
+  const email = getEmailConfig();
+  if (!email.apiKey || !email.from) throw new AccountAccessDeliveryError();
+}
+
 export async function sendAccountAccessNotifications({
   userId,
   type,
@@ -18,7 +30,7 @@ export async function sendAccountAccessNotifications({
     where: { id: userId },
     include: { customer: { include: { notificationPreference: true } } },
   });
-  if (!user) return { email: 'skipped', whatsapp: 'skipped' } as const;
+  if (!user) throw new AccountAccessDeliveryError();
 
   const isSetup = type === 'PASSWORD_SETUP';
   const subject = isSetup ? "הגדרת סיסמה לחשבון Livney's" : "איפוס סיסמה לחשבון Livney's";
@@ -31,7 +43,8 @@ export async function sendAccountAccessNotifications({
   const customer = user.customer;
   const phone = customer ? normalizePhoneToE164(customer.phone) : null;
   if (!customer?.isActive || !customer.notificationPreference?.whatsappEnabled || !phone) {
-    return { email: emailResult.mode, whatsapp: 'skipped' } as const;
+    if (emailResult.mode !== 'live') throw new AccountAccessDeliveryError();
+    return { delivered: true, email: emailResult.mode, whatsapp: 'skipped' } as const;
   }
 
   const config = getWhatsAppConfig();
@@ -43,5 +56,7 @@ export async function sendAccountAccessNotifications({
     languageCode: config.templateLanguage,
     bodyParameters: [user.name, url],
   }, { config });
-  return { email: emailResult.mode, whatsapp: whatsappResult.mode } as const;
+  const delivered = emailResult.mode === 'live' || whatsappResult.mode === 'live';
+  if (!delivered) throw new AccountAccessDeliveryError();
+  return { delivered, email: emailResult.mode, whatsapp: whatsappResult.mode } as const;
 }

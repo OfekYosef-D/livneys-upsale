@@ -9,7 +9,7 @@ import { confirmMfaSchema, forgotPasswordSchema, inviteCustomerUserSchema, passw
 import { getRequestBaseUrl, getRequestIp } from './request';
 import { consumeRateLimit } from './rate-limit';
 import { consumePasswordToken, issueAuthToken, issueAuthTokenInTransaction } from './tokens';
-import { sendAccountAccessNotifications } from './notifications';
+import { assertAccountAccessDeliveryConfigured, sendAccountAccessNotifications } from './notifications';
 import { encryptMfaSecret, generateMfaSecret, generateRecoveryCodes, hashRecoveryCode, verifyTotpCode } from './mfa';
 
 const genericResetMessage = 'אם קיים חשבון פעיל עבור הכתובת, נשלח אליו קישור מאובטח לאיפוס סיסמה.';
@@ -31,7 +31,9 @@ export async function requestPasswordResetAction(input: unknown): Promise<Action
       where: { email: parsed.email },
       include: { customer: { select: { isActive: true } } },
     });
-    if (user?.isActive && (user.role === 'ADMIN' || user.customer?.isActive)) {
+    let deliveryConfigured = true;
+    try { assertAccountAccessDeliveryConfigured(); } catch { deliveryConfigured = false; }
+    if (deliveryConfigured && user?.isActive && (user.role === 'ADMIN' || user.customer?.isActive)) {
       const token = await issueAuthToken({ userId: user.id, type: AuthTokenType.PASSWORD_RESET, baseUrl });
       await notifySafely(user.id, AuthTokenType.PASSWORD_RESET, token.url);
     } else {
@@ -65,6 +67,7 @@ export async function inviteCustomerUserAction(input: unknown): Promise<ActionRe
   try {
     const parsed = inviteCustomerUserSchema.parse(input);
     await assertAdminAction();
+    assertAccountAccessDeliveryConfigured();
     const customer = await prisma.customer.findUnique({ where: { id: parsed.customerId } });
     if (!customer?.isActive) throw new Error('הלקוח אינו פעיל.');
 
@@ -113,6 +116,7 @@ export async function resendCustomerUserSetupAction(input: unknown): Promise<Act
   try {
     const parsed = setCustomerUserActiveSchema.pick({ customerId: true, userId: true }).parse(input);
     await assertAdminAction();
+    assertAccountAccessDeliveryConfigured();
     const user = await prisma.user.findFirst({
       where: { id: parsed.userId, customerId: parsed.customerId, role: 'CUSTOMER', isActive: true },
     });

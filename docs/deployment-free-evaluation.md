@@ -23,6 +23,11 @@ Next.js is pinned to 15.5.20 rather than the originally proposed 14.2.35 because
 | `NEXTAUTH_SECRET` | Local secret | Separate generated secret | Separate generated secret |
 | `NEXTAUTH_URL` | `http://localhost:3000` | Stable preview deployment URL | Assigned `vercel.app` URL |
 | `CRON_SECRET` | Local secret | Separate generated secret | Separate generated secret |
+| `MFA_ENCRYPTION_KEY` | 32 random bytes, Base64 | Separate generated key | Separate generated key |
+| `TURNSTILE_SECRET_KEY` | Cloudflare test secret | Cloudflare test secret | Real domain-bound secret |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare test site key | Cloudflare test site key | Real domain-bound site key |
+| `RESEND_API_KEY` | Resend test key | Resend test/preview key | Live Resend key |
+| `EMAIL_FROM` | Verified development sender | Verified preview sender | Verified customer-domain sender |
 | `WHATSAPP_SEND_ENABLED` | `false` | `false` | `false` |
 
 Cloudinary credentials remain optional. When absent, the product form explains that upload is unavailable while retaining HTTPS URL and bundled-image support.
@@ -40,6 +45,11 @@ $env:DIRECT_URL=$env:DATABASE_URL
 $env:NEXTAUTH_SECRET='replace-with-at-least-32-characters'
 $env:NEXTAUTH_URL='http://localhost:3000'
 $env:CRON_SECRET='replace-with-at-least-16-characters'
+$env:MFA_ENCRYPTION_KEY='<base64-encoded-32-random-bytes>'
+$env:TURNSTILE_SECRET_KEY='<turnstile-secret>'
+$env:NEXT_PUBLIC_TURNSTILE_SITE_KEY='<turnstile-site-key>'
+$env:RESEND_API_KEY='<resend-api-key>'
+$env:EMAIL_FROM="Livney's <orders@verified-domain.example>"
 $env:WHATSAPP_SEND_ENABLED='false'
 npm run deploy:check
 npm run build
@@ -94,6 +104,11 @@ npx vercel@latest env add DIRECT_URL production --sensitive
 npx vercel@latest env add NEXTAUTH_SECRET production --sensitive
 npx vercel@latest env add NEXTAUTH_URL production --no-sensitive
 npx vercel@latest env add CRON_SECRET production --sensitive
+npx vercel@latest env add MFA_ENCRYPTION_KEY production --sensitive
+npx vercel@latest env add TURNSTILE_SECRET_KEY production --sensitive
+npx vercel@latest env add NEXT_PUBLIC_TURNSTILE_SITE_KEY production --no-sensitive
+npx vercel@latest env add RESEND_API_KEY production --sensitive
+npx vercel@latest env add EMAIL_FROM production --no-sensitive
 npx vercel@latest env add WHATSAPP_SEND_ENABLED production --no-sensitive
 
 npx vercel@latest env add DATABASE_URL preview --sensitive
@@ -101,10 +116,15 @@ npx vercel@latest env add DIRECT_URL preview --sensitive
 npx vercel@latest env add NEXTAUTH_SECRET preview --sensitive
 npx vercel@latest env add NEXTAUTH_URL preview --no-sensitive
 npx vercel@latest env add CRON_SECRET preview --sensitive
+npx vercel@latest env add MFA_ENCRYPTION_KEY preview --sensitive
+npx vercel@latest env add TURNSTILE_SECRET_KEY preview --sensitive
+npx vercel@latest env add NEXT_PUBLIC_TURNSTILE_SITE_KEY preview --no-sensitive
+npx vercel@latest env add RESEND_API_KEY preview --sensitive
+npx vercel@latest env add EMAIL_FROM preview --no-sensitive
 npx vercel@latest env add WHATSAPP_SEND_ENABLED preview --no-sensitive
 ```
 
-Generate independent `NEXTAUTH_SECRET` and `CRON_SECRET` values for each environment. Use at least 48 random bytes for NextAuth and 32 for cron. Set WhatsApp exactly to `false`.
+Generate independent `NEXTAUTH_SECRET`, `CRON_SECRET`, and `MFA_ENCRYPTION_KEY` values for each environment. Use at least 48 random bytes for NextAuth, 32 for cron, and exactly 32 Base64-encoded random bytes for MFA encryption. Preview may use Cloudflare's documented always-pass test keys; production must use real domain-bound Turnstile keys. Verify the Resend sender before enabling account approvals: setup and reset actions deliberately refuse to report success when no live email channel exists. Set WhatsApp exactly to `false` until Meta credentials and templates are approved.
 
 Deploy the feature branch as preview, use its stable branch URL for preview `NEXTAUTH_URL`, and redeploy after setting that URL. Merge only after preview checks pass. Production is deployed from `main`.
 

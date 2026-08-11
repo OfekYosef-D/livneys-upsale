@@ -21,7 +21,10 @@ vi.mock('../auth/captcha', () => ({ verifyRegistrationChallenge: verifyChallenge
 vi.mock('../auth/rate-limit', () => ({ consumeRateLimit: consumeRateLimitMock }));
 vi.mock('../auth/request', () => ({ getRequestIp: vi.fn(async () => '127.0.0.1'), getRequestBaseUrl: vi.fn(async () => 'https://example.com') }));
 vi.mock('../auth/tokens', () => ({ issueAuthTokenInTransaction: issueAuthTokenMock }));
-vi.mock('../auth/notifications', () => ({ sendAccountAccessNotifications: sendAccountAccessNotificationsMock }));
+vi.mock('../auth/notifications', () => ({
+  assertAccountAccessDeliveryConfigured: vi.fn(),
+  sendAccountAccessNotifications: sendAccountAccessNotificationsMock,
+}));
 
 vi.mock('@/lib/authorization', () => ({
   assertAdminAction: vi.fn(),

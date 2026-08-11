@@ -10,6 +10,8 @@ const validEnv = {
   MFA_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
   TURNSTILE_SECRET_KEY: 'turnstile-secret',
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'turnstile-site',
+  RESEND_API_KEY: 're_test',
+  EMAIL_FROM: "Livney's <orders@example.com>",
   WHATSAPP_SEND_ENABLED: 'false',
 };
 

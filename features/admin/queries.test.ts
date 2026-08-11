@@ -115,6 +115,25 @@ describe('admin dashboard queries', () => {
     const data = await getAdminDashboardData();
 
     expect(mockedOrderFindMany).toHaveBeenCalledWith(expect.not.objectContaining({ take: expect.any(Number) }));
+    expect(mockedOrderFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        status: { in: ['SUBMITTED', 'SPECIAL_REQUEST', 'APPROVED', 'PACKED'] },
+        customer: {
+          users: {
+            none: { email: { endsWith: '@livneys.local', mode: 'insensitive' } },
+          },
+        },
+      },
+    }));
+    expect(mockedReminderJobFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        customer: {
+          users: {
+            none: { email: { endsWith: '@livneys.local', mode: 'insensitive' } },
+          },
+        },
+      },
+    }));
     expect(data.orders[0]).toMatchObject({
       id: 'ord-1',
       orderNumber: 1001,

@@ -6,7 +6,7 @@ import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { assertAdminAction } from '@/lib/authorization';
 import { prisma } from '@/lib/db';
 import { verifyRegistrationChallenge } from '../auth/captcha';
-import { sendAccountAccessNotifications } from '../auth/notifications';
+import { assertAccountAccessDeliveryConfigured, sendAccountAccessNotifications } from '../auth/notifications';
 import { consumeRateLimit } from '../auth/rate-limit';
 import { getRequestBaseUrl, getRequestIp } from '../auth/request';
 import { issueAuthTokenInTransaction } from '../auth/tokens';
@@ -76,6 +76,7 @@ export async function convertRegistrationToCustomerAction(input: ConvertRegistra
   try {
     const parsed = convertRegistrationSchema.parse(input);
     await assertAdminAction();
+    assertAccountAccessDeliveryConfigured();
     await assertRouteAndPriceList(parsed.routeId, parsed.priceListId);
 
     const baseUrl = await getRequestBaseUrl();

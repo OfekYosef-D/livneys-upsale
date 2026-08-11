@@ -13,7 +13,11 @@ export async function getAdminDashboardData() {
         status: {
           in: activeStatuses,
         },
-        customer: { isActive: true },
+        customer: {
+          users: {
+            none: { email: { endsWith: '@livneys.local', mode: 'insensitive' } },
+          },
+        },
       },
       include: {
         customer: true,
@@ -55,7 +59,13 @@ export async function getAdminDashboardData() {
       orderBy: { name: 'asc' },
     }),
     prisma.reminderJob.findMany({
-      where: { customer: { isActive: true } },
+      where: {
+        customer: {
+          users: {
+            none: { email: { endsWith: '@livneys.local', mode: 'insensitive' } },
+          },
+        },
+      },
       include: {
         customer: true,
         route: true,
