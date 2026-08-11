@@ -5,8 +5,13 @@ const consumeRateLimit = vi.hoisted(() => vi.fn());
 const compare = vi.hoisted(() => vi.fn());
 const hash = vi.hoisted(() => vi.fn());
 const assertPasswordTokenUsable = vi.hoisted(() => vi.fn());
+const after = vi.hoisted(() => vi.fn());
+const issueAuthToken = vi.hoisted(() => vi.fn());
+const assertAccountAccessDeliveryConfigured = vi.hoisted(() => vi.fn());
+const sendAccountAccessNotifications = vi.hoisted(() => vi.fn());
 
 vi.mock('bcryptjs', () => ({ default: { compare, hash } }));
+vi.mock('next/server', () => ({ after }));
 vi.mock('@/lib/action-result', () => ({
   actionOk: (data: unknown) => ({ ok: true, data }),
   actionError: (error: unknown) => ({ ok: false, error: error instanceof Error ? error.message : 'Unexpected error' }),
@@ -21,12 +26,12 @@ vi.mock('./rate-limit', () => ({ consumeRateLimit }));
 vi.mock('./tokens', () => ({
   assertPasswordTokenUsable,
   consumePasswordToken: vi.fn(),
-  issueAuthToken: vi.fn(),
+  issueAuthToken,
   issueAuthTokenInTransaction: vi.fn(),
 }));
 vi.mock('./notifications', () => ({
-  assertAccountAccessDeliveryConfigured: vi.fn(() => { throw new Error('not configured'); }),
-  sendAccountAccessNotifications: vi.fn(),
+  assertAccountAccessDeliveryConfigured,
+  sendAccountAccessNotifications,
 }));
 vi.mock('./mfa', () => ({
   encryptMfaSecret: vi.fn(), generateMfaSecret: vi.fn(), generateRecoveryCodes: vi.fn(),
@@ -42,8 +47,13 @@ describe('password reset actions', () => {
     compare.mockReset();
     hash.mockReset();
     assertPasswordTokenUsable.mockReset();
+    after.mockReset();
+    issueAuthToken.mockReset();
+    assertAccountAccessDeliveryConfigured.mockReset();
+    sendAccountAccessNotifications.mockReset();
     userFindUnique.mockResolvedValue(null);
     compare.mockResolvedValue(false);
+    assertAccountAccessDeliveryConfigured.mockImplementation(() => { throw new Error('not configured'); });
   });
 
   it('limits password reset independently by IP and normalized account', async () => {
@@ -55,6 +65,31 @@ describe('password reset actions', () => {
     expect(consumeRateLimit).toHaveBeenNthCalledWith(2, expect.objectContaining({
       scope: 'password-reset-account', identifier: 'buyer@example.com', limit: 4,
     }));
+  });
+
+  it('defers reset email delivery and applies the same timing padding for an active account', async () => {
+    assertAccountAccessDeliveryConfigured.mockReset();
+    userFindUnique.mockResolvedValue({
+      id: 'user-1',
+      isActive: true,
+      role: 'CUSTOMER',
+      customer: { isActive: true },
+    });
+    issueAuthToken.mockResolvedValue({ url: 'https://example.com/set-password?token=secret' });
+
+    await expect(requestPasswordResetAction({ email: 'buyer@example.com' })).resolves.toMatchObject({ ok: true });
+
+    expect(issueAuthToken).toHaveBeenCalledOnce();
+    expect(compare).toHaveBeenCalledWith('password-reset-timing-pad', expect.any(String));
+    expect(sendAccountAccessNotifications).not.toHaveBeenCalled();
+    expect(after).toHaveBeenCalledOnce();
+
+    await after.mock.calls[0][0]();
+    expect(sendAccountAccessNotifications).toHaveBeenCalledWith({
+      userId: 'user-1',
+      type: 'PASSWORD_RESET',
+      url: 'https://example.com/set-password?token=secret',
+    });
   });
 
   it('rejects an unusable token before running the expensive password hash', async () => {

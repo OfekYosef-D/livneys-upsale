@@ -2,6 +2,7 @@
 
 import bcrypt from 'bcryptjs';
 import { AuthTokenType } from '@prisma/client';
+import { after } from 'next/server';
 import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { assertAdminAction, assertAdminEnrollmentAction } from '@/lib/authorization';
 import { prisma } from '@/lib/db';
@@ -44,10 +45,9 @@ export async function requestPasswordResetAction(input: unknown): Promise<Action
     try { assertAccountAccessDeliveryConfigured(); } catch { deliveryConfigured = false; }
     if (deliveryConfigured && user?.isActive && (user.role === 'ADMIN' || user.customer?.isActive)) {
       const token = await issueAuthToken({ userId: user.id, type: AuthTokenType.PASSWORD_RESET, baseUrl });
-      await notifySafely(user.id, AuthTokenType.PASSWORD_RESET, token.url);
-    } else {
-      await bcrypt.compare('invalid-reset-request', dummyPasswordHash);
+      after(() => notifySafely(user.id, AuthTokenType.PASSWORD_RESET, token.url));
     }
+    await bcrypt.compare('password-reset-timing-pad', dummyPasswordHash);
     return actionOk({ message: genericResetMessage });
   } catch (error) {
     return actionError(error);
