@@ -1,6 +1,13 @@
 'use server';
 
+import { Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+import {
+  cancelDraftOrder,
+  isRetryableOrderWriteError,
+  persistDraftOrder,
+  StaleOrderWriteError,
+} from '@/features/orders/persistence';
 import { createSubmittedOrder, getOrderWriteContext } from '@/features/orders/service';
 import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { assertCustomerAction } from '@/lib/authorization';
@@ -19,6 +26,22 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
     const context = await getOrderWriteContext(parsed.customerId);
     const normalizedItems = normalizeCustomerOrderItems(parsed.items, context.products);
     if (normalizedItems.length === 0) {
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          await prisma.$transaction(
+            (tx) => cancelDraftOrder(tx, {
+              customerId: parsed.customerId,
+              deliveryWindowStart: context.route.nextDeliveryAt,
+            }),
+            { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+          );
+          break;
+        } catch (error) {
+          if (!isRetryableOrderWriteError(error) || attempt === 3) throw error;
+        }
+      }
+
+      revalidatePath(`/customer/${parsed.customerId}`);
       return actionOk({ orderId: null });
     }
 
@@ -32,82 +55,53 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
     });
     const snapshotLines = pricing.lines;
     const vat = calculateVatSummary(pricing.total);
-    const existingDraft = await prisma.order.findFirst({
-      where: {
+    const draftPayload = {
+      order: {
         customerId: parsed.customerId,
-        status: 'DRAFT',
+        routeId: context.route.id,
+        status: 'DRAFT' as const,
+        source: 'CUSTOMER' as const,
         deliveryWindowStart: context.route.nextDeliveryAt,
+        deadlineAt: context.route.nextCutoffAt,
+        submittedAt: null,
+        notes: null,
+        internalNote: null,
+        subtotal: pricing.subtotal,
+        discountTotal: pricing.discountTotal,
+        paymentTerm: 'NET_30' as const,
+        paymentDiscountPercent: 0,
+        paymentDiscountTotal: 0,
+        total: pricing.total,
+        vatRatePercent: vat.vatRatePercent,
+        vatTotal: vat.vatTotal,
+        totalIncludingVat: vat.totalIncludingVat,
+        commercialTermsVersion: null,
+        commercialTermsAcceptedAt: null,
       },
-    });
+      lines: snapshotLines,
+    };
 
-    const order = await prisma.order.upsert({
-      where: {
-        id: existingDraft?.id ?? '__new_draft__',
-      },
-      create: {
-        customerId: parsed.customerId,
-        routeId: context.route.id,
-        status: 'DRAFT',
-        source: 'CUSTOMER',
-        deliveryWindowStart: context.route.nextDeliveryAt,
-        deadlineAt: context.route.nextCutoffAt,
-        subtotal: pricing.subtotal,
-        discountTotal: pricing.discountTotal,
-        paymentTerm: 'NET_30',
-        paymentDiscountPercent: 0,
-        paymentDiscountTotal: 0,
-        total: pricing.total,
-        vatRatePercent: vat.vatRatePercent,
-        vatTotal: vat.vatTotal,
-        totalIncludingVat: vat.totalIncludingVat,
-        lines: {
-          create: snapshotLines.map((line) => ({
-            productId: line.productId,
-            productName: line.productName,
-            quantity: line.quantity,
-            listUnitPrice: line.listUnitPrice,
-            unitPrice: line.unitPrice,
-            lineSubtotal: line.lineSubtotal,
-            discountTotal: line.discountTotal,
-            lineTotal: line.lineTotal,
-            promotionId: line.promotionId,
-            promotionSnapshot: line.promotionSnapshot ?? undefined,
-          })),
-        },
-      },
-      update: {
-        routeId: context.route.id,
-        deliveryWindowStart: context.route.nextDeliveryAt,
-        deadlineAt: context.route.nextCutoffAt,
-        subtotal: pricing.subtotal,
-        discountTotal: pricing.discountTotal,
-        paymentTerm: 'NET_30',
-        paymentDiscountPercent: 0,
-        paymentDiscountTotal: 0,
-        total: pricing.total,
-        vatRatePercent: vat.vatRatePercent,
-        vatTotal: vat.vatTotal,
-        totalIncludingVat: vat.totalIncludingVat,
-        lines: {
-          deleteMany: {},
-          create: snapshotLines.map((line) => ({
-            productId: line.productId,
-            productName: line.productName,
-            quantity: line.quantity,
-            listUnitPrice: line.listUnitPrice,
-            unitPrice: line.unitPrice,
-            lineSubtotal: line.lineSubtotal,
-            discountTotal: line.discountTotal,
-            lineTotal: line.lineTotal,
-            promotionId: line.promotionId,
-            promotionSnapshot: line.promotionSnapshot ?? undefined,
-          })),
-        },
-      },
-    });
+    let orderId: string | null = null;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const persisted = await prisma.$transaction(
+          (tx) => persistDraftOrder(tx, { payload: draftPayload }),
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        );
+        orderId = persisted.order.id;
+        break;
+      } catch (error) {
+        const retryable = error instanceof StaleOrderWriteError || isRetryableOrderWriteError(error);
+        if (!retryable || attempt === 3) throw error;
+      }
+    }
+
+    if (!orderId) {
+      throw new Error('Draft persistence retry loop exited unexpectedly.');
+    }
 
     revalidatePath(`/customer/${parsed.customerId}`);
-    return actionOk({ orderId: order.id });
+    return actionOk({ orderId });
   } catch (error) {
     return actionError(error);
   }
@@ -128,6 +122,7 @@ export async function submitCustomerOrderAction(input: SubmitCustomerOrderInput)
       customerId: parsed.customerId,
       items: normalizedItems,
       source: 'CUSTOMER',
+      idempotencyKey: parsed.idempotencyKey,
       paymentTerm: parsed.paymentTerm,
       commercialTermsAccepted: parsed.commercialTermsAccepted,
       notes: parsed.notes,
@@ -138,7 +133,9 @@ export async function submitCustomerOrderAction(input: SubmitCustomerOrderInput)
     revalidatePath(`/admin/routes/${order.routeId}`);
     revalidatePath(`/admin/customers/${parsed.customerId}`);
     revalidatePath(`/customer/${parsed.customerId}`);
-    await enqueueOrderLifecycleSafely({ orderId: order.orderId });
+    if (!order.replayed) {
+      await enqueueOrderLifecycleSafely({ orderId: order.orderId });
+    }
 
     return actionOk({ orderId: order.orderId, status: order.status });
   } catch (error) {

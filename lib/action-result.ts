@@ -1,5 +1,8 @@
 import { ZodError } from 'zod';
-import { AuthorizationError } from '@/lib/authorization';
+import { AuthorizationError } from './authorization';
+import { SafeActionError } from './safe-action-error';
+
+export { SafeActionError } from './safe-action-error';
 
 export type ActionResult<T> =
   | {
@@ -9,6 +12,8 @@ export type ActionResult<T> =
   | {
       ok: false;
       error: string;
+      code?: string;
+      details?: Record<string, string | number | boolean | null>;
     };
 
 export function actionOk<T>(data: T): ActionResult<T> {
@@ -16,6 +21,15 @@ export function actionOk<T>(data: T): ActionResult<T> {
 }
 
 export function actionError(error: unknown): ActionResult<never> {
+  if (error instanceof SafeActionError) {
+    return {
+      ok: false,
+      code: error.code,
+      error: error.message,
+      ...(error.details ? { details: error.details } : {}),
+    };
+  }
+
   if (error instanceof AuthorizationError) {
     return { ok: false, error: error.message };
   }

@@ -743,6 +743,7 @@ export function AdminRecommendationsManager({ data }: { data: RecommendationData
 
 export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
   const [customerId, setCustomerId] = useState(data.customers[0]?.id ?? '');
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const [productSearch, setProductSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [productSort, setProductSort] = useState<ManualProductSort>('category');
@@ -791,6 +792,7 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
                 () =>
                   createManualOrderAction({
                     customerId,
+                    idempotencyKey,
                     intakeChannel: stringValue(form, 'intakeChannel') as 'PHONE' | 'WHATSAPP' | 'ADMIN_MANUAL',
                     notes: stringValue(form, 'notes'),
                     internalNote: stringValue(form, 'internalNote'),
@@ -816,6 +818,7 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
                 onChange={(event) => {
                   setCustomerId(event.target.value);
                   setItems({});
+                  setIdempotencyKey(crypto.randomUUID());
                   setProductSearch('');
                   setCategoryFilter('all');
                 }}

@@ -65,6 +65,7 @@ const mockedEnqueueOrderLifecycleWhatsApp = vi.mocked(enqueueOrderLifecycleWhats
 const mockedRevalidatePath = vi.mocked(revalidatePath);
 const mockedOrderFindUnique = vi.mocked(prisma.order.findUnique);
 const mockedOrderUpdate = vi.mocked(prisma.order.update);
+const idempotencyKey = '8f82b072-99be-45e7-b1aa-2ca4d92fc8d2';
 
 describe('admin CRM actions', () => {
   beforeEach(() => {
@@ -83,12 +84,15 @@ describe('admin CRM actions', () => {
     });
     mockedCreateSubmittedOrder.mockResolvedValue({
       orderId: 'ord-manual',
+      orderNumber: 1002,
       status: 'SUBMITTED',
       routeId: 'route-south',
+      replayed: false,
     });
 
     const result = await actions.createManualOrderAction({
       customerId: 'cust-001',
+      idempotencyKey,
       intakeChannel: 'PHONE',
       notes: 'Call before delivery',
       internalNote: 'Ordered with Shai',
@@ -101,6 +105,7 @@ describe('admin CRM actions', () => {
     });
     expect(mockedCreateSubmittedOrder).toHaveBeenCalledWith({
       customerId: 'cust-001',
+      idempotencyKey,
       items: [{ productId: 'prod-a', quantity: 3 }],
       source: 'ADMIN',
       paymentTerm: 'NET_30',
@@ -115,6 +120,7 @@ describe('admin CRM actions', () => {
 
     const result = await actions.createManualOrderAction({
       customerId: 'cust-001',
+      idempotencyKey,
       intakeChannel: 'WHATSAPP',
       items: [{ productId: 'prod-a', quantity: 3 }],
     });
@@ -154,7 +160,7 @@ describe('admin CRM actions', () => {
     });
     expect(mockedOrderUpdate).toHaveBeenCalledWith({
       where: { id: 'ord-123' },
-      data: { status: 'APPROVED' },
+      data: { status: 'APPROVED', revision: { increment: 1 } },
       select: {
         id: true,
         status: true,

@@ -13,6 +13,7 @@ export const saveDraftOrderSchema = z.object({
 
 export const submitCustomerOrderSchema = z.object({
   customerId: z.string().min(1),
+  idempotencyKey: z.string().uuid(),
   items: z.array(orderItemInputSchema).min(1),
   notes: z.string().max(1000).optional(),
   paymentTerm: z.enum(paymentTermValues),

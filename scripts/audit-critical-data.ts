@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
+import { assertNoActiveOrderDuplicates, summarizeActiveOrderDuplicates } from '../features/deployment/order-integrity-audit';
 import { prisma } from '../lib/db';
 
 async function main() {
   const includeOrders = process.argv.includes('--orders');
   const includeOrderNetSnapshots = includeOrders || process.argv.includes('--orders-net');
+  const assertOrderIntegrity = process.argv.includes('--assert-order-integrity');
   const [products, priceLists, priceListItems] = await Promise.all([
     prisma.product.findMany({ orderBy: { id: 'asc' } }),
     prisma.priceList.findMany({ orderBy: { id: 'asc' } }),
@@ -46,6 +48,17 @@ async function main() {
       },
     })
     : null;
+  const orderIdentitySnapshots = await prisma.order.findMany({
+    orderBy: [{ customerId: 'asc' }, { deliveryWindowStart: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    select: {
+      id: true,
+      orderNumber: true,
+      customerId: true,
+      deliveryWindowStart: true,
+      status: true,
+    },
+  });
+  const activeOrderDuplicates = summarizeActiveOrderDuplicates(orderIdentitySnapshots);
 
   console.log(JSON.stringify({
     products: summarize(products),
@@ -54,7 +67,13 @@ async function main() {
     ...(orderNetSnapshots ? { orderNetSnapshots: summarize(orderNetSnapshots) } : {}),
     ...(orders ? { orders: summarize(orders) } : {}),
     ...(orders ? { orderFinancialIntegrity: summarizeOrderFinancialIntegrity(orders) } : {}),
+    orderIdentitySnapshots: summarize(orderIdentitySnapshots),
+    activeOrderDuplicates,
   }, null, 2));
+
+  if (assertOrderIntegrity) {
+    assertNoActiveOrderDuplicates(activeOrderDuplicates);
+  }
 }
 
 function summarizeOrderFinancialIntegrity(orders: Array<{

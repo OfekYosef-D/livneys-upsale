@@ -1,6 +1,13 @@
-import type { OrderSource } from '@prisma/client';
+import { Prisma, type OrderSource } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import type { PaymentTermValue } from './payment-terms';
+import {
+  ActiveOrderExistsError,
+  IdempotencyKeyConflictError,
+  isRetryableOrderWriteError,
+  persistSubmittedOrder,
+  StaleOrderWriteError,
+} from './persistence';
 import { buildSubmittedOrderPayload, type OrderWriteContext } from './write';
 
 export type OrderWriteItem = {
@@ -99,6 +106,7 @@ export async function createSubmittedOrder({
   customerId,
   items,
   source,
+  idempotencyKey,
   paymentTerm,
   commercialTermsAccepted = false,
   notes,
@@ -109,13 +117,33 @@ export async function createSubmittedOrder({
   customerId: string;
   items: OrderWriteItem[];
   source: OrderSource;
+  idempotencyKey: string;
   paymentTerm: PaymentTermValue;
   commercialTermsAccepted?: boolean;
   notes?: string | null;
   internalNote?: string | null;
   replaceDraftForDeliveryWindow?: boolean;
   now?: Date;
-}): Promise<{ orderId: string; status: string; routeId: string }> {
+}): Promise<{ orderId: string; orderNumber: number; status: string; routeId: string; replayed: boolean }> {
+  const existingReplay = await prisma.order.findFirst({
+    where: {
+      idempotencyKey,
+      customerId,
+      customer: { isActive: true },
+    },
+    select: { id: true, orderNumber: true, status: true, routeId: true },
+  });
+
+  if (existingReplay?.routeId) {
+    return {
+      orderId: existingReplay.id,
+      orderNumber: existingReplay.orderNumber,
+      status: existingReplay.status,
+      routeId: existingReplay.routeId,
+      replayed: true,
+    };
+  }
+
   const context = await getOrderWriteContext(customerId);
   const payload = buildSubmittedOrderPayload({
     context,
@@ -128,78 +156,73 @@ export async function createSubmittedOrder({
     internalNote,
   });
 
-  const existingDraft = replaceDraftForDeliveryWindow
-    ? await prisma.order.findFirst({
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const persisted = await prisma.$transaction(
+        (tx) => persistSubmittedOrder(tx, {
+          payload,
+          idempotencyKey,
+          replaceDraftForDeliveryWindow,
+        }),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+
+      return {
+        orderId: persisted.order.id,
+        orderNumber: persisted.order.orderNumber,
+        status: persisted.order.status,
+        routeId: context.route.id,
+        replayed: persisted.replayed,
+      };
+    } catch (error) {
+      const isConcurrentWrite = error instanceof StaleOrderWriteError || isRetryableOrderWriteError(error);
+      if (!isConcurrentWrite) throw error;
+
+      const replayedOrder = await prisma.order.findUnique({
+        where: { idempotencyKey },
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          routeId: true,
+          customerId: true,
+          deliveryWindowStart: true,
+        },
+      });
+
+      if (replayedOrder) {
+        if (
+          replayedOrder.customerId !== customerId
+          || replayedOrder.deliveryWindowStart.getTime() !== context.route.nextDeliveryAt.getTime()
+        ) {
+          throw new IdempotencyKeyConflictError();
+        }
+
+        return {
+          orderId: replayedOrder.id,
+          orderNumber: replayedOrder.orderNumber,
+          status: replayedOrder.status,
+          routeId: replayedOrder.routeId ?? context.route.id,
+          replayed: true,
+        };
+      }
+
+      const activeOrder = await prisma.order.findFirst({
         where: {
           customerId,
-          status: 'DRAFT',
           deliveryWindowStart: context.route.nextDeliveryAt,
+          status: { not: 'CANCELLED' },
         },
-      })
-    : null;
+        select: { id: true, orderNumber: true, status: true },
+      });
 
-  const order = await prisma.order.upsert({
-    where: {
-      id: existingDraft?.id ?? '__new_submitted_order__',
-    },
-    create: {
-      ...payload.order,
-      lines: {
-        create: payload.lines.map((line) => ({
-          productId: line.productId,
-          productName: line.productName,
-          quantity: line.quantity,
-          listUnitPrice: line.listUnitPrice,
-          unitPrice: line.unitPrice,
-          lineSubtotal: line.lineSubtotal,
-          discountTotal: line.discountTotal,
-          lineTotal: line.lineTotal,
-          promotionId: line.promotionId,
-          promotionSnapshot: line.promotionSnapshot ?? undefined,
-        })),
-      },
-    },
-    update: {
-      routeId: payload.order.routeId,
-      status: payload.order.status,
-      source: payload.order.source,
-      deliveryWindowStart: payload.order.deliveryWindowStart,
-      deadlineAt: payload.order.deadlineAt,
-      submittedAt: payload.order.submittedAt,
-      notes: payload.order.notes,
-      internalNote: payload.order.internalNote,
-      subtotal: payload.order.subtotal,
-      discountTotal: payload.order.discountTotal,
-      paymentTerm: payload.order.paymentTerm,
-      paymentDiscountPercent: payload.order.paymentDiscountPercent,
-      paymentDiscountTotal: payload.order.paymentDiscountTotal,
-      total: payload.order.total,
-      vatRatePercent: payload.order.vatRatePercent,
-      vatTotal: payload.order.vatTotal,
-      totalIncludingVat: payload.order.totalIncludingVat,
-      commercialTermsVersion: payload.order.commercialTermsVersion,
-      commercialTermsAcceptedAt: payload.order.commercialTermsAcceptedAt,
-      lines: {
-        deleteMany: {},
-        create: payload.lines.map((line) => ({
-          productId: line.productId,
-          productName: line.productName,
-          quantity: line.quantity,
-          listUnitPrice: line.listUnitPrice,
-          unitPrice: line.unitPrice,
-          lineSubtotal: line.lineSubtotal,
-          discountTotal: line.discountTotal,
-          lineTotal: line.lineTotal,
-          promotionId: line.promotionId,
-          promotionSnapshot: line.promotionSnapshot ?? undefined,
-        })),
-      },
-    },
-  });
+      if (activeOrder && activeOrder.status !== 'DRAFT') {
+        throw new ActiveOrderExistsError(activeOrder.id, activeOrder.orderNumber, activeOrder.status);
+      }
 
-  return {
-    orderId: order.id,
-    status: payload.order.status,
-    routeId: context.route.id,
-  };
+      if (attempt === 3) throw error;
+    }
+  }
+
+  throw new Error('Order submission retry loop exited unexpectedly.');
 }

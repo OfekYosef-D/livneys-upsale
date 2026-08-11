@@ -750,6 +750,7 @@ export async function createManualOrderAction(input: unknown): Promise<ActionRes
       customerId: parsed.customerId,
       items: parsed.items,
       source: 'ADMIN',
+      idempotencyKey: parsed.idempotencyKey,
       paymentTerm: 'NET_30',
       notes: parsed.notes,
       internalNote,
@@ -761,7 +762,9 @@ export async function createManualOrderAction(input: unknown): Promise<ActionRes
     revalidatePath(`/admin/routes/${order.routeId}`);
     revalidatePath(`/admin/customers/${parsed.customerId}`);
     revalidatePath(`/customer/${parsed.customerId}`);
-    await enqueueOrderLifecycleSafely({ orderId: order.orderId });
+    if (!order.replayed) {
+      await enqueueOrderLifecycleSafely({ orderId: order.orderId });
+    }
     return actionOk({ orderId: order.orderId, status: order.status });
   } catch (error) {
     return actionError(error);
@@ -790,7 +793,7 @@ export async function updateOrderStatusAction(input: unknown): Promise<ActionRes
     const nextStatus = assertOrderStatusTransition(existing.status, parsed.status);
     const order = await prisma.order.update({
       where: { id: existing.id },
-      data: { status: nextStatus },
+      data: { status: nextStatus, revision: { increment: 1 } },
       select: {
         id: true,
         status: true,

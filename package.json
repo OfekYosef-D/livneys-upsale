@@ -10,6 +10,7 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:audit:critical": "tsx scripts/audit-critical-data.ts",
+    "db:audit:order-integrity": "tsx scripts/audit-critical-data.ts --orders --assert-order-integrity",
     "db:seed:demo": "prisma db seed",
     "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts"
   },
