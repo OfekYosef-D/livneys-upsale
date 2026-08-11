@@ -97,7 +97,7 @@ async function verifyAdminSecondFactor({
     try {
       if (verifyTotpCode(decryptMfaSecret(encryptedSecret), code, now)) return true;
     } catch {
-      return false;
+      // A recovery code remains usable if the encrypted TOTP secret is damaged or a key was rotated.
     }
   }
 

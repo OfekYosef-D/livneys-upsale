@@ -128,6 +128,12 @@ describe('registration actions', () => {
         status: 'PENDING',
       }),
     }));
+    expect(consumeRateLimitMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      scope: 'registration-ip', identifier: '127.0.0.1', limit: 10,
+    }));
+    expect(consumeRateLimitMock).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      scope: 'registration-account', identifier: 'dana@example.com', limit: 3,
+    }));
   });
 
   it('converts approved leads into customers and login users', async () => {

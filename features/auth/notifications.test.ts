@@ -3,16 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const userFindUnique = vi.hoisted(() => vi.fn());
 const sendEmail = vi.hoisted(() => vi.fn());
 const getEmail = vi.hoisted(() => vi.fn());
+const sendWhatsApp = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/db', () => ({ prisma: { user: { findUnique: userFindUnique } } }));
 vi.mock('@/features/notifications/email', () => ({ getEmailConfig: getEmail, sendEmailMessage: sendEmail }));
 vi.mock('@/features/notifications/config', () => ({ getWhatsAppConfig: vi.fn(), resolveWhatsAppTemplateName: vi.fn() }));
 vi.mock('@/features/notifications/phone', () => ({ normalizePhoneToE164: vi.fn(() => null) }));
-vi.mock('@/features/notifications/sender', () => ({ sendWhatsAppTemplate: vi.fn() }));
+vi.mock('@/features/notifications/sender', () => ({ sendWhatsAppTemplate: sendWhatsApp }));
 
 const { AccountAccessDeliveryError, assertAccountAccessDeliveryConfigured, sendAccountAccessNotifications } = await import('./notifications');
 
 describe('account access delivery', () => {
-  beforeEach(() => { userFindUnique.mockReset(); sendEmail.mockReset(); getEmail.mockReset(); });
+  beforeEach(() => { userFindUnique.mockReset(); sendEmail.mockReset(); getEmail.mockReset(); sendWhatsApp.mockReset(); });
 
   it('refuses account creation when live email delivery is not configured', () => {
     getEmail.mockReturnValue({ apiKey: null, from: null });
@@ -55,5 +56,23 @@ describe('account access delivery', () => {
       name: 'AccountAccessDeliveryError',
       message: expect.not.stringContaining('internal details'),
     });
+  });
+
+  it('never sends a personal access token to the company-wide WhatsApp number', async () => {
+    getEmail.mockReturnValue({ apiKey: 're_live', from: 'orders@example.com' });
+    sendEmail.mockResolvedValue({ mode: 'live', providerMessageId: 'email-1' });
+    userFindUnique.mockResolvedValue({
+      id: 'buyer-2', email: 'buyer2@example.com', name: 'Buyer Two',
+      customer: {
+        isActive: true,
+        phone: '050-0000000',
+        notificationPreference: { whatsappEnabled: true },
+      },
+    });
+
+    await expect(sendAccountAccessNotifications({
+      userId: 'buyer-2', type: 'PASSWORD_SETUP', url: 'https://example.com/setup-password?token=personal',
+    })).resolves.toMatchObject({ delivered: true, email: 'live', whatsapp: 'skipped' });
+    expect(sendWhatsApp).not.toHaveBeenCalled();
   });
 });

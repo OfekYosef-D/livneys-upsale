@@ -2,7 +2,13 @@ import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/db';
 
-type RateLimitScope = 'login-ip' | 'login-account' | 'password-reset' | 'registration';
+type RateLimitScope =
+  | 'login-ip'
+  | 'login-account'
+  | 'password-reset-ip'
+  | 'password-reset-account'
+  | 'registration-ip'
+  | 'registration-account';
 
 export class RateLimitError extends Error {
   readonly code = 'RATE_LIMITED';

@@ -126,6 +126,8 @@ npx vercel@latest env add WHATSAPP_SEND_ENABLED preview --no-sensitive
 
 Generate independent `NEXTAUTH_SECRET`, `CRON_SECRET`, and `MFA_ENCRYPTION_KEY` values for each environment. Use at least 48 random bytes for NextAuth, 32 for cron, and exactly 32 Base64-encoded random bytes for MFA encryption. Preview may use Cloudflare's documented always-pass test keys; production must use real domain-bound Turnstile keys. Verify the Resend sender before enabling account approvals: setup and reset actions deliberately refuse to report success when no live email channel exists. Set WhatsApp exactly to `false` until Meta credentials and templates are approved.
 
+Password setup and reset URLs are intentionally delivered by email only. A company-wide phone number must never receive a specific user's access token; WhatsApp account-access delivery may be enabled only after the product stores and verifies a phone number for that individual user.
+
 Deploy the feature branch as preview, use its stable branch URL for preview `NEXTAUTH_URL`, and redeploy after setting that URL. Merge only after preview checks pass. Production is deployed from `main`.
 
 ```powershell

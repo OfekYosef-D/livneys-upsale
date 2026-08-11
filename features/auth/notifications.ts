@@ -1,9 +1,6 @@
 import type { AuthTokenType } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { getEmailConfig, sendEmailMessage } from '@/features/notifications/email';
-import { getWhatsAppConfig, resolveWhatsAppTemplateName } from '@/features/notifications/config';
-import { normalizePhoneToE164 } from '@/features/notifications/phone';
-import { sendWhatsAppTemplate } from '@/features/notifications/sender';
 
 export class AccountAccessDeliveryError extends Error {
   constructor(message = 'החשבון נשמר, אך לא ניתן היה למסור את קישור הגישה. יש לנסות שליחה מחדש מכרטיס הלקוח.') {
@@ -30,7 +27,7 @@ export async function sendAccountAccessNotifications({
 }) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { customer: { include: { notificationPreference: true } } },
+    select: { email: true, name: true },
   });
   if (!user) throw new AccountAccessDeliveryError();
 
@@ -48,32 +45,6 @@ export async function sendAccountAccessNotifications({
     throw new AccountAccessDeliveryError();
   }
 
-  const customer = user.customer;
-  const phone = customer ? normalizePhoneToE164(customer.phone) : null;
-  if (!customer?.isActive || !customer.notificationPreference?.whatsappEnabled || !phone) {
-    if (emailResult.mode !== 'live') throw new AccountAccessDeliveryError();
-    return { delivered: true, email: emailResult.mode, whatsapp: 'skipped' } as const;
-  }
-
-  const config = getWhatsAppConfig();
-  const templateKey = type;
-  let whatsappResult: Awaited<ReturnType<typeof sendWhatsAppTemplate>>;
-  try {
-    whatsappResult = await sendWhatsAppTemplate({
-      to: phone,
-      templateKey,
-      templateName: resolveWhatsAppTemplateName(templateKey, config),
-      languageCode: config.templateLanguage,
-      bodyParameters: [user.name, url],
-    }, { config });
-  } catch (error) {
-    console.error('Account access WhatsApp delivery failed', { userId, type, error });
-    if (emailResult.mode === 'live') {
-      return { delivered: true, email: emailResult.mode, whatsapp: 'failed' } as const;
-    }
-    throw new AccountAccessDeliveryError();
-  }
-  const delivered = emailResult.mode === 'live' || whatsappResult.mode === 'live';
-  if (!delivered) throw new AccountAccessDeliveryError();
-  return { delivered, email: emailResult.mode, whatsapp: whatsappResult.mode } as const;
+  if (emailResult.mode !== 'live') throw new AccountAccessDeliveryError();
+  return { delivered: true, email: emailResult.mode, whatsapp: 'skipped' } as const;
 }

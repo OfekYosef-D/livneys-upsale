@@ -20,8 +20,15 @@ export async function requestPasswordResetAction(input: unknown): Promise<Action
     const parsed = forgotPasswordSchema.parse(input);
     const [ip, baseUrl] = await Promise.all([getRequestIp(), getRequestBaseUrl()]);
     await consumeRateLimit({
-      scope: 'password-reset',
-      identifier: `${ip}:${parsed.email}`,
+      scope: 'password-reset-ip',
+      identifier: ip,
+      limit: 20,
+      windowMs: 30 * 60 * 1000,
+      blockMs: 60 * 60 * 1000,
+    });
+    await consumeRateLimit({
+      scope: 'password-reset-account',
+      identifier: parsed.email,
       limit: 4,
       windowMs: 30 * 60 * 1000,
       blockMs: 60 * 60 * 1000,

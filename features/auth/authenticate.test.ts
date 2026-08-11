@@ -57,4 +57,18 @@ describe('credential authentication', () => {
     recoveryUpdateMany.mockResolvedValue({ count: 0 });
     await expect(authenticateCredentials({ email: 'admin@example.com', password: 'secret', mfaCode: 'wrong' })).resolves.toBeNull();
   });
+
+  it('falls back to a recovery code when the stored TOTP secret cannot be decrypted', async () => {
+    userFindUnique.mockResolvedValue({
+      id: 'admin-1', email: 'admin@example.com', name: 'Admin', passwordHash: 'hash', role: 'ADMIN',
+      isActive: true, sessionVersion: 2, mfaEnabled: true, mfaSecretEncrypted: 'damaged-ciphertext',
+      customerId: null, customer: null,
+    });
+    recoveryUpdateMany.mockResolvedValue({ count: 1 });
+
+    await expect(authenticateCredentials({
+      email: 'admin@example.com', password: 'secret', mfaCode: 'ABCDE-FGHIJ',
+    })).resolves.toMatchObject({ id: 'admin-1', mfaEnabled: true });
+    expect(recoveryUpdateMany).toHaveBeenCalledOnce();
+  });
 });

@@ -24,8 +24,15 @@ export async function createCompanyRegistrationAction(input: CompanyRegistration
     const parsed = companyRegistrationSchema.parse(input);
     const ip = await getRequestIp();
     await consumeRateLimit({
-      scope: 'registration',
-      identifier: `${ip}:${parsed.email}`,
+      scope: 'registration-ip',
+      identifier: ip,
+      limit: 10,
+      windowMs: 60 * 60 * 1000,
+      blockMs: 6 * 60 * 60 * 1000,
+    });
+    await consumeRateLimit({
+      scope: 'registration-account',
+      identifier: parsed.email,
       limit: 3,
       windowMs: 60 * 60 * 1000,
       blockMs: 6 * 60 * 60 * 1000,
