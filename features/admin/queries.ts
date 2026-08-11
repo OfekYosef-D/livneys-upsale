@@ -205,6 +205,7 @@ export async function getAdminOrderDetail(orderId: string) {
 
   return {
     ...mapOrderSummary(order),
+    revision: order.revision,
     notes: order.notes,
     internalNote: order.internalNote,
     customerContact: order.customer.contact,

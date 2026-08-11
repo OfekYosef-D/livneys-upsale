@@ -93,7 +93,7 @@ export function AdminOrderDetail({ order }: { order: OrderData }) {
               רישום תוספת מאושרת
             </Link>
           )}
-          <AdminOrderStatusActions orderId={order.id} status={order.status} />
+          <AdminOrderStatusActions key={`${order.id}:${order.revision}`} orderId={order.id} status={order.status} />
         </section>
       </aside>
       <div className="lg:col-span-2">
