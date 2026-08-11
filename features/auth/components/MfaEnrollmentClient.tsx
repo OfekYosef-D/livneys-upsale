@@ -21,17 +21,49 @@ export function MfaEnrollmentClient({ alreadyEnabled }: { alreadyEnabled: boolea
         </div>
       )}
       {!secret && codes.length === 0 && (
-        <button
-          disabled={pending}
-          onClick={() => startTransition(async () => {
-            const result = await startMfaEnrollmentAction({ intent: 'start' });
-            if (result.ok) { setSecret(result.data.secret); setUri(result.data.uri); setMessage(''); }
-            else setMessage(result.error);
-          })}
-          className="min-h-11 rounded-full bg-black px-5 text-sm font-black text-white disabled:bg-black/30"
-        >
-          {copy.button}
-        </button>
+        alreadyEnabled ? (
+          <form
+            className="space-y-3 rounded-xl border border-black/10 bg-black/[0.025] p-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const password = new FormData(event.currentTarget).get('password');
+              startTransition(async () => {
+                const result = await startMfaEnrollmentAction({ intent: 'start', password });
+                if (result.ok) { setSecret(result.data.secret); setUri(result.data.uri); setMessage(''); }
+                else setMessage(result.error);
+              });
+            }}
+          >
+            <div>
+              <label htmlFor="mfa-current-password" className="block text-xs font-black">אימות סיסמה לפני החלפת MFA</label>
+              <p className="mt-1 text-xs font-bold leading-5 text-black/55">הזינו את הסיסמה הנוכחית. כך ניתן לתקן או להחליף את אפליקציית האימות גם כשהגורם הקיים אינו זמין.</p>
+            </div>
+            <input
+              id="mfa-current-password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              className="h-11 w-full rounded-xl border border-black/12 bg-white px-3 text-sm font-bold outline-none focus:border-black/35 focus:ring-2 focus:ring-black/10"
+            />
+            <button disabled={pending} className="min-h-11 w-full rounded-full bg-black px-5 text-sm font-black text-white disabled:bg-black/30">
+              {pending ? 'מאמתים...' : copy.button}
+            </button>
+          </form>
+        ) : (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => startTransition(async () => {
+              const result = await startMfaEnrollmentAction({ intent: 'start' });
+              if (result.ok) { setSecret(result.data.secret); setUri(result.data.uri); setMessage(''); }
+              else setMessage(result.error);
+            })}
+            className="min-h-11 rounded-full bg-black px-5 text-sm font-black text-white disabled:bg-black/30"
+          >
+            {copy.button}
+          </button>
+        )
       )}
 
       {secret && codes.length === 0 && (

@@ -34,6 +34,7 @@ export const setCustomerUserActiveSchema = z.object({
 
 export const startMfaSchema = z.object({
   intent: z.literal('start'),
+  password: z.string().max(200).optional().default(''),
 });
 
 export const confirmMfaSchema = z.object({

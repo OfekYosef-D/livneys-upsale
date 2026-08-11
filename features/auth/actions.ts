@@ -154,8 +154,20 @@ export async function resendCustomerUserSetupAction(input: unknown): Promise<Act
 
 export async function startMfaEnrollmentAction(input: unknown): Promise<ActionResult<{ secret: string; uri: string }>> {
   try {
-    startMfaSchema.parse(input);
+    const parsed = startMfaSchema.parse(input);
     const session = await assertAdminEnrollmentAction();
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true, isActive: true, mfaEnabled: true, passwordHash: true },
+    });
+    if (!user || user.role !== 'ADMIN' || !user.isActive) throw new Error('אין הרשאה לבצע פעולה זו.');
+    if (
+      user.mfaEnabled
+      && (!parsed.password || !user.passwordHash || !(await bcrypt.compare(parsed.password, user.passwordHash)))
+    ) {
+      throw new Error('יש לאמת מחדש את הסיסמה הנוכחית לפני החלפת האימות הדו-שלבי.');
+    }
+
     const secret = generateMfaSecret();
     await prisma.user.update({
       where: { id: session.user.id },

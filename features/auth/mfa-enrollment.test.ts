@@ -10,6 +10,9 @@ const generateMfaSecret = vi.hoisted(() => vi.fn());
 const generateRecoveryCodes = vi.hoisted(() => vi.fn());
 const hashRecoveryCode = vi.hoisted(() => vi.fn());
 const verifyTotpCode = vi.hoisted(() => vi.fn());
+const comparePassword = vi.hoisted(() => vi.fn());
+
+vi.mock('bcryptjs', () => ({ default: { compare: comparePassword, hash: vi.fn() } }));
 
 vi.mock('@/lib/action-result', () => ({
   actionOk: (data: unknown) => ({ ok: true, data }),
@@ -44,6 +47,36 @@ describe('MFA re-enrollment', () => {
     assertAdminEnrollmentAction.mockResolvedValue({ user: { id: 'admin-1', email: 'admin@example.com' } });
     generateMfaSecret.mockReturnValue('NEWSECRET');
     encryptMfaSecret.mockReturnValue('encrypted-new');
+    userFindUnique.mockResolvedValue({
+      id: 'admin-1', role: 'ADMIN', isActive: true, mfaEnabled: false, passwordHash: 'password-hash',
+    });
+  });
+
+  it('requires the current password before replacing an active factor', async () => {
+    userFindUnique.mockResolvedValue({
+      id: 'admin-1', role: 'ADMIN', isActive: true, mfaEnabled: true, passwordHash: 'password-hash',
+    });
+    comparePassword.mockResolvedValue(false);
+
+    await expect(startMfaEnrollmentAction({ intent: 'start', password: 'wrong-password' })).resolves.toMatchObject({ ok: false });
+
+    expect(comparePassword).toHaveBeenCalledWith('wrong-password', 'password-hash');
+    expect(userUpdate).not.toHaveBeenCalled();
+  });
+
+  it('allows password-verified repair when the current authenticator is unavailable', async () => {
+    userFindUnique.mockResolvedValue({
+      id: 'admin-1', role: 'ADMIN', isActive: true, mfaEnabled: true, passwordHash: 'password-hash',
+    });
+    comparePassword.mockResolvedValue(true);
+    userUpdate.mockResolvedValue({});
+
+    await expect(startMfaEnrollmentAction({ intent: 'start', password: 'current-password' })).resolves.toMatchObject({ ok: true });
+
+    expect(userUpdate).toHaveBeenCalledWith({
+      where: { id: 'admin-1' },
+      data: { mfaPendingSecretEncrypted: 'encrypted-new' },
+    });
   });
 
   it('stores a replacement secret as pending without disabling the active factor', async () => {
