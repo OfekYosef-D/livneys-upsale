@@ -22,6 +22,7 @@ describe('admin MFA', () => {
     const codes = generateRecoveryCodes(8);
     expect(codes).toHaveLength(8);
     expect(new Set(codes).size).toBe(8);
-    expect(codes.every((code) => /^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code))).toBe(true);
+    expect(codes.every((code) => /^[A-F0-9]{8}-[A-F0-9]{8}$/.test(code))).toBe(true);
+    expect(codes.every((code) => code.replace('-', '').length === 16)).toBe(true);
   });
 });

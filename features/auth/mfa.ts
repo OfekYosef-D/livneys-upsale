@@ -47,8 +47,8 @@ export function decryptMfaSecret(value: string, encodedKey = process.env.MFA_ENC
 
 export function generateRecoveryCodes(count = 8): string[] {
   return Array.from({ length: count }, () => {
-    const value = randomBytes(8).toString('hex').toUpperCase().slice(0, 10);
-    return `${value.slice(0, 5)}-${value.slice(5)}`;
+    const value = randomBytes(8).toString('hex').toUpperCase();
+    return `${value.slice(0, 8)}-${value.slice(8)}`;
   });
 }
 

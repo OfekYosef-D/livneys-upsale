@@ -6,6 +6,7 @@ import { ArrowLeft, Building2, CheckCircle2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/Button';
 import { createCompanyRegistrationAction } from '@/features/registration/actions';
+import { resetTurnstileChallenge, type TurnstileHost } from '@/features/registration/turnstile';
 import { calculateVatSummary } from '@/features/orders/vat';
 import { institutionalBusinessTypes, INSTITUTIONAL_PRICING_NOTICE, MINIMUM_INSTITUTIONAL_ORDER_TOTAL, PRICES_BEFORE_VAT_LABEL } from '@/features/owner-rules/constants';
 import { brand } from '@/lib/brand';
@@ -71,6 +72,7 @@ export function CompanyRegistrationForm() {
                     setSubmitted(true);
                   } else {
                     setMessage(result.error);
+                    resetTurnstileChallenge(window as TurnstileHost);
                   }
                 });
               }}
