@@ -20,4 +20,15 @@ describe('QuantityStepper', () => {
     expect(html).toContain('enterKeyHint="done"');
     expect(html).toContain('value="12"');
   });
+
+  it('rejects a typed quantity that is not a valid order multiple', async () => {
+    const quantityModule: Record<string, unknown> = await import('./QuantityStepper');
+    const parseOrderQuantity = quantityModule.parseOrderQuantity as
+      | ((draft: string, min: number, step: number) => number | null)
+      | undefined;
+
+    expect(parseOrderQuantity?.('13', 6, 6)).toBeNull();
+    expect(parseOrderQuantity?.('24', 6, 6)).toBe(24);
+    expect(parseOrderQuantity?.('0', 6, 6)).toBe(0);
+  });
 });

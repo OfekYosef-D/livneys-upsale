@@ -2,6 +2,20 @@
 import { Minus, Plus } from 'lucide-react';
 import { useEffect, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react';
 
+export function parseOrderQuantity(draft: string, min: number, step: number): number | null {
+  const safeStep = Math.max(1, Math.floor(step));
+  const safeMin = Math.max(1, Math.floor(min));
+
+  if (!/^\d+$/.test(draft)) return null;
+
+  const quantity = Number(draft);
+  if (!Number.isSafeInteger(quantity)) return null;
+  if (quantity === 0) return 0;
+  if (quantity < safeMin || quantity % safeStep !== 0) return null;
+
+  return quantity;
+}
+
 export function QuantityStepper({
   value,
   onChange,
@@ -17,11 +31,8 @@ export function QuantityStepper({
   const safeMin = Math.max(1, Math.floor(min));
   const [draft, setDraft] = useState(String(value));
   const [isEditing, setIsEditing] = useState(false);
-  const parsedDraft = Number(draft);
-  const draftIsValid =
-    /^\d+$/.test(draft) &&
-    Number.isSafeInteger(parsedDraft) &&
-    (parsedDraft === 0 || (parsedDraft >= safeMin && parsedDraft % safeStep === 0));
+  const parsedDraft = parseOrderQuantity(draft, safeMin, safeStep);
+  const draftIsValid = parsedDraft !== null;
   const decrement = Math.max(0, value - safeStep);
   const increment = value === 0 ? Math.max(safeMin, safeStep) : value + safeStep;
 
@@ -29,16 +40,17 @@ export function QuantityStepper({
     if (!isEditing) setDraft(String(value));
   }, [isEditing, value]);
 
-  function commitDraft() {
+  function commitDraft(nextDraft: string) {
     setIsEditing(false);
+    const parsedQuantity = parseOrderQuantity(nextDraft, safeMin, safeStep);
 
-    if (!draftIsValid) {
+    if (parsedQuantity === null) {
       setDraft(String(value));
       return;
     }
 
-    onChange(parsedDraft);
-    setDraft(String(parsedDraft));
+    onChange(parsedQuantity);
+    setDraft(String(parsedQuantity));
   }
 
   function handleFocus(event: FocusEvent<HTMLInputElement>) {
@@ -54,6 +66,8 @@ export function QuantityStepper({
     if (event.key === 'Enter') event.currentTarget.blur();
     if (event.key !== 'Escape') return;
 
+    event.preventDefault();
+    event.currentTarget.value = String(value);
     setDraft(String(value));
     event.currentTarget.blur();
   }
@@ -83,7 +97,7 @@ export function QuantityStepper({
         maxLength={6}
         onChange={handleInput}
         onFocus={handleFocus}
-        onBlur={commitDraft}
+        onBlur={(event) => commitDraft(event.currentTarget.value)}
         onKeyDown={handleKeyDown}
         className={`h-full min-w-0 w-full appearance-none border-0 px-1 text-center text-base font-black tabular-nums outline-none transition focus:ring-2 focus:ring-inset focus:ring-black/25 ${
           isEditing && !draftIsValid ? 'bg-red-50 text-red-700' : 'bg-[#e6e1d8] text-black'
