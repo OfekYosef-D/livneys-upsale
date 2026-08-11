@@ -59,7 +59,10 @@ export function QuantityStepper({
   }
 
   function handleInput(event: FormEvent<HTMLInputElement>) {
-    setDraft(event.currentTarget.value.replace(/\D/g, ''));
+    const nextDraft = event.currentTarget.value.replace(/\D/g, '');
+    setDraft(nextDraft);
+    const parsedQuantity = parseOrderQuantity(nextDraft, safeMin, safeStep);
+    if (parsedQuantity !== null) onChange(parsedQuantity);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -96,7 +99,6 @@ export function QuantityStepper({
         value={draft}
         maxLength={6}
         onChange={handleInput}
-        onInput={handleInput}
         onFocus={handleFocus}
         onBlur={(event) => commitDraft(event.currentTarget.value)}
         onKeyDown={handleKeyDown}
