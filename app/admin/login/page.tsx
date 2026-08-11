@@ -1,5 +1,8 @@
-import { AdminLoginClient } from '@/features/auth/components/AdminLoginClient';
+import { redirect } from 'next/navigation';
+import { sanitizeInternalNextPath } from '@/features/auth/security';
 
-export default function AdminLoginPage() {
-  return <AdminLoginClient />;
+export default async function AdminLoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  const query = await searchParams;
+  const next = sanitizeInternalNextPath(query.next, '/admin');
+  redirect(`/login?next=${encodeURIComponent(next)}`);
 }

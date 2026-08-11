@@ -13,6 +13,7 @@ export async function getAdminDashboardData() {
         status: {
           in: activeStatuses,
         },
+        customer: { isActive: true },
       },
       include: {
         customer: true,
@@ -54,6 +55,7 @@ export async function getAdminDashboardData() {
       orderBy: { name: 'asc' },
     }),
     prisma.reminderJob.findMany({
+      where: { customer: { isActive: true } },
       include: {
         customer: true,
         route: true,
@@ -164,6 +166,10 @@ export async function getAdminCustomerDetail(customerId: string) {
         include: { product: true },
         take: 8,
       },
+      users: {
+        select: { id: true, name: true, email: true, isActive: true, passwordHash: true },
+        orderBy: { createdAt: 'asc' },
+      },
     },
   });
 
@@ -179,6 +185,13 @@ export async function getAdminCustomerDetail(customerId: string) {
     notes: customer.notes,
     routeName: customer.route.name,
     routeId: customer.route.id,
+    users: customer.users.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      isActive: user.isActive,
+      setupComplete: Boolean(user.passwordHash),
+    })),
     orders: customer.orders.map(mapOrderSummary),
     recommendations: customer.recommendations.map((recommendation) => ({
       productName: recommendation.product.name,

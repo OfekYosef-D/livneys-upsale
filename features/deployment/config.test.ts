@@ -7,6 +7,9 @@ const validEnv = {
   NEXTAUTH_SECRET: 'a'.repeat(32),
   NEXTAUTH_URL: 'https://livneys-upsale.vercel.app',
   CRON_SECRET: 'b'.repeat(16),
+  MFA_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+  TURNSTILE_SECRET_KEY: 'turnstile-secret',
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'turnstile-site',
   WHATSAPP_SEND_ENABLED: 'false',
 };
 

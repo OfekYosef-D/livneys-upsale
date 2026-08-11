@@ -13,6 +13,11 @@ enum UserRole {
   CUSTOMER
 }
 
+enum AuthTokenType {
+  PASSWORD_SETUP
+  PASSWORD_RESET
+}
+
 enum CompanyRegistrationStatus {
   PENDING
   CONTACTED
@@ -89,10 +94,17 @@ model User {
   id                       String                 @id @default(cuid())
   email                    String                 @unique
   name                     String
-  passwordHash             String
+  passwordHash             String?
   role                     UserRole
-  customerId               String?                @unique
+  isActive                 Boolean                @default(true)
+  sessionVersion           Int                    @default(1)
+  passwordChangedAt        DateTime?
+  mfaEnabled               Boolean                @default(false)
+  mfaSecretEncrypted       String?
+  customerId               String?
   customer                 Customer?              @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  authTokens               AuthToken[]
+  mfaRecoveryCodes         MfaRecoveryCode[]
   contactLogs              CustomerContactLog[]
   reviewedAdditionRequests OrderAdditionRequest[] @relation("OrderAdditionReviewer")
   orderActivities          OrderActivity[]
@@ -100,6 +112,8 @@ model User {
   updatedAt                DateTime               @updatedAt
 
   @@index([role])
+  @@index([customerId])
+  @@index([isActive])
 }
 
 model Customer {
@@ -123,7 +137,7 @@ model Customer {
   priceListId            String
   route                  Route                           @relation(fields: [routeId], references: [id])
   priceList              PriceList                       @relation(fields: [priceListId], references: [id])
-  user                   User?
+  users                  User[]
   orders                 Order[]
   additionRequests       OrderAdditionRequest[]
   recommendations        CustomerProductRecommendation[]
@@ -140,6 +154,40 @@ model Customer {
   @@index([routeId])
   @@index([priceListId])
   @@index([isActive])
+}
+
+model AuthToken {
+  id        String        @id @default(cuid())
+  userId    String
+  type      AuthTokenType
+  tokenHash String        @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@index([userId, type, expiresAt])
+}
+
+model MfaRecoveryCode {
+  id        String   @id @default(cuid())
+  userId    String
+  codeHash  String   @unique
+  usedAt    DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId, usedAt])
+}
+
+model RateLimitBucket {
+  key          String   @id
+  count        Int      @default(0)
+  windowStart  DateTime
+  blockedUntil DateTime?
+  updatedAt    DateTime @updatedAt
+
+  @@index([blockedUntil])
 }
 
 model Product {

@@ -8,16 +8,20 @@ const routeFindUniqueMock = vi.hoisted(() => vi.fn());
 const priceListFindUniqueMock = vi.hoisted(() => vi.fn());
 const customerCreateMock = vi.hoisted(() => vi.fn());
 const userCreateMock = vi.hoisted(() => vi.fn());
+const consumeRateLimitMock = vi.hoisted(() => vi.fn());
+const verifyChallengeMock = vi.hoisted(() => vi.fn(async () => true));
+const issueAuthTokenMock = vi.hoisted(() => vi.fn(async () => ({ url: 'https://example.com/setup-password?token=raw' })));
+const sendAccountAccessNotificationsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
 }));
 
-vi.mock('bcryptjs', () => ({
-  default: {
-    hash: vi.fn(async () => 'hashed-password'),
-  },
-}));
+vi.mock('../auth/captcha', () => ({ verifyRegistrationChallenge: verifyChallengeMock }));
+vi.mock('../auth/rate-limit', () => ({ consumeRateLimit: consumeRateLimitMock }));
+vi.mock('../auth/request', () => ({ getRequestIp: vi.fn(async () => '127.0.0.1'), getRequestBaseUrl: vi.fn(async () => 'https://example.com') }));
+vi.mock('../auth/tokens', () => ({ issueAuthTokenInTransaction: issueAuthTokenMock }));
+vi.mock('../auth/notifications', () => ({ sendAccountAccessNotifications: sendAccountAccessNotificationsMock }));
 
 vi.mock('@/lib/authorization', () => ({
   assertAdminAction: vi.fn(),
@@ -89,6 +93,10 @@ describe('registration actions', () => {
     mockedPriceListFindUnique.mockReset();
     mockedCustomerCreate.mockReset();
     mockedUserCreate.mockReset();
+    consumeRateLimitMock.mockClear();
+    verifyChallengeMock.mockClear();
+    issueAuthTokenMock.mockClear();
+    sendAccountAccessNotificationsMock.mockClear();
   });
 
   it('creates public company registration requests without admin auth', async () => {
@@ -143,12 +151,12 @@ describe('registration actions', () => {
       openingOrderNotes: 'Needs tasting',
     } as never);
     mockedCustomerCreate.mockResolvedValue({ id: 'cust-cafe-south' } as never);
+    mockedUserCreate.mockResolvedValue({ id: 'user-cafe-south' } as never);
 
     const result = await actions.convertRegistrationToCustomerAction({
       requestId: 'lead-1',
       routeId: 'route-south',
       priceListId: 'price-list-standard',
-      temporaryPassword: 'livneys-demo',
     });
 
     expect(result.ok).toBe(true);
@@ -166,7 +174,7 @@ describe('registration actions', () => {
     expect(mockedUserCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         email: 'dana@example.com',
-        passwordHash: 'hashed-password',
+        passwordHash: null,
         role: 'CUSTOMER',
         customerId,
       }),
@@ -177,5 +185,6 @@ describe('registration actions', () => {
         convertedCustomerId: customerId,
       }),
     }));
+    expect(issueAuthTokenMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ userId: 'user-cafe-south', type: 'PASSWORD_SETUP' }));
   });
 });

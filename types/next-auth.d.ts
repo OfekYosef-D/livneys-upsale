@@ -6,6 +6,8 @@ declare module 'next-auth' {
       id: string;
       role: 'ADMIN' | 'CUSTOMER';
       customerId: string | null;
+      sessionVersion?: number;
+      mfaEnabled?: boolean;
     } & DefaultSession['user'];
   }
 }
@@ -15,5 +17,7 @@ declare module 'next-auth/jwt' {
     id?: string;
     role?: 'ADMIN' | 'CUSTOMER';
     customerId?: string | null;
+    sessionVersion?: number;
+    mfaEnabled?: boolean;
   }
 }

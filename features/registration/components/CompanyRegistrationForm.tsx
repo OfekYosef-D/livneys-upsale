@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Script from 'next/script';
 import { ArrowLeft, Building2, CheckCircle2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/Button';
@@ -62,6 +63,8 @@ export function CompanyRegistrationForm() {
                     address: stringValue(form, 'address'),
                     deliveryNotes: stringValue(form, 'deliveryNotes'),
                     openingOrderNotes: stringValue(form, 'openingOrderNotes'),
+                    website: stringValue(form, 'website'),
+                    challengeToken: stringValue(form, 'cf-turnstile-response'),
                   });
 
                   if (result.ok) {
@@ -88,6 +91,18 @@ export function CompanyRegistrationForm() {
                   </select>
                 </label>
               </div>
+
+              <label className="absolute -left-[10000px] h-px w-px overflow-hidden" aria-hidden="true">
+                אתר
+                <input name="website" tabIndex={-1} autoComplete="off" />
+              </label>
+
+              {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (
+                <>
+                  <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" />
+                  <div className="cf-turnstile" data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY} data-language="he" />
+                </>
+              )}
 
               <Input name="address" label="כתובת העסק" required autoComplete="street-address" />
 

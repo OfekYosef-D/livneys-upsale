@@ -100,20 +100,21 @@ export async function updateCustomerAction(input: unknown): Promise<ActionResult
     await prisma.$transaction(async (tx) => {
       const existing = await tx.customer.findUnique({
         where: { id: parsed.id },
-        include: { user: true },
+        include: { users: true },
       });
 
       if (!existing) {
         throw new Error('הלקוח לא נמצא.');
       }
 
-      if (existing.user && existing.email !== parsed.email) {
+      const matchingLoginUser = existing.users.find((user) => user.email === existing.email);
+      if (matchingLoginUser && existing.email !== parsed.email) {
         if (!parsed.email) {
           throw new Error('לא ניתן להסיר אימייל מלקוח עם חשבון התחברות.');
         }
 
         await tx.user.update({
-          where: { id: existing.user.id },
+          where: { id: matchingLoginUser.id },
           data: {
             email: parsed.email,
             name: parsed.contact,
