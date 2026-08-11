@@ -33,6 +33,7 @@ describe('one-time password tokens', () => {
     expect(JSON.stringify(persisted)).not.toContain(result.rawToken);
     expect(result.url).toBe(`https://example.com/setup-password?token=${result.rawToken}`);
     expect(result.expiresAt).toEqual(new Date('2026-08-12T12:00:00.000Z'));
+    expect(updateMany).not.toHaveBeenCalled();
   });
 
   it('does not issue a token after the account has been deactivated', async () => {

@@ -57,12 +57,6 @@ export async function issueAuthTokenInTransaction(
   const rawToken = createRawAuthToken();
   const tokenHash = hashAuthToken(rawToken);
   const expiresAt = new Date(now.getTime() + tokenTtlMs[type]);
-  if (type === AuthTokenType.PASSWORD_SETUP) {
-    await tx.authToken.updateMany({
-      where: { userId, type, usedAt: null },
-      data: { usedAt: now },
-    });
-  }
   const tokenRecord = await tx.authToken.create({
     data: { userId, type, tokenHash, expiresAt, sessionVersion: user.sessionVersion },
   });

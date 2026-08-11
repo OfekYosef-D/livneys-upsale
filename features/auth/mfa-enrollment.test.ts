@@ -107,7 +107,7 @@ describe('MFA re-enrollment', () => {
     hashRecoveryCode.mockImplementation((code: string) => `hash:${code}`);
     const tx = {
       mfaRecoveryCode: { deleteMany: vi.fn(), createMany: vi.fn() },
-      user: { update: vi.fn() },
+      user: { updateMany: vi.fn(async () => ({ count: 1 })) },
     };
     transaction.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
 
@@ -122,8 +122,8 @@ describe('MFA re-enrollment', () => {
     expect(consumeRateLimit).toHaveBeenNthCalledWith(2, expect.objectContaining({
       scope: 'mfa-replacement-account', identifier: 'admin-1',
     }));
-    expect(tx.user.update).toHaveBeenCalledWith({
-      where: { id: 'admin-1' },
+    expect(tx.user.updateMany).toHaveBeenCalledWith({
+      where: { id: 'admin-1', mfaPendingSecretEncrypted: 'encrypted-new' },
       data: {
         mfaEnabled: true,
         mfaSecretEncrypted: 'encrypted-new',
@@ -131,5 +131,25 @@ describe('MFA re-enrollment', () => {
         sessionVersion: { increment: 1 },
       },
     });
+  });
+
+  it('rejects a stale confirmation without replacing the active factor or recovery codes', async () => {
+    userFindUnique.mockResolvedValue({ id: 'admin-1', mfaPendingSecretEncrypted: 'encrypted-old' });
+    decryptMfaSecret.mockReturnValue('OLDSECRET');
+    verifyTotpCode.mockReturnValue(true);
+    generateRecoveryCodes.mockReturnValue(['recover-stale']);
+    const tx = {
+      mfaRecoveryCode: { deleteMany: vi.fn(), createMany: vi.fn() },
+      user: { updateMany: vi.fn(async () => ({ count: 0 })) },
+    };
+    transaction.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
+
+    await expect(confirmMfaEnrollmentAction({ code: '123456' })).resolves.toMatchObject({ ok: false });
+
+    expect(tx.user.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'admin-1', mfaPendingSecretEncrypted: 'encrypted-old' },
+    }));
+    expect(tx.mfaRecoveryCode.deleteMany).not.toHaveBeenCalled();
+    expect(tx.mfaRecoveryCode.createMany).not.toHaveBeenCalled();
   });
 });

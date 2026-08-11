@@ -202,18 +202,20 @@ export async function confirmMfaEnrollmentAction(input: unknown): Promise<Action
 
     const recoveryCodes = generateRecoveryCodes();
     await prisma.$transaction(async (tx) => {
-      await tx.mfaRecoveryCode.deleteMany({ where: { userId: user.id } });
-      await tx.mfaRecoveryCode.createMany({
-        data: recoveryCodes.map((code) => ({ userId: user.id, codeHash: hashRecoveryCode(code) })),
-      });
-      await tx.user.update({
-        where: { id: user.id },
+      const claimed = await tx.user.updateMany({
+        where: { id: user.id, mfaPendingSecretEncrypted: user.mfaPendingSecretEncrypted },
         data: {
           mfaEnabled: true,
           mfaSecretEncrypted: user.mfaPendingSecretEncrypted,
           mfaPendingSecretEncrypted: null,
           sessionVersion: { increment: 1 },
         },
+      });
+      if (claimed.count !== 1) throw new Error('יש להתחיל מחדש את הגדרת האימות הדו-שלבי.');
+
+      await tx.mfaRecoveryCode.deleteMany({ where: { userId: user.id } });
+      await tx.mfaRecoveryCode.createMany({
+        data: recoveryCodes.map((code) => ({ userId: user.id, codeHash: hashRecoveryCode(code) })),
       });
     });
     return actionOk({ recoveryCodes });
