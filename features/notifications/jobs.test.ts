@@ -33,8 +33,13 @@ vi.mock('./sender', () => ({
   PermanentWhatsAppError: class PermanentWhatsAppError extends Error {},
 }));
 
+vi.mock('./email', () => ({
+  sendEmailMessage: vi.fn(),
+}));
+
 const { prisma } = await import('@/lib/db');
 const { sendWhatsAppTemplate, PermanentWhatsAppError } = await import('./sender');
+const { sendEmailMessage } = await import('./email');
 
 const mockedOrderFindUnique = vi.mocked(prisma.order.findUnique);
 const mockedNotificationJobUpsert = vi.mocked(prisma.notificationJob.upsert);
@@ -43,6 +48,7 @@ const mockedNotificationJobUpdateMany = vi.mocked(prisma.notificationJob.updateM
 const mockedNotificationJobUpdate = vi.mocked(prisma.notificationJob.update);
 const mockedNotificationEventCreate = vi.mocked(prisma.notificationEvent.create);
 const mockedSendWhatsAppTemplate = vi.mocked(sendWhatsAppTemplate);
+const mockedSendEmailMessage = vi.mocked(sendEmailMessage);
 
 describe('notification jobs', () => {
   beforeEach(() => {
@@ -53,6 +59,7 @@ describe('notification jobs', () => {
     mockedNotificationJobUpdate.mockReset();
     mockedNotificationEventCreate.mockReset();
     mockedSendWhatsAppTemplate.mockReset();
+    mockedSendEmailMessage.mockReset();
   });
 
   it('queues order lifecycle WhatsApp jobs for eligible customers in dry-run mode', async () => {
@@ -221,6 +228,44 @@ describe('notification jobs', () => {
         status: 'SENT',
         dryRun: true,
         message: 'Preview message',
+      }),
+    });
+  });
+
+  it('processes email jobs through Resend and records the email channel', async () => {
+    const now = new Date('2026-07-01T10:00:00.000Z');
+    mockedNotificationJobUpdateMany.mockResolvedValue({ count: 1 } as never);
+    mockedNotificationJobFindUnique.mockResolvedValue({
+      id: 'job-email-1',
+      customerId: 'cust-001',
+      reminderJobId: null,
+      channel: 'EMAIL',
+      templateKey: 'ORDER_ADDITION_APPROVED',
+      payload: {
+        to: 'client@example.com',
+        subject: 'עדכון להזמנה #1042',
+        text: 'בקשת התוספת אושרה.',
+      },
+      message: 'בקשת התוספת אושרה.',
+      attempts: 1,
+      maxAttempts: 3,
+    } as never);
+    mockedSendEmailMessage.mockResolvedValue({ mode: 'live', providerMessageId: 'email-001' });
+
+    const result = await processNotificationJob('job-email-1', { now });
+
+    expect(result).toEqual({ processed: true, status: 'SENT' });
+    expect(mockedSendEmailMessage).toHaveBeenCalledWith({
+      to: 'client@example.com',
+      subject: 'עדכון להזמנה #1042',
+      text: 'בקשת התוספת אושרה.',
+    });
+    expect(mockedSendWhatsAppTemplate).not.toHaveBeenCalled();
+    expect(mockedNotificationEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        channel: 'EMAIL',
+        providerMessageId: 'email-001',
+        dryRun: false,
       }),
     });
   });

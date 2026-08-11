@@ -205,6 +205,28 @@ describe('admin CRM actions', () => {
     expect(mockedOrderUpdate).not.toHaveBeenCalled();
   });
 
+  it('blocks packing while an addition request is pending', async () => {
+    mockedAssertAdminAction.mockResolvedValue({
+      user: { id: 'admin', role: 'ADMIN', customerId: null },
+      expires: '2026-06-27T00:00:00.000Z',
+    });
+    mockedOrderFindUnique.mockResolvedValue({
+      id: 'ord-123',
+      status: 'APPROVED',
+      customerId: 'cust-001',
+      routeId: 'route-south',
+      additionRequests: [{ id: 'request-001' }],
+    } as never);
+
+    const result = await actions.updateOrderStatusAction({ orderId: 'ord-123', status: 'PACKED' });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'יש לאשר או לדחות את בקשת התוספת לפני אריזת ההזמנה.',
+    });
+    expect(mockedOrderUpdate).not.toHaveBeenCalled();
+  });
+
   it('rejects order status updates before any database read when the session is not admin', async () => {
     mockedAssertAdminAction.mockRejectedValue(new Error('Unauthorized'));
 
