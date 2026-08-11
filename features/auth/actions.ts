@@ -8,7 +8,7 @@ import { prisma } from '@/lib/db';
 import { confirmMfaSchema, forgotPasswordSchema, inviteCustomerUserSchema, passwordTokenSchema, setCustomerUserActiveSchema, startMfaSchema } from './schema';
 import { getRequestBaseUrl, getRequestIp } from './request';
 import { consumeRateLimit } from './rate-limit';
-import { consumePasswordToken, issueAuthToken, issueAuthTokenInTransaction } from './tokens';
+import { assertPasswordTokenUsable, consumePasswordToken, issueAuthToken, issueAuthTokenInTransaction } from './tokens';
 import { assertAccountAccessDeliveryConfigured, sendAccountAccessNotifications } from './notifications';
 import { encryptMfaSecret, generateMfaSecret, generateRecoveryCodes, hashRecoveryCode, verifyTotpCode } from './mfa';
 
@@ -55,10 +55,11 @@ export async function requestPasswordResetAction(input: unknown): Promise<Action
 export async function setPasswordWithTokenAction(input: unknown): Promise<ActionResult<{ redirectTo: string }>> {
   try {
     const parsed = passwordTokenSchema.parse(input);
-    const passwordHash = await bcrypt.hash(parsed.password, 12);
     const tokenType = typeof input === 'object' && input && 'type' in input && input.type === 'setup'
       ? AuthTokenType.PASSWORD_SETUP
       : AuthTokenType.PASSWORD_RESET;
+    await assertPasswordTokenUsable({ token: parsed.token, type: tokenType });
+    const passwordHash = await bcrypt.hash(parsed.password, 12);
     const identity = await consumePasswordToken({
       token: parsed.token,
       type: tokenType,

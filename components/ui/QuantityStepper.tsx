@@ -1,6 +1,6 @@
 'use client';
 import { Minus, Plus } from 'lucide-react';
-import { useEffect, useState, type FocusEvent, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type FocusEvent, type FormEvent, type KeyboardEvent } from 'react';
 
 export function parseOrderQuantity(draft: string, min: number, step: number): number | null {
   const safeStep = Math.max(1, Math.floor(step));
@@ -14,6 +14,10 @@ export function parseOrderQuantity(draft: string, min: number, step: number): nu
   if (quantity < safeMin || quantity % safeStep !== 0) return null;
 
   return quantity;
+}
+
+export function finalizeOrderQuantity(draft: string, min: number, step: number, fallbackValue: number): number {
+  return parseOrderQuantity(draft, min, step) ?? fallbackValue;
 }
 
 export function QuantityStepper({
@@ -31,6 +35,7 @@ export function QuantityStepper({
   const safeMin = Math.max(1, Math.floor(min));
   const [draft, setDraft] = useState(String(value));
   const [isEditing, setIsEditing] = useState(false);
+  const editStartValue = useRef(value);
   const parsedDraft = parseOrderQuantity(draft, safeMin, safeStep);
   const draftIsValid = parsedDraft !== null;
   const decrement = Math.max(0, value - safeStep);
@@ -45,7 +50,8 @@ export function QuantityStepper({
     const parsedQuantity = parseOrderQuantity(nextDraft, safeMin, safeStep);
 
     if (parsedQuantity === null) {
-      setDraft(String(value));
+      onChange(editStartValue.current);
+      setDraft(String(editStartValue.current));
       return;
     }
 
@@ -54,6 +60,7 @@ export function QuantityStepper({
   }
 
   function handleFocus(event: FocusEvent<HTMLInputElement>) {
+    editStartValue.current = value;
     setIsEditing(true);
     event.currentTarget.select();
   }
@@ -70,8 +77,9 @@ export function QuantityStepper({
     if (event.key !== 'Escape') return;
 
     event.preventDefault();
-    event.currentTarget.value = String(value);
-    setDraft(String(value));
+    onChange(editStartValue.current);
+    event.currentTarget.value = String(editStartValue.current);
+    setDraft(String(editStartValue.current));
     event.currentTarget.blur();
   }
 

@@ -27,8 +27,15 @@ type AdminUserClient = {
   findUnique(args: { where: { email: string }; select: { role: true; customerId: true } }): Promise<{ role: string; customerId: string | null } | null>;
   upsert(args: {
     where: { email: string };
-    create: { email: string; name: string; passwordHash: string; role: 'ADMIN'; customerId: null };
-    update: { name: string; passwordHash: string; role: 'ADMIN'; customerId: null };
+    create: { email: string; name: string; passwordHash: string; passwordChangedAt: Date; role: 'ADMIN'; customerId: null };
+    update: {
+      name: string;
+      passwordHash: string;
+      passwordChangedAt: Date;
+      sessionVersion: { increment: 1 };
+      role: 'ADMIN';
+      customerId: null;
+    };
     select: { id: true; email: true };
   }): Promise<{ id: string; email: string }>;
 };
@@ -37,7 +44,11 @@ export function parseBootstrapAdminInput(input: BootstrapAdminInput): ParsedBoot
   return bootstrapAdminSchema.parse(input);
 }
 
-export async function bootstrapAdmin(input: BootstrapAdminInput, users: AdminUserClient) {
+export async function bootstrapAdmin(
+  input: BootstrapAdminInput,
+  users: AdminUserClient,
+  { now = new Date() }: { now?: Date } = {},
+) {
   const parsed = parseBootstrapAdminInput(input);
   const existing = await users.findUnique({
     where: { email: parsed.email },
@@ -55,12 +66,15 @@ export async function bootstrapAdmin(input: BootstrapAdminInput, users: AdminUse
       email: parsed.email,
       name: parsed.name,
       passwordHash,
+      passwordChangedAt: now,
       role: 'ADMIN',
       customerId: null,
     },
     update: {
       name: parsed.name,
       passwordHash,
+      passwordChangedAt: now,
+      sessionVersion: { increment: 1 },
       role: 'ADMIN',
       customerId: null,
     },

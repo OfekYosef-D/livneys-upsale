@@ -99,6 +99,31 @@ export async function consumePasswordToken({
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
+export async function assertPasswordTokenUsable({
+  token,
+  type,
+  now = new Date(),
+}: {
+  token: string;
+  type: AuthTokenType;
+  now?: Date;
+}) {
+  const record = await prisma.authToken.findUnique({
+    where: { tokenHash: hashAuthToken(token) },
+    include: { user: { include: { customer: true } } },
+  });
+  if (
+    !record
+    || record.type !== type
+    || record.usedAt
+    || record.expiresAt <= now
+    || !record.user.isActive
+    || (record.user.role === 'CUSTOMER' && !record.user.customer?.isActive)
+  ) {
+    throw new InvalidAuthTokenError();
+  }
+}
+
 export class InvalidAuthTokenError extends Error {
   readonly code = 'INVALID_TOKEN';
 

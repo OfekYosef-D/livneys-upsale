@@ -24,6 +24,7 @@ describe('production admin bootstrap', () => {
     const findUnique = vi.fn(async () => null);
     const upsert = vi.fn(async () => ({ id: 'admin-1', email: 'owner@livneys.co.il' }));
 
+    const now = new Date('2026-08-11T19:00:00.000Z');
     const result = await bootstrapAdmin(
       {
         email: 'owner@livneys.co.il',
@@ -31,6 +32,7 @@ describe('production admin bootstrap', () => {
         password: 'Strong-Admin-Password-2026!',
       },
       { findUnique, upsert },
+      { now },
     );
 
     expect(result).toEqual({ id: 'admin-1', email: 'owner@livneys.co.il' });
@@ -38,7 +40,9 @@ describe('production admin bootstrap', () => {
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { email: 'owner@livneys.co.il' },
       create: expect.objectContaining({ role: 'ADMIN', customerId: null }),
-      update: expect.objectContaining({ role: 'ADMIN', customerId: null }),
+      update: expect.objectContaining({
+        role: 'ADMIN', customerId: null, passwordChangedAt: now, sessionVersion: { increment: 1 },
+      }),
     }));
   });
 

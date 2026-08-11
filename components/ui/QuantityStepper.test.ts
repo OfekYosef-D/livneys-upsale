@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseOrderQuantity } from './QuantityStepper';
+import { finalizeOrderQuantity, parseOrderQuantity } from './QuantityStepper';
 
 describe('editable order quantity', () => {
   it('accepts zero and valid case-size multiples typed from a keyboard', () => {
@@ -12,5 +12,10 @@ describe('editable order quantity', () => {
     expect(parseOrderQuantity('2.5', 1, 1)).toBeNull();
     expect(parseOrderQuantity('3', 6, 6)).toBeNull();
     expect(parseOrderQuantity('7', 6, 6)).toBeNull();
+  });
+
+  it('restores the pre-edit quantity when a partially valid draft ends invalid', () => {
+    expect(finalizeOrderQuantity('67', 6, 6, 24)).toBe(24);
+    expect(finalizeOrderQuantity('66', 6, 6, 24)).toBe(66);
   });
 });

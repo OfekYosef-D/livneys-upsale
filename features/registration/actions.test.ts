@@ -136,6 +136,22 @@ describe('registration actions', () => {
     }));
   });
 
+  it('does not consume the victim account bucket before CAPTCHA succeeds', async () => {
+    verifyChallengeMock.mockResolvedValueOnce(false);
+
+    const result = await actions.createCompanyRegistrationAction({
+      businessName: 'Blocked Bot', invoiceName: 'Blocked Bot Ltd', contactName: 'Bot',
+      phone: '050-1111111', email: 'victim@example.com', accountingContactName: '', accountingEmail: '',
+      accountingPhone: '', businessType: 'Cafe', address: 'Nowhere', deliveryNotes: '', openingOrderNotes: '',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(consumeRateLimitMock).toHaveBeenCalledOnce();
+    expect(consumeRateLimitMock).toHaveBeenCalledWith(expect.objectContaining({
+      scope: 'registration-ip', identifier: '127.0.0.1',
+    }));
+  });
+
   it('converts approved leads into customers and login users', async () => {
     mockedAssertAdminAction.mockResolvedValue({
       user: { id: 'admin', role: 'ADMIN', customerId: null },

@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const userFindUnique = vi.hoisted(() => vi.fn());
 const consumeRateLimit = vi.hoisted(() => vi.fn());
 const compare = vi.hoisted(() => vi.fn());
+const hash = vi.hoisted(() => vi.fn());
+const assertPasswordTokenUsable = vi.hoisted(() => vi.fn());
 
-vi.mock('bcryptjs', () => ({ default: { compare, hash: vi.fn() } }));
+vi.mock('bcryptjs', () => ({ default: { compare, hash } }));
 vi.mock('@/lib/action-result', () => ({
   actionOk: (data: unknown) => ({ ok: true, data }),
   actionError: (error: unknown) => ({ ok: false, error: error instanceof Error ? error.message : 'Unexpected error' }),
@@ -17,6 +19,7 @@ vi.mock('./request', () => ({
 }));
 vi.mock('./rate-limit', () => ({ consumeRateLimit }));
 vi.mock('./tokens', () => ({
+  assertPasswordTokenUsable,
   consumePasswordToken: vi.fn(),
   issueAuthToken: vi.fn(),
   issueAuthTokenInTransaction: vi.fn(),
@@ -37,6 +40,8 @@ describe('password reset actions', () => {
     userFindUnique.mockReset();
     consumeRateLimit.mockReset();
     compare.mockReset();
+    hash.mockReset();
+    assertPasswordTokenUsable.mockReset();
     userFindUnique.mockResolvedValue(null);
     compare.mockResolvedValue(false);
   });
@@ -50,5 +55,18 @@ describe('password reset actions', () => {
     expect(consumeRateLimit).toHaveBeenNthCalledWith(2, expect.objectContaining({
       scope: 'password-reset-account', identifier: 'buyer@example.com', limit: 4,
     }));
+  });
+
+  it('rejects an unusable token before running the expensive password hash', async () => {
+    assertPasswordTokenUsable.mockRejectedValueOnce(new Error('invalid token'));
+
+    const { setPasswordWithTokenAction } = await import('./actions');
+    await expect(setPasswordWithTokenAction({
+      token: 'x'.repeat(64),
+      password: 'Strong-New-Password-2026!',
+      passwordConfirmation: 'Strong-New-Password-2026!',
+      type: 'reset',
+    })).resolves.toEqual({ ok: false, error: 'invalid token' });
+    expect(hash).not.toHaveBeenCalled();
   });
 });

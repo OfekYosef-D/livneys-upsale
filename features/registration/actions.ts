@@ -30,6 +30,12 @@ export async function createCompanyRegistrationAction(input: CompanyRegistration
       windowMs: 60 * 60 * 1000,
       blockMs: 6 * 60 * 60 * 1000,
     });
+    const challengeValid = await verifyRegistrationChallenge({
+      token: parsed.challengeToken,
+      honeypot: parsed.website,
+      ip,
+    });
+    if (!challengeValid) throw new Error('לא ניתן לאמת את הבקשה. נסו שוב.');
     await consumeRateLimit({
       scope: 'registration-account',
       identifier: parsed.email,
@@ -37,12 +43,6 @@ export async function createCompanyRegistrationAction(input: CompanyRegistration
       windowMs: 60 * 60 * 1000,
       blockMs: 6 * 60 * 60 * 1000,
     });
-    const challengeValid = await verifyRegistrationChallenge({
-      token: parsed.challengeToken,
-      honeypot: parsed.website,
-      ip,
-    });
-    if (!challengeValid) throw new Error('לא ניתן לאמת את הבקשה. נסו שוב.');
     const { website: _website, challengeToken: _challengeToken, ...registration } = parsed;
 
     const request = await prisma.companyRegistrationRequest.create({
