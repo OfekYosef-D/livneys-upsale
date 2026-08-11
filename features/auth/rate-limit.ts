@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/db';
 
+type RateLimitScope = 'login-ip' | 'login-account' | 'password-reset' | 'registration';
+
 export class RateLimitError extends Error {
   readonly code = 'RATE_LIMITED';
 
@@ -19,7 +21,7 @@ export async function consumeRateLimit({
   blockMs = windowMs,
   now = new Date(),
 }: {
-  scope: 'login' | 'password-reset' | 'registration';
+  scope: RateLimitScope;
   identifier: string;
   limit: number;
   windowMs: number;
@@ -55,7 +57,7 @@ export async function consumeRateLimit({
   return { key, remaining: Math.max(0, limit - result.count) };
 }
 
-export async function clearRateLimit(scope: 'login' | 'password-reset' | 'registration', identifier: string) {
+export async function clearRateLimit(scope: RateLimitScope, identifier: string) {
   const key = `${scope}:${createHash('sha256').update(identifier.toLowerCase()).digest('hex')}`;
   await prisma.rateLimitBucket.deleteMany({ where: { key } });
 }

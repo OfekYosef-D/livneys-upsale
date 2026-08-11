@@ -25,10 +25,17 @@ export async function authenticateCredentials(
   if (!parsed.success) return null;
 
   const email = parsed.data.email.toLowerCase();
-  const rateIdentifier = `${ip}:${email}`;
   await consumeRateLimit({
-    scope: 'login',
-    identifier: rateIdentifier,
+    scope: 'login-ip',
+    identifier: ip,
+    limit: 40,
+    windowMs: 15 * 60 * 1000,
+    blockMs: 30 * 60 * 1000,
+    now,
+  });
+  await consumeRateLimit({
+    scope: 'login-account',
+    identifier: email,
     limit: 8,
     windowMs: 15 * 60 * 1000,
     blockMs: 30 * 60 * 1000,
@@ -59,7 +66,10 @@ export async function authenticateCredentials(
     if (!secondFactorValid) return null;
   }
 
-  await clearRateLimit('login', rateIdentifier);
+  await Promise.all([
+    clearRateLimit('login-ip', ip),
+    clearRateLimit('login-account', email),
+  ]);
   return {
     id: user.id,
     email: user.email,

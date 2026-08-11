@@ -90,7 +90,11 @@ export async function inviteCustomerUserAction(input: unknown): Promise<ActionRe
       });
       return { user, token };
     });
-    await notifySafely(created.user.id, AuthTokenType.PASSWORD_SETUP, created.token.url);
+    await sendAccountAccessNotifications({
+      userId: created.user.id,
+      type: AuthTokenType.PASSWORD_SETUP,
+      url: created.token.url,
+    });
     return actionOk({ userId: created.user.id });
   } catch (error) {
     return actionError(error);
@@ -126,7 +130,11 @@ export async function resendCustomerUserSetupAction(input: unknown): Promise<Act
       type: AuthTokenType.PASSWORD_SETUP,
       baseUrl: await getRequestBaseUrl(),
     });
-    await notifySafely(user.id, AuthTokenType.PASSWORD_SETUP, token.url);
+    await sendAccountAccessNotifications({
+      userId: user.id,
+      type: AuthTokenType.PASSWORD_SETUP,
+      url: token.url,
+    });
     return actionOk({ userId: user.id });
   } catch (error) {
     return actionError(error);

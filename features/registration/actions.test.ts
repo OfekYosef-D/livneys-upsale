@@ -190,4 +190,27 @@ describe('registration actions', () => {
     }));
     expect(issueAuthTokenMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ userId: 'user-cafe-south', type: 'PASSWORD_SETUP' }));
   });
+
+  it('does not report a successful conversion when the setup link was not delivered', async () => {
+    mockedAssertAdminAction.mockResolvedValue({
+      user: { id: 'admin', role: 'ADMIN', customerId: null },
+      expires: '2026-07-01T00:00:00.000Z',
+    });
+    mockedRouteFindUnique.mockResolvedValue({ id: 'route-south', isActive: true } as never);
+    mockedPriceListFindUnique.mockResolvedValue({ id: 'price-list-standard' } as never);
+    mockedRegistrationFindUnique.mockResolvedValue({
+      id: 'lead-2', status: 'PENDING', businessName: 'Cafe North', invoiceName: 'Cafe North Ltd',
+      contactName: 'Noa', phone: '050-3333333', email: 'noa@example.com', accountingContactName: '',
+      accountingEmail: '', accountingPhone: '', businessType: 'Cafe', address: 'North 1',
+      deliveryNotes: '', openingOrderNotes: '',
+    } as never);
+    mockedUserCreate.mockResolvedValue({ id: 'user-cafe-north' } as never);
+    sendAccountAccessNotificationsMock.mockRejectedValueOnce(new Error('provider failure'));
+
+    const result = await actions.convertRegistrationToCustomerAction({
+      requestId: 'lead-2', routeId: 'route-south', priceListId: 'price-list-standard',
+    });
+
+    expect(result).toEqual({ ok: false, error: 'provider failure' });
+  });
 });

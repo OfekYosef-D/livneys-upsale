@@ -149,15 +149,11 @@ export async function convertRegistrationToCustomerAction(input: ConvertRegistra
       });
       return { customerId: nextCustomerId, userId: user.id, setupUrl: setupToken.url };
     });
-    try {
-      await sendAccountAccessNotifications({
-        userId: converted.userId,
-        type: AuthTokenType.PASSWORD_SETUP,
-        url: converted.setupUrl,
-      });
-    } catch (error) {
-      console.error('Failed to send account setup notification', { userId: converted.userId, error });
-    }
+    await sendAccountAccessNotifications({
+      userId: converted.userId,
+      type: AuthTokenType.PASSWORD_SETUP,
+      url: converted.setupUrl,
+    });
 
     const customerId = converted.customerId;
 

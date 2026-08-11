@@ -42,4 +42,18 @@ describe('account access delivery', () => {
       userId: 'admin-1', type: 'PASSWORD_RESET', url: 'https://example.com/reset-password?token=raw',
     })).resolves.toMatchObject({ delivered: true, email: 'live' });
   });
+
+  it('surfaces a safe retryable error when the live provider rejects delivery', async () => {
+    getEmail.mockReturnValue({ apiKey: 're_live', from: 'orders@example.com' });
+    sendEmail.mockRejectedValue(new Error('provider response with internal details'));
+    userFindUnique.mockResolvedValue({
+      id: 'admin-1', email: 'admin@example.com', name: 'Admin', customer: null,
+    });
+    await expect(sendAccountAccessNotifications({
+      userId: 'admin-1', type: 'PASSWORD_RESET', url: 'https://example.com/reset-password?token=raw',
+    })).rejects.toMatchObject({
+      name: 'AccountAccessDeliveryError',
+      message: expect.not.stringContaining('internal details'),
+    });
+  });
 });

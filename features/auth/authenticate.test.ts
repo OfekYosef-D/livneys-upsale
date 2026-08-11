@@ -24,7 +24,10 @@ describe('credential authentication', () => {
       customerId: 'cust-1', customer: { isActive: true },
     });
     await expect(authenticateCredentials({ email: 'BUYER@example.com', password: 'secret' }, { ip: '1.2.3.4' })).resolves.toMatchObject({ id: 'user-1', sessionVersion: 3 });
-    expect(clear).toHaveBeenCalledWith('login', '1.2.3.4:buyer@example.com');
+    expect(consume).toHaveBeenNthCalledWith(1, expect.objectContaining({ scope: 'login-ip', identifier: '1.2.3.4', limit: 40 }));
+    expect(consume).toHaveBeenNthCalledWith(2, expect.objectContaining({ scope: 'login-account', identifier: 'buyer@example.com', limit: 8 }));
+    expect(clear).toHaveBeenCalledWith('login-ip', '1.2.3.4');
+    expect(clear).toHaveBeenCalledWith('login-account', 'buyer@example.com');
   });
 
   it('performs a dummy password comparison for unknown accounts and returns the same failure', async () => {
