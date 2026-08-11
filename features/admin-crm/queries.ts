@@ -5,7 +5,10 @@ export async function getCustomerManagementData() {
   const [customers, routes, priceLists] = await Promise.all([
     prisma.customer.findMany({
       where: {
-        NOT: { email: { endsWith: '@livneys.local', mode: 'insensitive' } },
+        OR: [
+          { email: null },
+          { NOT: { email: { endsWith: '@livneys.local', mode: 'insensitive' } } },
+        ],
       },
       include: {
         route: true,
