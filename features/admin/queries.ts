@@ -194,6 +194,10 @@ export async function getAdminOrderDetail(orderId: string) {
       customer: true,
       route: true,
       lines: true,
+      additionRequests: {
+        include: { lines: true, reviewedBy: { select: { name: true } } },
+        orderBy: [{ submittedAt: 'desc' }, { createdAt: 'desc' }],
+      },
     },
   });
 
@@ -215,6 +219,29 @@ export async function getAdminOrderDetail(orderId: string) {
       discountTotal: Number(line.discountTotal),
       lineTotal: Number(line.lineTotal),
       promotionLabel: getPromotionLabel(line.promotionSnapshot),
+    })),
+    additionRequests: order.additionRequests.map((request) => ({
+      id: request.id,
+      status: request.status,
+      rejectionReason: request.rejectionReason,
+      submittedAt: request.submittedAt.toISOString(),
+      reviewedAt: request.reviewedAt?.toISOString() ?? null,
+      reviewedByName: request.reviewedBy?.name ?? null,
+      subtotal: Number(request.subtotal),
+      discountTotal: Number(request.discountTotal),
+      paymentDiscountPercent: Number(request.paymentDiscountPercent),
+      paymentDiscountTotal: Number(request.paymentDiscountTotal),
+      total: Number(request.total),
+      vatRatePercent: Number(request.vatRatePercent),
+      vatTotal: Number(request.vatTotal),
+      totalIncludingVat: Number(request.totalIncludingVat),
+      lines: request.lines.map((line) => ({
+        id: line.id,
+        productName: line.productName,
+        quantity: line.quantity,
+        unitPrice: Number(line.unitPrice),
+        lineTotal: Number(line.lineTotal),
+      })),
     })),
   };
 }

@@ -8,6 +8,7 @@ import {
   type WhatsAppTemplateKey,
 } from './config';
 import { normalizePhoneToE164 } from './phone';
+import { sendEmailMessage } from './email';
 import { PermanentWhatsAppError, sendWhatsAppTemplate, type WhatsAppTemplateBodyParameter } from './sender';
 import {
   buildOrderTemplatePayload,
@@ -32,6 +33,12 @@ type NotificationJobPayload = {
   to: string;
   languageCode: string;
   bodyParameters: WhatsAppTemplateBodyParameter[];
+};
+
+type EmailNotificationJobPayload = {
+  to: string;
+  subject: string;
+  text: string;
 };
 
 export type ProcessNotificationJobResult =
@@ -162,17 +169,17 @@ export async function processNotificationJob(
   }
 
   try {
-    const payload = parseNotificationJobPayload(job.payload);
-    const result = await sendWhatsAppTemplate(
-      {
-        to: payload.to,
-        templateKey: job.templateKey as WhatsAppTemplateKey,
-        templateName: job.templateName ?? resolveWhatsAppTemplateName(job.templateKey as WhatsAppTemplateKey, config),
-        languageCode: payload.languageCode,
-        bodyParameters: payload.bodyParameters,
-      },
-      { config },
-    );
+    const channel = job.channel === 'EMAIL' ? 'EMAIL' : 'WHATSAPP';
+    const result = channel === 'EMAIL'
+      ? await sendEmailMessage(parseEmailNotificationJobPayload(job.payload))
+      : await sendWhatsAppTemplate(
+        {
+          ...parseNotificationJobPayload(job.payload),
+          templateKey: job.templateKey as WhatsAppTemplateKey,
+          templateName: job.templateName ?? resolveWhatsAppTemplateName(job.templateKey as WhatsAppTemplateKey, config),
+        },
+        { config },
+      );
     const dryRun = result.mode === 'dry-run';
 
     await prisma.notificationJob.update({
@@ -187,7 +194,7 @@ export async function processNotificationJob(
       },
     });
 
-    if (job.reminderJobId) {
+    if (job.reminderJobId && channel === 'WHATSAPP') {
       await prisma.reminderJob.update({
         where: { id: job.reminderJobId },
         data: {
@@ -203,10 +210,10 @@ export async function processNotificationJob(
         customerId: job.customerId,
         notificationJobId: job.id,
         reminderJobId: job.reminderJobId,
-        channel: 'WHATSAPP',
+        channel,
         type: job.templateKey,
         status: 'SENT',
-        message: job.message ?? `${job.templateKey} WhatsApp notification`,
+        message: job.message ?? `${job.templateKey} ${channel} notification`,
         templateKey: job.templateKey,
         dryRun,
         providerMessageId: result.providerMessageId,
@@ -214,7 +221,8 @@ export async function processNotificationJob(
     });
     return { processed: true, status: dryRun ? 'DRY_RUN' : 'SENT' };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected WhatsApp notification failure';
+    const channel = job.channel === 'EMAIL' ? 'EMAIL' : 'WHATSAPP';
+    const message = error instanceof Error ? error.message : 'Unexpected notification failure';
     const permanent = error instanceof PermanentWhatsAppError;
     const maxAttempts = job.maxAttempts ?? 3;
     const exhausted = job.attempts >= maxAttempts;
@@ -231,7 +239,7 @@ export async function processNotificationJob(
       },
     });
 
-    if (job.reminderJobId) {
+    if (job.reminderJobId && channel === 'WHATSAPP') {
       await prisma.reminderJob.update({
         where: { id: job.reminderJobId },
         data: {
@@ -246,12 +254,12 @@ export async function processNotificationJob(
         customerId: job.customerId,
         notificationJobId: job.id,
         reminderJobId: job.reminderJobId,
-        channel: 'WHATSAPP',
+        channel,
         type: job.templateKey,
         status: 'FAILED',
-        message: job.message ?? `${job.templateKey} WhatsApp notification`,
+        message: job.message ?? `${job.templateKey} ${channel} notification`,
         templateKey: job.templateKey,
-        dryRun: !config.sendEnabled,
+        dryRun: job.dryRun,
         errorMessage: message,
       },
     });
@@ -275,7 +283,6 @@ export async function processDueNotifications({
       status: 'PENDING',
       scheduledAt: { lte: now },
       OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
-      channel: 'WHATSAPP',
     },
     orderBy: { scheduledAt: 'asc' },
     take: limit,
@@ -548,6 +555,23 @@ function parseNotificationJobPayload(value: Prisma.JsonValue): NotificationJobPa
     to: payload.to,
     languageCode: payload.languageCode,
     bodyParameters: payload.bodyParameters.map(parseBodyParameter),
+  };
+}
+
+function parseEmailNotificationJobPayload(value: Prisma.JsonValue): EmailNotificationJobPayload {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Notification job payload is invalid');
+  }
+
+  const payload = value as Record<string, unknown>;
+  if (typeof payload.to !== 'string' || typeof payload.subject !== 'string' || typeof payload.text !== 'string') {
+    throw new Error('Notification job payload is missing email data');
+  }
+
+  return {
+    to: payload.to,
+    subject: payload.subject,
+    text: payload.text,
   };
 }
 

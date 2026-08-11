@@ -6,6 +6,8 @@ export const whatsappTemplateKeys = [
   'ORDER_DELIVERED',
   'ORDER_CANCELLED',
   'ORDER_SPECIAL_REQUEST',
+  'ORDER_ADDITION_APPROVED',
+  'ORDER_ADDITION_REJECTED',
 ] as const;
 
 export type WhatsAppTemplateKey = (typeof whatsappTemplateKeys)[number];
@@ -33,6 +35,8 @@ const templateEnvNames: Record<WhatsAppTemplateKey, string> = {
   ORDER_DELIVERED: 'WHATSAPP_TEMPLATE_ORDER_DELIVERED',
   ORDER_CANCELLED: 'WHATSAPP_TEMPLATE_ORDER_CANCELLED',
   ORDER_SPECIAL_REQUEST: 'WHATSAPP_TEMPLATE_ORDER_SPECIAL_REQUEST',
+  ORDER_ADDITION_APPROVED: 'WHATSAPP_TEMPLATE_ORDER_ADDITION_APPROVED',
+  ORDER_ADDITION_REJECTED: 'WHATSAPP_TEMPLATE_ORDER_ADDITION_REJECTED',
 };
 
 export function getWhatsAppConfig(env: EnvLike = process.env): WhatsAppConfig {

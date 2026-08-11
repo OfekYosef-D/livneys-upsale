@@ -19,7 +19,19 @@ describe('WhatsApp notification config', () => {
       'ORDER_DELIVERED',
       'ORDER_CANCELLED',
       'ORDER_SPECIAL_REQUEST',
+      'ORDER_ADDITION_APPROVED',
+      'ORDER_ADDITION_REJECTED',
     ]);
+  });
+
+  it('resolves addition decision templates', () => {
+    const config = getWhatsAppConfig({
+      WHATSAPP_TEMPLATE_ORDER_ADDITION_APPROVED: 'livneys_addition_approved_he',
+      WHATSAPP_TEMPLATE_ORDER_ADDITION_REJECTED: 'livneys_addition_rejected_he',
+    });
+
+    expect(resolveWhatsAppTemplateName('ORDER_ADDITION_APPROVED', config)).toBe('livneys_addition_approved_he');
+    expect(resolveWhatsAppTemplateName('ORDER_ADDITION_REJECTED', config)).toBe('livneys_addition_rejected_he');
   });
 
   it('resolves configured template names without requiring live sending', () => {

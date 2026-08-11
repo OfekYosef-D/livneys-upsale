@@ -26,6 +26,7 @@ import {
   setCartQuantity,
   type Cart,
 } from '@/lib/order-utils';
+import { getActiveOrderCustomerRedirect } from '@/features/order-additions/ui';
 
 export function ReviewOrderClient({
   customer,
@@ -93,6 +94,11 @@ export function ReviewOrderClient({
     setIsSubmitting(false);
 
     if (!result.ok) {
+      const redirectPath = getActiveOrderCustomerRedirect(customer.id, result.code, result.details);
+      if (redirectPath) {
+        router.push(redirectPath);
+        return;
+      }
       setError(result.error);
       return;
     }

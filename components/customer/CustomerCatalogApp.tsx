@@ -23,6 +23,7 @@ import { getPreloadedCartNotice } from '@/features/customer-portal/cart-origin';
 import type { PortalCustomer, PortalOrder, PortalProduct, PortalRoute } from '@/features/customer-portal/types';
 import { calculateVatSummary } from '@/features/orders/vat';
 import { INSTITUTIONAL_PRICING_NOTICE, PRICES_BEFORE_VAT_LABEL } from '@/features/owner-rules/constants';
+import { getActiveOrderCustomerRedirect } from '@/features/order-additions/ui';
 
 export function CustomerCatalogApp({
   customer,
@@ -94,6 +95,11 @@ export function CustomerCatalogApp({
     setIsSavingDraft(false);
 
     if (!result.ok) {
+      const redirectPath = getActiveOrderCustomerRedirect(customer.id, result.code, result.details);
+      if (redirectPath) {
+        router.push(redirectPath);
+        return;
+      }
       setError(result.error);
       return;
     }

@@ -1,8 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { createSubmittedOrder } from '@/features/orders/service';
+import { assertOrderCanBePacked } from '../order-additions/business-rules';
+import { packOrderSafely } from '../order-additions/persistence';
 import { assertOrderStatusTransition, orderStatusValues, type OrderStatus } from '@/features/orders/utils';
 import { formatManualOrderInternalNote } from '@/features/orders/write';
 import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
@@ -783,6 +786,10 @@ export async function updateOrderStatusAction(input: unknown): Promise<ActionRes
         status: true,
         customerId: true,
         routeId: true,
+        additionRequests: {
+          where: { status: 'PENDING' },
+          select: { id: true },
+        },
       },
     });
 
@@ -791,16 +798,24 @@ export async function updateOrderStatusAction(input: unknown): Promise<ActionRes
     }
 
     const nextStatus = assertOrderStatusTransition(existing.status, parsed.status);
-    const order = await prisma.order.update({
-      where: { id: existing.id },
-      data: { status: nextStatus, revision: { increment: 1 } },
-      select: {
-        id: true,
-        status: true,
-        customerId: true,
-        routeId: true,
-      },
-    });
+    if (nextStatus === 'PACKED') {
+      assertOrderCanBePacked(existing.additionRequests?.length ?? 0);
+    }
+    const order = nextStatus === 'PACKED'
+      ? await prisma.$transaction(
+          (tx) => packOrderSafely(tx, existing.id),
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        )
+      : await prisma.order.update({
+          where: { id: existing.id },
+          data: { status: nextStatus, revision: { increment: 1 } },
+          select: {
+            id: true,
+            status: true,
+            customerId: true,
+            routeId: true,
+          },
+        });
 
     revalidatePath('/admin');
     revalidatePath(`/admin/orders/${order.id}`);

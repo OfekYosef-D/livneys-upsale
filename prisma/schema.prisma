@@ -40,6 +40,14 @@ enum PaymentTerm {
   IMMEDIATE_OR_CASH
 }
 
+enum OrderAdditionRequestStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 enum NotificationChannel {
   EMAIL
   WHATSAPP
@@ -78,53 +86,56 @@ enum PromotionEffectType {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  name         String
-  passwordHash String
-  role         UserRole
-  customerId   String?   @unique
-  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  contactLogs  CustomerContactLog[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                       String                 @id @default(cuid())
+  email                    String                 @unique
+  name                     String
+  passwordHash             String
+  role                     UserRole
+  customerId               String?                @unique
+  customer                 Customer?              @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  contactLogs              CustomerContactLog[]
+  reviewedAdditionRequests OrderAdditionRequest[] @relation("OrderAdditionReviewer")
+  orderActivities          OrderActivity[]
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
 
   @@index([role])
 }
 
 model Customer {
-  id                      String                          @id
-  name                    String
-  invoiceName             String?
-  contact                 String
-  email                   String?
-  phone                   String
-  accountingContactName   String?
-  accountingEmail         String?
-  accountingPhone         String?
-  businessType            String?
-  region                  String
-  address                 String
-  deliveryConstraints     String?
-  notes                   String?
-  statusLabel             String?
-  isActive                Boolean                         @default(true)
-  routeId                 String
-  priceListId             String
-  route                   Route                           @relation(fields: [routeId], references: [id])
-  priceList               PriceList                       @relation(fields: [priceListId], references: [id])
-  user                    User?
-  orders                  Order[]
-  recommendations         CustomerProductRecommendation[]
-  promotionTargets        PromotionCustomerTarget[]
-  reminderJobs            ReminderJob[]
-  notificationPreference  NotificationPreference?
-  notificationEvents      NotificationEvent[]
-  notificationJobs        NotificationJob[]
-  contactLogs             CustomerContactLog[]
-  whatsappWebhookEvents   WhatsAppWebhookEvent[]
-  createdAt               DateTime                        @default(now())
-  updatedAt               DateTime                        @updatedAt
+  id                     String                          @id
+  name                   String
+  invoiceName            String?
+  contact                String
+  email                  String?
+  phone                  String
+  accountingContactName  String?
+  accountingEmail        String?
+  accountingPhone        String?
+  businessType           String?
+  region                 String
+  address                String
+  deliveryConstraints    String?
+  notes                  String?
+  statusLabel            String?
+  isActive               Boolean                         @default(true)
+  routeId                String
+  priceListId            String
+  route                  Route                           @relation(fields: [routeId], references: [id])
+  priceList              PriceList                       @relation(fields: [priceListId], references: [id])
+  user                   User?
+  orders                 Order[]
+  additionRequests       OrderAdditionRequest[]
+  recommendations        CustomerProductRecommendation[]
+  promotionTargets       PromotionCustomerTarget[]
+  reminderJobs           ReminderJob[]
+  notificationPreference NotificationPreference?
+  notificationEvents     NotificationEvent[]
+  notificationJobs       NotificationJob[]
+  contactLogs            CustomerContactLog[]
+  whatsappWebhookEvents  WhatsAppWebhookEvent[]
+  createdAt              DateTime                        @default(now())
+  updatedAt              DateTime                        @updatedAt
 
   @@index([routeId])
   @@index([priceListId])
@@ -132,27 +143,28 @@ model Customer {
 }
 
 model Product {
-  id              String                          @id
-  sku             String                          @unique
-  name            String
-  category        String
-  basePrice       Decimal                         @db.Decimal(10, 2)
-  unit            String
-  caseSize        String
-  minQty          Int                             @default(1)
-  orderMultiple   Int                             @default(1)
-  imageUrl        String?
-  assetImage      String?
-  stockLabel      String?
-  description     String?
-  isActive        Boolean                         @default(true)
-  priceListItems  PriceListItem[]
-  orderLines      OrderLine[]
-  promotions      Promotion[]
+  id               String                          @id
+  sku              String                          @unique
+  name             String
+  category         String
+  basePrice        Decimal                         @db.Decimal(10, 2)
+  unit             String
+  caseSize         String
+  minQty           Int                             @default(1)
+  orderMultiple    Int                             @default(1)
+  imageUrl         String?
+  assetImage       String?
+  stockLabel       String?
+  description      String?
+  isActive         Boolean                         @default(true)
+  priceListItems   PriceListItem[]
+  orderLines       OrderLine[]
+  additionLines    OrderAdditionLine[]
+  promotions       Promotion[]
   promotionTargets PromotionProductTarget[]
-  recommendations CustomerProductRecommendation[]
-  createdAt       DateTime                        @default(now())
-  updatedAt       DateTime                        @updatedAt
+  recommendations  CustomerProductRecommendation[]
+  createdAt        DateTime                        @default(now())
+  updatedAt        DateTime                        @updatedAt
 
   @@index([category])
   @@index([isActive])
@@ -184,15 +196,15 @@ model CompanyRegistrationRequest {
 }
 
 model PriceList {
-  id          String          @id
-  name        String
-  description String?
-  isDefault   Boolean         @default(false)
-  items       PriceListItem[]
-  customers   Customer[]
+  id               String                     @id
+  name             String
+  description      String?
+  isDefault        Boolean                    @default(false)
+  items            PriceListItem[]
+  customers        Customer[]
   promotionTargets PromotionPriceListTarget[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
 
   @@index([isDefault])
 }
@@ -212,62 +224,64 @@ model PriceListItem {
 }
 
 model Route {
-  id              String         @id
-  name            String
-  region          String
-  driver          String?
-  opsContactName  String?
-  opsContactPhone String?
-  deliveryWeekday Int
-  cutoffWeekday   Int
-  cutoffTime      String
-  nextDeliveryAt  DateTime
-  nextCutoffAt    DateTime
-  isActive        Boolean        @default(true)
-  customers       Customer[]
-  orders          Order[]
-  reminderRules   ReminderRule[]
-  reminderJobs    ReminderJob[]
+  id               String                 @id
+  name             String
+  region           String
+  driver           String?
+  opsContactName   String?
+  opsContactPhone  String?
+  deliveryWeekday  Int
+  cutoffWeekday    Int
+  cutoffTime       String
+  nextDeliveryAt   DateTime
+  nextCutoffAt     DateTime
+  isActive         Boolean                @default(true)
+  customers        Customer[]
+  orders           Order[]
+  reminderRules    ReminderRule[]
+  reminderJobs     ReminderJob[]
   promotionTargets PromotionRouteTarget[]
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 
   @@index([isActive])
   @@index([deliveryWeekday])
 }
 
 model Order {
-  id                  String      @id @default(cuid())
-  orderNumber         Int         @unique @default(autoincrement())
-  idempotencyKey      String?     @unique
-  revision            Int         @default(1)
-  customerId          String
-  routeId             String?
-  status              OrderStatus
-  source              OrderSource @default(CUSTOMER)
-  deliveryWindowStart DateTime
-  deliveryWindowEnd   DateTime?
-  deadlineAt          DateTime
-  submittedAt         DateTime?
-  notes               String?
-  internalNote        String?
-  subtotal            Decimal     @default(0) @db.Decimal(10, 2)
-  discountTotal       Decimal     @default(0) @db.Decimal(10, 2)
-  paymentTerm         PaymentTerm @default(NET_30)
-  paymentDiscountPercent Decimal  @default(0) @db.Decimal(5, 2)
-  paymentDiscountTotal Decimal    @default(0) @db.Decimal(10, 2)
-  total               Decimal     @db.Decimal(10, 2)
-  vatRatePercent      Decimal     @default(18) @db.Decimal(5, 2)
-  vatTotal            Decimal     @default(0) @db.Decimal(10, 2)
-  totalIncludingVat   Decimal     @default(0) @db.Decimal(10, 2)
-  commercialTermsVersion String?
+  id                        String                 @id @default(cuid())
+  orderNumber               Int                    @unique @default(autoincrement())
+  idempotencyKey            String?                @unique
+  revision                  Int                    @default(1)
+  customerId                String
+  routeId                   String?
+  status                    OrderStatus
+  source                    OrderSource            @default(CUSTOMER)
+  deliveryWindowStart       DateTime
+  deliveryWindowEnd         DateTime?
+  deadlineAt                DateTime
+  submittedAt               DateTime?
+  notes                     String?
+  internalNote              String?
+  subtotal                  Decimal                @default(0) @db.Decimal(10, 2)
+  discountTotal             Decimal                @default(0) @db.Decimal(10, 2)
+  paymentTerm               PaymentTerm            @default(NET_30)
+  paymentDiscountPercent    Decimal                @default(0) @db.Decimal(5, 2)
+  paymentDiscountTotal      Decimal                @default(0) @db.Decimal(10, 2)
+  total                     Decimal                @db.Decimal(10, 2)
+  vatRatePercent            Decimal                @default(18) @db.Decimal(5, 2)
+  vatTotal                  Decimal                @default(0) @db.Decimal(10, 2)
+  totalIncludingVat         Decimal                @default(0) @db.Decimal(10, 2)
+  commercialTermsVersion    String?
   commercialTermsAcceptedAt DateTime?
-  customer            Customer    @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  route               Route?      @relation(fields: [routeId], references: [id], onDelete: SetNull)
-  lines               OrderLine[]
-  notificationJobs    NotificationJob[]
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  customer                  Customer               @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  route                     Route?                 @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  lines                     OrderLine[]
+  additionRequests          OrderAdditionRequest[]
+  activities                OrderActivity[]
+  notificationJobs          NotificationJob[]
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
 
   @@index([customerId, status])
   @@index([customerId, deliveryWindowStart])
@@ -277,52 +291,130 @@ model Order {
 }
 
 model OrderLine {
-  id          String   @id @default(cuid())
-  orderId     String
-  productId   String?
-  productName String
-  listUnitPrice Decimal  @default(0) @db.Decimal(10, 2)
-  unitPrice   Decimal  @db.Decimal(10, 2)
-  quantity    Int
-  lineSubtotal Decimal  @default(0) @db.Decimal(10, 2)
-  discountTotal Decimal @default(0) @db.Decimal(10, 2)
-  lineTotal   Decimal  @db.Decimal(10, 2)
-  promotionId String?
-  promotionSnapshot Json?
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  promotion   Promotion? @relation(fields: [promotionId], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                    String             @id @default(cuid())
+  orderId               String
+  productId             String?
+  productName           String
+  listUnitPrice         Decimal            @default(0) @db.Decimal(10, 2)
+  unitPrice             Decimal            @db.Decimal(10, 2)
+  quantity              Int
+  lineSubtotal          Decimal            @default(0) @db.Decimal(10, 2)
+  discountTotal         Decimal            @default(0) @db.Decimal(10, 2)
+  lineTotal             Decimal            @db.Decimal(10, 2)
+  promotionId           String?
+  promotionSnapshot     Json?
+  additionRequestLineId String?            @unique
+  order                 Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product               Product?           @relation(fields: [productId], references: [id], onDelete: SetNull)
+  promotion             Promotion?         @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  additionRequestLine   OrderAdditionLine? @relation("AppliedAdditionLine", fields: [additionRequestLineId], references: [id], onDelete: SetNull)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
   @@index([orderId])
   @@index([productId])
   @@index([promotionId])
 }
 
+model OrderAdditionRequest {
+  id                        String                     @id @default(cuid())
+  orderId                   String
+  customerId                String
+  status                    OrderAdditionRequestStatus @default(PENDING)
+  revision                  Int                        @default(1)
+  idempotencyKey            String                     @unique
+  lastMutationKey           String                     @unique
+  orderRevisionAtSubmission Int
+  submittedAt               DateTime                   @default(now())
+  reviewedAt                DateTime?
+  reviewedByUserId          String?
+  rejectionReason           String?
+  subtotal                  Decimal                    @default(0) @db.Decimal(10, 2)
+  discountTotal             Decimal                    @default(0) @db.Decimal(10, 2)
+  paymentTerm               PaymentTerm
+  paymentDiscountPercent    Decimal                    @default(0) @db.Decimal(5, 2)
+  paymentDiscountTotal      Decimal                    @default(0) @db.Decimal(10, 2)
+  total                     Decimal                    @default(0) @db.Decimal(10, 2)
+  vatRatePercent            Decimal                    @default(18) @db.Decimal(5, 2)
+  vatTotal                  Decimal                    @default(0) @db.Decimal(10, 2)
+  totalIncludingVat         Decimal                    @default(0) @db.Decimal(10, 2)
+  order                     Order                      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer                  Customer                   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  reviewedBy                User?                      @relation("OrderAdditionReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  lines                     OrderAdditionLine[]
+  activities                OrderActivity[]
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+
+  @@index([orderId, status])
+  @@index([customerId, status])
+  @@index([reviewedByUserId])
+  @@index([submittedAt])
+}
+
+model OrderAdditionLine {
+  id                String               @id @default(cuid())
+  requestId         String
+  productId         String?
+  productName       String
+  quantity          Int
+  listUnitPrice     Decimal              @default(0) @db.Decimal(10, 2)
+  unitPrice         Decimal              @db.Decimal(10, 2)
+  lineSubtotal      Decimal              @default(0) @db.Decimal(10, 2)
+  discountTotal     Decimal              @default(0) @db.Decimal(10, 2)
+  lineTotal         Decimal              @db.Decimal(10, 2)
+  promotionId       String?
+  promotionSnapshot Json?
+  request           OrderAdditionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  product           Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
+  appliedOrderLine  OrderLine?           @relation("AppliedAdditionLine")
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([requestId])
+  @@index([productId])
+}
+
+model OrderActivity {
+  id                String                @id @default(cuid())
+  orderId           String
+  additionRequestId String?
+  actorUserId       String?
+  action            String
+  metadata          Json?
+  order             Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  additionRequest   OrderAdditionRequest? @relation(fields: [additionRequestId], references: [id], onDelete: SetNull)
+  actorUser         User?                 @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  createdAt         DateTime              @default(now())
+
+  @@index([orderId, createdAt])
+  @@index([additionRequestId])
+  @@index([actorUserId])
+}
+
 model Promotion {
-  id          String    @id
-  title       String
-  tag         String
-  description String
-  productId   String?
-  effectType  PromotionEffectType @default(DISPLAY_ONLY)
-  discountValue Decimal? @db.Decimal(10, 2)
-  buyQuantity Int?
-  freeQuantity Int?
-  priority    Int       @default(0)
-  startsAt    DateTime?
-  endsAt      DateTime?
-  isActive    Boolean   @default(true)
-  product     Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
-  productTargets PromotionProductTarget[]
-  categoryTargets PromotionCategoryTarget[]
-  customerTargets PromotionCustomerTarget[]
-  routeTargets PromotionRouteTarget[]
+  id               String                     @id
+  title            String
+  tag              String
+  description      String
+  productId        String?
+  effectType       PromotionEffectType        @default(DISPLAY_ONLY)
+  discountValue    Decimal?                   @db.Decimal(10, 2)
+  buyQuantity      Int?
+  freeQuantity     Int?
+  priority         Int                        @default(0)
+  startsAt         DateTime?
+  endsAt           DateTime?
+  isActive         Boolean                    @default(true)
+  product          Product?                   @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productTargets   PromotionProductTarget[]
+  categoryTargets  PromotionCategoryTarget[]
+  customerTargets  PromotionCustomerTarget[]
+  routeTargets     PromotionRouteTarget[]
   priceListTargets PromotionPriceListTarget[]
-  orderLines  OrderLine[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  orderLines       OrderLine[]
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
 
   @@index([productId])
   @@index([isActive])
@@ -457,25 +549,25 @@ model NotificationPreference {
 }
 
 model NotificationEvent {
-  id            String              @id @default(cuid())
-  customerId    String
-  reminderJobId String?
+  id                String              @id @default(cuid())
+  customerId        String
+  reminderJobId     String?
   notificationJobId String?
-  channel       NotificationChannel
-  type          String
-  status        NotificationStatus
-  subject       String?
-  message       String
-  templateKey   String?
-  dryRun        Boolean             @default(false)
+  channel           NotificationChannel
+  type              String
+  status            NotificationStatus
+  subject           String?
+  message           String
+  templateKey       String?
+  dryRun            Boolean             @default(false)
   providerMessageId String?
-  providerStatus String?
-  errorMessage  String?
-  customer      Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  reminderJob   ReminderJob?        @relation(fields: [reminderJobId], references: [id], onDelete: SetNull)
-  notificationJob NotificationJob?   @relation(fields: [notificationJobId], references: [id], onDelete: SetNull)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  providerStatus    String?
+  errorMessage      String?
+  customer          Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  reminderJob       ReminderJob?        @relation(fields: [reminderJobId], references: [id], onDelete: SetNull)
+  notificationJob   NotificationJob?    @relation(fields: [notificationJobId], references: [id], onDelete: SetNull)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
   @@index([customerId])
   @@index([reminderJobId])
@@ -485,33 +577,33 @@ model NotificationEvent {
 }
 
 model NotificationJob {
-  id                String                @id @default(cuid())
-  customerId        String
-  orderId           String?
-  reminderJobId     String?
-  channel           NotificationChannel   @default(WHATSAPP)
-  templateKey       String
-  templateName      String?
-  status            NotificationJobStatus @default(PENDING)
-  dryRun            Boolean               @default(true)
-  payload           Json
-  message           String?
-  scheduledAt       DateTime              @default(now())
-  nextAttemptAt     DateTime?
-  lastAttemptAt     DateTime?
-  processedAt       DateTime?
-  attempts          Int                   @default(0)
-  maxAttempts       Int                   @default(3)
-  providerMessageId String?
-  errorMessage      String?
-  dedupeKey         String                @unique
-  customer          Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  order             Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  reminderJob       ReminderJob?          @relation(fields: [reminderJobId], references: [id], onDelete: SetNull)
+  id                 String                 @id @default(cuid())
+  customerId         String
+  orderId            String?
+  reminderJobId      String?
+  channel            NotificationChannel    @default(WHATSAPP)
+  templateKey        String
+  templateName       String?
+  status             NotificationJobStatus  @default(PENDING)
+  dryRun             Boolean                @default(true)
+  payload            Json
+  message            String?
+  scheduledAt        DateTime               @default(now())
+  nextAttemptAt      DateTime?
+  lastAttemptAt      DateTime?
+  processedAt        DateTime?
+  attempts           Int                    @default(0)
+  maxAttempts        Int                    @default(3)
+  providerMessageId  String?
+  errorMessage       String?
+  dedupeKey          String                 @unique
+  customer           Customer               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order              Order?                 @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  reminderJob        ReminderJob?           @relation(fields: [reminderJobId], references: [id], onDelete: SetNull)
   notificationEvents NotificationEvent[]
-  webhookEvents     WhatsAppWebhookEvent[]
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
+  webhookEvents      WhatsAppWebhookEvent[]
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
 
   @@index([customerId])
   @@index([orderId])

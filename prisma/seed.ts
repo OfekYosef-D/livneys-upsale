@@ -70,6 +70,9 @@ async function resetDemoData() {
   await prisma.notificationPreference.deleteMany();
   await prisma.customerProductRecommendation.deleteMany();
   await prisma.promotion.deleteMany();
+  await prisma.orderActivity.deleteMany();
+  await prisma.orderAdditionLine.deleteMany();
+  await prisma.orderAdditionRequest.deleteMany();
   await prisma.orderLine.deleteMany();
   await prisma.order.deleteMany();
   await prisma.user.deleteMany();

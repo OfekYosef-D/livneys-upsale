@@ -85,4 +85,5 @@ export type CustomerPortalData = {
   route: PortalRoute;
   products: PortalProduct[];
   lastOrder: PortalOrder;
+  activeOrderForDelivery: { id: string; orderNumber: number } | null;
 };

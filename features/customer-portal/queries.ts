@@ -4,6 +4,7 @@ import { resolveCatalogPricing } from '@/features/pricing/engine';
 import { formatRouteDeadline } from '@/features/routes/utils';
 import { prisma } from '@/lib/db';
 import { mapPortalOrder } from './order-mapping';
+import { getActiveOrderForDelivery } from '../order-additions/queries';
 import type { CustomerPortalData, PortalOrder, PortalProduct } from './types';
 
 function filterPortalOrderToActiveProducts(order: PortalOrder, activeProductIds: Set<string>): PortalOrder {
@@ -57,7 +58,7 @@ export async function getCustomerPortalData(customerId: string): Promise<Custome
     notFound();
   }
 
-  const [lastSubmittedOrder, activePromotions] = await Promise.all([
+  const [lastSubmittedOrder, activePromotions, activeOrderForDelivery] = await Promise.all([
     prisma.order.findFirst({
       where: {
         customerId,
@@ -78,6 +79,7 @@ export async function getCustomerPortalData(customerId: string): Promise<Custome
         priceListTargets: true,
       },
     }),
+    getActiveOrderForDelivery(customerId, customer.route.nextDeliveryAt),
   ]);
 
   const recommendationIds = new Set(customer.recommendations.map((item) => item.productId));
@@ -175,6 +177,7 @@ export async function getCustomerPortalData(customerId: string): Promise<Custome
     },
     products,
     lastOrder: filterPortalOrderToActiveProducts(mapPortalOrder(lastSubmittedOrder, customerId), activeProductIds),
+    activeOrderForDelivery,
   };
 }
 

@@ -26,6 +26,7 @@ import {
   updateRouteAction,
 } from '@/features/admin-crm/actions';
 import { orderStatusLabels } from '@/features/orders/utils';
+import { getActiveOrderAdminRedirect } from '@/features/order-additions/ui';
 import { OrderFinancialSummary } from '@/features/orders/components/OrderFinancialSummary';
 import { calculateVatSummary } from '@/features/orders/vat';
 import { institutionalBusinessTypes, productPricePresets, promotionPresets } from '@/features/owner-rules/constants';
@@ -807,6 +808,10 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
                     window.location.href = `/admin/orders/${orderId}`;
                   }
                 },
+                (result) => {
+                  const redirectPath = getActiveOrderAdminRedirect(result.code, result.details);
+                  if (redirectPath) window.location.href = redirectPath;
+                },
               );
             }}
           >
@@ -1432,7 +1437,12 @@ function useCrmAction() {
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function run<T extends Record<string, unknown>>(call: () => Promise<ActionResult<T>>, success: string, after?: (data: T) => void) {
+  function run<T extends Record<string, unknown>>(
+    call: () => Promise<ActionResult<T>>,
+    success: string,
+    after?: (data: T) => void,
+    onError?: (result: Extract<ActionResult<T>, { ok: false }>) => void,
+  ) {
     startTransition(async () => {
       const result = await call();
       if (result.ok) {
@@ -1441,6 +1451,7 @@ function useCrmAction() {
         after?.(result.data);
       } else {
         setMessage(result.error);
+        onError?.(result);
       }
     });
   }

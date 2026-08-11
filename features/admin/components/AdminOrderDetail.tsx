@@ -6,6 +6,7 @@ import { paymentTermLabels } from '@/features/orders/payment-terms';
 import { money } from '@/lib/format';
 import { AdminOrderStatusActions } from './AdminOrderStatusActions';
 import { OrderStatusPill } from './OrderStatusPill';
+import { AdminAdditionRequests } from '@/features/order-additions/components/AdminAdditionRequests';
 
 type OrderData = NonNullable<Awaited<ReturnType<typeof getAdminOrderDetail>>>;
 
@@ -87,9 +88,17 @@ export function AdminOrderDetail({ order }: { order: OrderData }) {
           </div>
           {order.notes && <p className="mt-3 rounded-xl border border-black/10 p-3 text-sm font-bold">{order.notes}</p>}
           {order.internalNote && <p className="mt-3 rounded-xl bg-[#e6e1d8] p-3 text-xs font-black text-black/65">{order.internalNote}</p>}
+          {['SUBMITTED', 'SPECIAL_REQUEST', 'APPROVED'].includes(order.status) && !order.additionRequests.some((request) => request.status === 'PENDING') && (
+            <Link href={`/admin/orders/${order.id}/addition`} className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-[#e6e1d8] px-4 text-sm font-black text-black ring-1 ring-black/10 hover:bg-black hover:text-white">
+              רישום תוספת מאושרת
+            </Link>
+          )}
           <AdminOrderStatusActions orderId={order.id} status={order.status} />
         </section>
       </aside>
+      <div className="lg:col-span-2">
+        <AdminAdditionRequests orderId={order.id} requests={order.additionRequests} />
+      </div>
     </div>
   );
 }
