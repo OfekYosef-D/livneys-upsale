@@ -41,10 +41,16 @@ export async function issueAuthTokenInTransaction(
       sessionVersion: true,
       isActive: true,
       role: true,
+      passwordHash: true,
       customer: { select: { isActive: true } },
     },
   });
-  if (!user || !user.isActive || (user.role === 'CUSTOMER' && !user.customer?.isActive)) {
+  if (
+    !user
+    || !user.isActive
+    || (user.role === 'CUSTOMER' && !user.customer?.isActive)
+    || (type === 'PASSWORD_SETUP' && user.passwordHash)
+  ) {
     throw new InvalidAuthTokenError();
   }
 

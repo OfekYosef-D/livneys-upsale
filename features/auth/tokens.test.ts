@@ -18,7 +18,7 @@ describe('one-time password tokens', () => {
   beforeEach(() => {
     updateMany.mockReset(); create.mockReset(); findUnique.mockReset(); userUpdate.mockReset(); userFindUnique.mockReset(); transaction.mockClear();
     userFindUnique.mockResolvedValue({
-      id: 'user-1', sessionVersion: 3, isActive: true, role: 'CUSTOMER', customer: { isActive: true },
+      id: 'user-1', sessionVersion: 3, isActive: true, role: 'CUSTOMER', passwordHash: null, customer: { isActive: true },
     });
   });
 
@@ -42,6 +42,17 @@ describe('one-time password tokens', () => {
 
     await expect(issueAuthToken({
       userId: 'user-1', type: AuthTokenType.PASSWORD_RESET, baseUrl: 'https://example.com',
+    })).rejects.toBeInstanceOf(InvalidAuthTokenError);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('does not issue a setup token after the user has already set a password', async () => {
+    userFindUnique.mockResolvedValue({
+      id: 'user-1', sessionVersion: 4, isActive: true, role: 'CUSTOMER', passwordHash: 'existing-hash', customer: { isActive: true },
+    });
+
+    await expect(issueAuthToken({
+      userId: 'user-1', type: AuthTokenType.PASSWORD_SETUP, baseUrl: 'https://example.com',
     })).rejects.toBeInstanceOf(InvalidAuthTokenError);
     expect(create).not.toHaveBeenCalled();
   });
