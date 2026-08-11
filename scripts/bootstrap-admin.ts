@@ -11,8 +11,7 @@ async function main() {
       password: process.env.BOOTSTRAP_ADMIN_PASSWORD,
     },
     {
-      findUnique: (args) => prisma.user.findUnique(args),
-      upsert: (args) => prisma.user.upsert(args),
+      $transaction: (callback) => prisma.$transaction((tx) => callback({ user: tx.user, authToken: tx.authToken })),
     },
   );
 

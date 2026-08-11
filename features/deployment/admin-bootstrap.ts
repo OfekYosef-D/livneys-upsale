@@ -40,44 +40,67 @@ type AdminUserClient = {
   }): Promise<{ id: string; email: string }>;
 };
 
+type AdminBootstrapTransaction = {
+  user: AdminUserClient;
+  authToken: {
+    updateMany(args: {
+      where: { userId: string; usedAt: null };
+      data: { usedAt: Date };
+    }): Promise<unknown>;
+  };
+};
+
+type AdminBootstrapDatabase = {
+  $transaction(
+    callback: (tx: AdminBootstrapTransaction) => Promise<{ id: string; email: string }>,
+  ): Promise<{ id: string; email: string }>;
+};
+
 export function parseBootstrapAdminInput(input: BootstrapAdminInput): ParsedBootstrapAdminInput {
   return bootstrapAdminSchema.parse(input);
 }
 
 export async function bootstrapAdmin(
   input: BootstrapAdminInput,
-  users: AdminUserClient,
+  database: AdminBootstrapDatabase,
   { now = new Date() }: { now?: Date } = {},
 ) {
   const parsed = parseBootstrapAdminInput(input);
-  const existing = await users.findUnique({
-    where: { email: parsed.email },
-    select: { role: true, customerId: true },
-  });
-
-  if (existing && (existing.role !== 'ADMIN' || existing.customerId)) {
-    throw new Error('Refusing to convert an existing customer account into an administrator.');
-  }
-
   const passwordHash = await bcrypt.hash(parsed.password, 12);
-  return users.upsert({
-    where: { email: parsed.email },
-    create: {
-      email: parsed.email,
-      name: parsed.name,
-      passwordHash,
-      passwordChangedAt: now,
-      role: 'ADMIN',
-      customerId: null,
-    },
-    update: {
-      name: parsed.name,
-      passwordHash,
-      passwordChangedAt: now,
-      sessionVersion: { increment: 1 },
-      role: 'ADMIN',
-      customerId: null,
-    },
-    select: { id: true, email: true },
+  return database.$transaction(async (tx) => {
+    const existing = await tx.user.findUnique({
+      where: { email: parsed.email },
+      select: { role: true, customerId: true },
+    });
+
+    if (existing && (existing.role !== 'ADMIN' || existing.customerId)) {
+      throw new Error('Refusing to convert an existing customer account into an administrator.');
+    }
+
+    const administrator = await tx.user.upsert({
+      where: { email: parsed.email },
+      create: {
+        email: parsed.email,
+        name: parsed.name,
+        passwordHash,
+        passwordChangedAt: now,
+        role: 'ADMIN',
+        customerId: null,
+      },
+      update: {
+        name: parsed.name,
+        passwordHash,
+        passwordChangedAt: now,
+        sessionVersion: { increment: 1 },
+        role: 'ADMIN',
+        customerId: null,
+      },
+      select: { id: true, email: true },
+    });
+    await tx.authToken.updateMany({
+      where: { userId: administrator.id, usedAt: null },
+      data: { usedAt: now },
+    });
+    return administrator;
   });
 }
