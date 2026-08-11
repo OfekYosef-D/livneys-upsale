@@ -14,6 +14,7 @@ import { prisma } from '@/lib/db';
 import { enqueueOrderLifecycleWhatsApp } from '../notifications/jobs';
 import { getTemplateKeyForOrderStatus } from '../notifications/templates';
 import { revokeCustomerSessionsOnDeactivation } from './customer-access';
+import { syncCustomerLoginIdentity } from './customer-login-sync';
 import {
   createCustomerSchema,
   createPriceListSchema,
@@ -108,20 +109,12 @@ export async function updateCustomerAction(input: unknown): Promise<ActionResult
         throw new Error('הלקוח לא נמצא.');
       }
 
-      const matchingLoginUser = existing.users.find((user) => user.email === existing.email);
-      if (matchingLoginUser && existing.email !== parsed.email) {
-        if (!parsed.email) {
-          throw new Error('לא ניתן להסיר אימייל מלקוח עם חשבון התחברות.');
-        }
-
-        await tx.user.update({
-          where: { id: matchingLoginUser.id },
-          data: {
-            email: parsed.email,
-            name: parsed.contact,
-          },
-        });
-      }
+      await syncCustomerLoginIdentity(tx, {
+        currentEmail: existing.email,
+        nextEmail: parsed.email,
+        nextContactName: parsed.contact,
+        users: existing.users,
+      });
 
       await tx.customer.update({
         where: { id: parsed.id },

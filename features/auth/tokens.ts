@@ -35,6 +35,19 @@ export async function issueAuthTokenInTransaction(
     now?: Date;
   },
 ) {
+  const user = await tx.user.findUnique({
+    where: { id: userId },
+    select: {
+      sessionVersion: true,
+      isActive: true,
+      role: true,
+      customer: { select: { isActive: true } },
+    },
+  });
+  if (!user || !user.isActive || (user.role === 'CUSTOMER' && !user.customer?.isActive)) {
+    throw new InvalidAuthTokenError();
+  }
+
   const rawToken = createRawAuthToken();
   const tokenHash = hashAuthToken(rawToken);
   const expiresAt = new Date(now.getTime() + tokenTtlMs[type]);
@@ -42,7 +55,9 @@ export async function issueAuthTokenInTransaction(
     where: { userId, type, usedAt: null },
     data: { usedAt: now },
   });
-  const tokenRecord = await tx.authToken.create({ data: { userId, type, tokenHash, expiresAt } });
+  const tokenRecord = await tx.authToken.create({
+    data: { userId, type, tokenHash, expiresAt, sessionVersion: user.sessionVersion },
+  });
 
   const path = type === 'PASSWORD_SETUP' ? '/setup-password' : '/reset-password';
   const url = new URL(path, baseUrl);
@@ -72,6 +87,7 @@ export async function consumePasswordToken({
       || record.usedAt
       || record.expiresAt <= now
       || !record.user.isActive
+      || record.sessionVersion !== record.user.sessionVersion
       || (record.user.role === 'CUSTOMER' && !record.user.customer?.isActive)
     ) {
       throw new InvalidAuthTokenError();
@@ -118,6 +134,7 @@ export async function assertPasswordTokenUsable({
     || record.usedAt
     || record.expiresAt <= now
     || !record.user.isActive
+    || record.sessionVersion !== record.user.sessionVersion
     || (record.user.role === 'CUSTOMER' && !record.user.customer?.isActive)
   ) {
     throw new InvalidAuthTokenError();
