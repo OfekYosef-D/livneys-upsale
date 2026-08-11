@@ -40,6 +40,7 @@ describe('order addition service', () => {
     vi.mocked(prisma.order.findFirst).mockResolvedValue({
       id: 'order-001', customerId: 'cust-001', status: 'APPROVED', revision: 7,
       paymentTerm: 'IMMEDIATE_OR_CASH', deliveryWindowStart: context.route.nextDeliveryAt,
+      lines: [{ productId: 'product-001', quantity: 2 }],
     } as never);
     vi.mocked(getOrderWriteContext).mockResolvedValue(context);
     vi.mocked(persistPendingAdditionRequest).mockResolvedValue({
@@ -75,6 +76,7 @@ describe('order addition service', () => {
     vi.mocked(prisma.order.findFirst).mockResolvedValue({
       id: 'order-001', customerId: 'cust-001', status: 'APPROVED', revision: 7,
       paymentTerm: 'NET_30', deliveryWindowStart: context.route.nextDeliveryAt,
+      lines: [],
     } as never);
     vi.mocked(getOrderWriteContext).mockResolvedValue(context);
     vi.mocked(prisma.$transaction)

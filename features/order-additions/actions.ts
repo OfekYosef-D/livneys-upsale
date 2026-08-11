@@ -37,9 +37,7 @@ export async function createApprovedOrderAdditionAction(input: unknown): Promise
         now: new Date(),
       }));
     revalidateAdditionPaths(reviewed.customerId, reviewed.orderId);
-    if (!reviewed.replayed) {
-      await enqueueDecisionNotificationsSafely(submitted.requestId, 'APPROVED');
-    }
+    await enqueueDecisionNotificationsSafely(submitted.requestId, 'APPROVED');
     return actionOk({ orderId: reviewed.orderId, requestId: submitted.requestId, status: 'APPROVED' });
   } catch (error) {
     return actionError(error);
@@ -62,9 +60,7 @@ export async function reviewOrderAdditionAction(input: unknown): Promise<ActionR
           }),
     );
     revalidateAdditionPaths(result.customerId, result.orderId);
-    if (!result.replayed) {
-      await enqueueDecisionNotificationsSafely(parsed.requestId, parsed.decision);
-    }
+    await enqueueDecisionNotificationsSafely(parsed.requestId, parsed.decision);
     return actionOk({ orderId: result.orderId, status: parsed.decision });
   } catch (error) {
     return actionError(error);

@@ -49,8 +49,8 @@ export function ExistingOrderView({ customer, data }: { customer: PortalCustomer
               <PackageCheck size={24} aria-hidden="true" />
             </div>
             <div className="divide-y divide-black/10">
-              {data.order.items.map((line) => (
-                <article key={`${line.productId}-${line.productName}`} className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 text-sm">
+              {data.order.items.map((line, index) => (
+                <article key={`${line.productId}-${line.productName}-${index}`} className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 text-sm">
                   <div className="min-w-0">
                     <p className="truncate font-black">{line.productName}</p>
                     <p className="mt-1 text-xs font-bold text-black/45">{line.qty} × {money(line.unitPrice ?? 0)}</p>

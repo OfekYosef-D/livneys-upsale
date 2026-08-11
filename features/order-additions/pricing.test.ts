@@ -41,4 +41,28 @@ describe('order addition pricing snapshot', () => {
       lines: [{ productId: 'product-001', quantity: 2, listUnitPrice: 100, lineTotal: 200 }],
     });
   });
+
+  it('prices quantity promotions against the combined order and addition quantity', () => {
+    const buyTwoGetOne = {
+      id: 'promo-001', title: '2+1', tag: '2+1', description: 'Buy two get one',
+      effectType: 'BUY_X_GET_Y' as const, discountValue: null, buyQuantity: 2, freeQuantity: 1,
+      priority: 10, startsAt: null, endsAt: null, isActive: true,
+      productIds: ['product-001'], categories: [], customerIds: [], routeIds: [], priceListIds: [],
+    };
+
+    expect(buildOrderAdditionSnapshot({
+      context: { ...context, promotions: [buyTwoGetOne] },
+      existingItems: [{ productId: 'product-001', quantity: 2 }],
+      items: [{ productId: 'product-001', quantity: 1 }],
+      paymentTerm: 'NET_30',
+      now: new Date('2026-08-11T12:00:00.000Z'),
+    })).toMatchObject({
+      subtotal: 100,
+      discountTotal: 100,
+      total: 0,
+      vatTotal: 0,
+      totalIncludingVat: 0,
+      lines: [{ productId: 'product-001', quantity: 1, discountTotal: 100, lineTotal: 0 }],
+    });
+  });
 });

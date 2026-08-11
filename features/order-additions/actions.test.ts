@@ -67,6 +67,7 @@ describe('order addition actions', () => {
 
     expect(result).toEqual({ ok: true, data: { orderId: 'order-001', requestId: 'request-002', status: 'APPROVED' } });
     expect(approveAdditionRequest).toHaveBeenCalledWith({}, expect.objectContaining({ requestId: 'request-002', reviewerUserId: 'admin-001' }));
+    expect(enqueueOrderAdditionDecisionNotifications).toHaveBeenCalledWith({ requestId: 'request-002', decision: 'APPROVED' });
   });
 
   it('retries a serializable review race', async () => {
@@ -78,5 +79,15 @@ describe('order addition actions', () => {
 
     await expect(reviewOrderAdditionAction({ requestId: 'request-001', decision: 'APPROVED' })).resolves.toMatchObject({ ok: true });
     expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries deduplicated notification enqueueing when a decision is replayed', async () => {
+    vi.mocked(assertAdminAction).mockResolvedValue({ user: { id: 'admin-001' } } as never);
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback({} as never));
+    vi.mocked(approveAdditionRequest).mockResolvedValue({ orderId: 'order-001', customerId: 'cust-001', replayed: true });
+
+    await reviewOrderAdditionAction({ requestId: 'request-001', decision: 'APPROVED' });
+
+    expect(enqueueOrderAdditionDecisionNotifications).toHaveBeenCalledWith({ requestId: 'request-001', decision: 'APPROVED' });
   });
 });

@@ -13,7 +13,7 @@ import { calculatePaymentTermsSummary, paymentTermLabels } from '../../orders/pa
 import { calculateVatSummary } from '../../orders/vat';
 import { fallbackProductImage, productImages } from '../../../lib/product-assets';
 import { money } from '../../../lib/format';
-import { getCartItems, getCartPricingSummary, setCartQuantity, type Cart } from '../../../lib/order-utils';
+import { getCartItems, getIncrementalCartPricingSummary, setCartQuantity, type Cart } from '../../../lib/order-utils';
 import { createApprovedOrderAdditionAction, submitOrderAdditionAction } from '../actions';
 
 export function AdditionCatalogClient({
@@ -40,7 +40,7 @@ export function AdditionCatalogClient({
     return normalized ? products.filter((product) => [product.name, product.category, product.sku].some((value) => value.toLocaleLowerCase('he').includes(normalized))) : products;
   }, [products, query]);
   const cartItems = getCartItems(cart, new Set(products.map((product) => product.id)));
-  const pricing = getCartPricingSummary(cart, products);
+  const pricing = getIncrementalCartPricingSummary(cart, products, order.items);
   const payment = calculatePaymentTermsSummary(pricing.total, order.paymentTerm);
   const vat = calculateVatSummary(payment.total);
 

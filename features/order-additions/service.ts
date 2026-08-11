@@ -31,13 +31,22 @@ export async function submitOrderAddition({
       revision: true,
       paymentTerm: true,
       deliveryWindowStart: true,
+      lines: { select: { productId: true, quantity: true } },
     },
   });
   if (!order) throw new SafeActionError('NOT_FOUND', 'ההזמנה לא נמצאה.');
   assertAdditionAllowed(order.status);
 
   const context = await getOrderWriteContext(customerId);
-  const snapshot = buildOrderAdditionSnapshot({ context, items, paymentTerm: order.paymentTerm, now });
+  const snapshot = buildOrderAdditionSnapshot({
+    context,
+    existingItems: order.lines.flatMap((line) => line.productId
+      ? [{ productId: line.productId, quantity: line.quantity }]
+      : []),
+    items,
+    paymentTerm: order.paymentTerm,
+    now,
+  });
   let persisted: Awaited<ReturnType<typeof persistPendingAdditionRequest>> | null = null;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {

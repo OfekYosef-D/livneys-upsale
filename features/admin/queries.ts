@@ -212,6 +212,7 @@ export async function getAdminOrderDetail(orderId: string) {
     customerPhone: order.customer.phone,
     lines: order.lines.map((line) => ({
       id: line.id,
+      productId: line.productId,
       productName: line.productName,
       quantity: line.quantity,
       listUnitPrice: Number(line.listUnitPrice),

@@ -35,7 +35,17 @@ export default async function AdminOrderAdditionPage({ params }: { params: Promi
         totalIncludingVat: order.totalIncludingVat,
         commercialTermsVersion: order.commercialTermsVersion,
         commercialTermsAcceptedAt: order.commercialTermsAcceptedAt,
-        items: [],
+        items: order.lines.flatMap((line) => line.productId ? [{
+          productId: line.productId,
+          productName: line.productName,
+          qty: line.quantity,
+          listUnitPrice: line.listUnitPrice,
+          unitPrice: line.unitPrice,
+          lineSubtotal: line.lineSubtotal,
+          discountTotal: line.discountTotal,
+          lineTotal: line.lineTotal,
+          promotionLabel: line.promotionLabel,
+        }] : []),
       }}
       initialLines={[]}
       mode="admin"

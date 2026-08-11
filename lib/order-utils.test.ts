@@ -6,6 +6,7 @@ import {
   getAllowedProductIds,
   getCartItems,
   getCartPricingSummary,
+  getIncrementalCartPricingSummary,
   getCartTotal,
   prepareCustomerCart,
   sanitizeCart,
@@ -117,6 +118,24 @@ describe('order utilities', () => {
       discountTotal: 100,
       total: 720,
     });
+  });
+
+  it('shows the incremental buy-x-get-y discount earned by the combined quantity', () => {
+    const bundleProduct = {
+      id: 'bundle', name: 'Bundle', category: 'A', listPrice: 100, price: 100,
+      promotion: {
+        effectType: 'BUY_X_GET_Y' as const,
+        discountValue: null,
+        buyQuantity: 2,
+        freeQuantity: 1,
+      },
+    };
+
+    expect(getIncrementalCartPricingSummary(
+      { bundle: 1 },
+      [bundleProduct],
+      [{ productId: 'bundle', qty: 2 }],
+    )).toEqual({ subtotal: 100, discountTotal: 100, total: 0 });
   });
 
   it('filters products by category, search text, previous order, recommended, and promotions', () => {

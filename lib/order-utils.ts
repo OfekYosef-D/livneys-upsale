@@ -180,6 +180,27 @@ export function getCartPricingSummary<T extends CatalogProductLike>(cart: Cart, 
   }, { subtotal: 0, discountTotal: 0, total: 0 });
 }
 
+export function getIncrementalCartPricingSummary<T extends CatalogProductLike>(
+  cart: Cart,
+  products: T[],
+  existingItems: OrderLine[],
+): { subtotal: number; discountTotal: number; total: number } {
+  const allowedProductIds = getAllowedProductIds(products);
+  const existingCart = buildCartFromOrder(existingItems, allowedProductIds);
+  const combinedCart = getCartItems(cart, allowedProductIds).reduce(
+    (combined, item) => setCartQuantity(combined, item.productId, (combined[item.productId] ?? 0) + item.qty),
+    existingCart,
+  );
+  const baseline = getCartPricingSummary(existingCart, products);
+  const combined = getCartPricingSummary(combinedCart, products);
+
+  return {
+    subtotal: roundCurrency(combined.subtotal - baseline.subtotal),
+    discountTotal: Math.max(0, roundCurrency(combined.discountTotal - baseline.discountTotal)),
+    total: Math.max(0, roundCurrency(combined.total - baseline.total)),
+  };
+}
+
 export function filterCatalogProducts<T extends CatalogProductLike>(products: T[], filters: CatalogFilters): T[] {
   const query = normalize(filters.query ?? '');
 
