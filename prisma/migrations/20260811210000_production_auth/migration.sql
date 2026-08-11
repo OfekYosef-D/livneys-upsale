@@ -8,7 +8,8 @@ ALTER TABLE "User"
   ADD COLUMN "mfaEnabled" BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN "mfaSecretEncrypted" TEXT;
 
-ALTER TABLE "User" DROP CONSTRAINT "User_customerId_key";
+ALTER TABLE "User" DROP CONSTRAINT IF EXISTS "User_customerId_key";
+DROP INDEX IF EXISTS "User_customerId_key";
 CREATE INDEX "User_customerId_idx" ON "User"("customerId");
 CREATE INDEX "User_isActive_idx" ON "User"("isActive");
 

@@ -70,7 +70,8 @@ describe('Prisma migration files', () => {
     expect(sql).toContain('CREATE TABLE "AuthToken"');
     expect(sql).toContain('CREATE TABLE "MfaRecoveryCode"');
     expect(sql).toContain('CREATE TABLE "RateLimitBucket"');
-    expect(sql).toContain('DROP CONSTRAINT "User_customerId_key"');
+    expect(sql).toContain('DROP CONSTRAINT IF EXISTS "User_customerId_key"');
+    expect(sql).toContain('DROP INDEX IF EXISTS "User_customerId_key"');
     expect(sql).toContain("WHERE LOWER(\"email\") LIKE '%@livneys.local'");
     expect(sql).not.toMatch(/^\s*(?:DELETE\s+FROM|TRUNCATE\s+)/im);
   });
