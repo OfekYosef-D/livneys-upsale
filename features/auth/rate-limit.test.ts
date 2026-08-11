@@ -11,7 +11,11 @@ describe('authentication rate limiting', () => {
 
   it('returns remaining attempts from the atomic database counter', async () => {
     queryRaw.mockResolvedValue([{ count: 2, blockedUntil: null }]);
-    await expect(consumeRateLimit({ scope: 'login-account', identifier: 'Email@example.com', limit: 8, windowMs: 1000 })).resolves.toMatchObject({ remaining: 6 });
+    const now = new Date('2026-08-11T12:00:00.000Z');
+    await expect(consumeRateLimit({ scope: 'login-account', identifier: 'Email@example.com', limit: 8, windowMs: 1000, now })).resolves.toMatchObject({ remaining: 6 });
+    expect(deleteMany).toHaveBeenCalledWith({
+      where: { updatedAt: { lt: new Date('2026-08-10T12:00:00.000Z') } },
+    });
   });
 
   it('surfaces a safe RATE_LIMITED error once blocked', async () => {

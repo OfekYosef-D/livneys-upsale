@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/db';
 
+const RATE_LIMIT_RETENTION_MS = 24 * 60 * 60 * 1000;
+
 type RateLimitScope =
   | 'login-ip'
   | 'login-account'
@@ -34,6 +36,10 @@ export async function consumeRateLimit({
   blockMs?: number;
   now?: Date;
 }) {
+  await prisma.rateLimitBucket.deleteMany({
+    where: { updatedAt: { lt: new Date(now.getTime() - RATE_LIMIT_RETENTION_MS) } },
+  });
+
   const key = `${scope}:${createHash('sha256').update(identifier.toLowerCase()).digest('hex')}`;
   const windowThreshold = new Date(now.getTime() - windowMs);
   const newBlockedUntil = new Date(now.getTime() + blockMs);
