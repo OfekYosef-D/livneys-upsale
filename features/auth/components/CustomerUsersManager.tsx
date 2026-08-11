@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState, useTransition } from 'react';
 import { inviteCustomerUserAction, resendCustomerUserSetupAction, setCustomerUserActiveAction } from '../actions';
-import { completeSuccessfulInvite } from './customer-users-manager-helpers';
+import { completeSuccessfulInvite, refreshAfterInviteFailure } from './customer-users-manager-helpers';
 
 type Account = { id: string; name: string; email: string; isActive: boolean; setupComplete: boolean };
 
@@ -58,7 +58,10 @@ export function CustomerUsersManager({ customerId, accounts }: { customerId: str
             setMessage('המשתמש נוסף ונשלח אליו קישור להגדרת סיסמה.');
             completeSuccessfulInvite(form, router);
           }
-          else setMessage(result.error);
+          else {
+            setMessage(result.error);
+            refreshAfterInviteFailure(router);
+          }
         });
       }} className="mt-4 space-y-2 border-t border-black/10 pt-4">
         <p className="text-xs font-black">הוספת משתמש מורשה נוסף</p>

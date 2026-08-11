@@ -5,3 +5,7 @@ export function completeSuccessfulInvite(form: ResettableForm, router: Refreshab
   form.reset();
   router.refresh();
 }
+
+export function refreshAfterInviteFailure(router: RefreshableRouter) {
+  router.refresh();
+}

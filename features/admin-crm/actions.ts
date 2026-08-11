@@ -13,6 +13,7 @@ import { assertAdminAction } from '@/lib/authorization';
 import { prisma } from '@/lib/db';
 import { enqueueOrderLifecycleWhatsApp } from '../notifications/jobs';
 import { getTemplateKeyForOrderStatus } from '../notifications/templates';
+import { revokeCustomerSessionsOnDeactivation } from './customer-access';
 import {
   createCustomerSchema,
   createPriceListSchema,
@@ -156,6 +157,11 @@ export async function updateCustomerAction(input: unknown): Promise<ActionResult
           },
         },
       });
+      await revokeCustomerSessionsOnDeactivation(tx, {
+        customerId: parsed.id,
+        wasActive: existing.isActive,
+        isActive: parsed.isActive,
+      });
     });
 
     revalidateAdminCrm();
@@ -170,9 +176,22 @@ export async function toggleCustomerActiveAction(input: { id: string; isActive: 
   try {
     const parsed = activeToggleSchema.parse(input);
     await assertAdminAction();
-    await prisma.customer.update({
-      where: { id: parsed.id },
-      data: { isActive: parsed.isActive },
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.customer.findUnique({
+        where: { id: parsed.id },
+        select: { isActive: true },
+      });
+      if (!existing) throw new Error('הלקוח לא נמצא.');
+
+      await tx.customer.update({
+        where: { id: parsed.id },
+        data: { isActive: parsed.isActive },
+      });
+      await revokeCustomerSessionsOnDeactivation(tx, {
+        customerId: parsed.id,
+        wasActive: existing.isActive,
+        isActive: parsed.isActive,
+      });
     });
 
     revalidateAdminCrm();
