@@ -9,6 +9,7 @@ import {
   updateRegistrationStatusAction,
 } from '@/features/registration/actions';
 import type { getRegistrationManagementData } from '@/features/registration/queries';
+import { refreshAfterRegistrationMutation } from './registration-admin-refresh';
 
 type RegistrationData = Awaited<ReturnType<typeof getRegistrationManagementData>>;
 type StatusFilter = 'all' | RegistrationData['requests'][number]['status'];
@@ -39,10 +40,10 @@ export function AdminRegistrationsClient({ data }: { data: RegistrationData }) {
       setPendingId(null);
       if (result.ok) {
         setMessage(success);
-        router.refresh();
       } else {
         setMessage(result.error);
       }
+      refreshAfterRegistrationMutation(router);
     });
   }
 

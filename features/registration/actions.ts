@@ -80,6 +80,7 @@ export async function updateRegistrationStatusAction(input: UpdateRegistrationSt
 }
 
 export async function convertRegistrationToCustomerAction(input: ConvertRegistrationInput): Promise<ActionResult<{ customerId: string }>> {
+  let committedCustomerId: string | null = null;
   try {
     const parsed = convertRegistrationSchema.parse(input);
     await assertAdminAction();
@@ -156,6 +157,7 @@ export async function convertRegistrationToCustomerAction(input: ConvertRegistra
       });
       return { customerId: nextCustomerId, userId: user.id, setupUrl: setupToken.url };
     });
+    committedCustomerId = converted.customerId;
     await sendAccountAccessNotifications({
       userId: converted.userId,
       type: AuthTokenType.PASSWORD_SETUP,
@@ -164,13 +166,18 @@ export async function convertRegistrationToCustomerAction(input: ConvertRegistra
 
     const customerId = converted.customerId;
 
-    revalidatePath('/admin/registrations');
-    revalidatePath('/admin/customers');
-    revalidatePath(`/admin/customers/${customerId}`);
+    revalidateRegistrationConversion(customerId);
     return actionOk({ customerId });
   } catch (error) {
+    if (committedCustomerId) revalidateRegistrationConversion(committedCustomerId);
     return actionError(error);
   }
+}
+
+function revalidateRegistrationConversion(customerId: string) {
+  revalidatePath('/admin/registrations');
+  revalidatePath('/admin/customers');
+  revalidatePath(`/admin/customers/${customerId}`);
 }
 
 async function assertRouteAndPriceList(routeId: string, priceListId: string) {

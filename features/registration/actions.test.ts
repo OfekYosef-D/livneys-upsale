@@ -76,6 +76,7 @@ vi.mock('@/lib/db', () => ({
 
 const { prisma } = await import('@/lib/db');
 const { assertAdminAction } = await import('@/lib/authorization');
+const { revalidatePath } = await import('next/cache');
 
 const mockedAssertAdminAction = vi.mocked(assertAdminAction);
 const mockedRegistrationCreate = vi.mocked(prisma.companyRegistrationRequest.create);
@@ -85,6 +86,7 @@ const mockedRouteFindUnique = vi.mocked(prisma.route.findUnique);
 const mockedPriceListFindUnique = vi.mocked(prisma.priceList.findUnique);
 const mockedCustomerCreate = vi.mocked(prisma.customer.create);
 const mockedUserCreate = vi.mocked(prisma.user.create);
+const mockedRevalidatePath = vi.mocked(revalidatePath);
 
 describe('registration actions', () => {
   beforeEach(() => {
@@ -100,6 +102,7 @@ describe('registration actions', () => {
     verifyChallengeMock.mockClear();
     issueAuthTokenMock.mockClear();
     sendAccountAccessNotificationsMock.mockClear();
+    mockedRevalidatePath.mockClear();
   });
 
   it('creates public company registration requests without admin auth', async () => {
@@ -234,5 +237,7 @@ describe('registration actions', () => {
     });
 
     expect(result).toEqual({ ok: false, error: 'provider failure' });
+    expect(mockedRevalidatePath).toHaveBeenCalledWith('/admin/registrations');
+    expect(mockedRevalidatePath).toHaveBeenCalledWith(expect.stringMatching(/^\/admin\/customers\/cust-cafe-north-/));
   });
 });
