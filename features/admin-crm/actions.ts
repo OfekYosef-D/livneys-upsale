@@ -114,6 +114,7 @@ export async function updateCustomerAction(input: unknown): Promise<ActionResult
         nextEmail: parsed.email,
         nextContactName: parsed.contact,
         users: existing.users,
+        now: new Date(),
       });
 
       await tx.customer.update({

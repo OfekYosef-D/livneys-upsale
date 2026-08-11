@@ -3,12 +3,13 @@ import type { Prisma } from '@prisma/client';
 type CustomerLoginUser = { id: string; email: string };
 
 export async function syncCustomerLoginIdentity(
-  tx: Pick<Prisma.TransactionClient, 'user'>,
+  tx: Pick<Prisma.TransactionClient, 'user' | 'authToken'>,
   input: {
     currentEmail: string | null;
     nextEmail: string | null;
     nextContactName: string;
     users: CustomerLoginUser[];
+    now: Date;
   },
 ) {
   if (input.currentEmail === input.nextEmail) return;
@@ -36,7 +37,12 @@ export async function syncCustomerLoginIdentity(
       data: {
         email: input.nextEmail,
         name: input.nextContactName,
+        sessionVersion: { increment: 1 },
       },
+    });
+    await tx.authToken.updateMany({
+      where: { userId: currentLoginUser.id, usedAt: null },
+      data: { usedAt: input.now },
     });
   }
 }
