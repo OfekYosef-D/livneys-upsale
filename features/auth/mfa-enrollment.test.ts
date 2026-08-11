@@ -116,6 +116,12 @@ describe('MFA re-enrollment', () => {
       data: { recoveryCodes: ['recover-1', 'recover-2'] },
     });
 
+    expect(consumeRateLimit).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      scope: 'mfa-replacement-ip', identifier: '203.0.113.12',
+    }));
+    expect(consumeRateLimit).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      scope: 'mfa-replacement-account', identifier: 'admin-1',
+    }));
     expect(tx.user.update).toHaveBeenCalledWith({
       where: { id: 'admin-1' },
       data: {

@@ -168,21 +168,7 @@ export async function startMfaEnrollmentAction(input: unknown): Promise<ActionRe
     });
     if (!user || user.role !== 'ADMIN' || !user.isActive) throw new Error('אין הרשאה לבצע פעולה זו.');
     if (user.mfaEnabled) {
-      const ip = await getRequestIp();
-      await consumeRateLimit({
-        scope: 'mfa-replacement-ip',
-        identifier: ip,
-        limit: 20,
-        windowMs: 30 * 60 * 1000,
-        blockMs: 60 * 60 * 1000,
-      });
-      await consumeRateLimit({
-        scope: 'mfa-replacement-account',
-        identifier: session.user.id,
-        limit: 8,
-        windowMs: 30 * 60 * 1000,
-        blockMs: 60 * 60 * 1000,
-      });
+      await consumeMfaReplacementRateLimits(session.user.id);
       if (!parsed.password || !user.passwordHash || !(await bcrypt.compare(parsed.password, user.passwordHash))) {
         throw new Error('יש לאמת מחדש את הסיסמה הנוכחית לפני החלפת האימות הדו-שלבי.');
       }
@@ -207,6 +193,7 @@ export async function confirmMfaEnrollmentAction(input: unknown): Promise<Action
     const session = await assertAdminEnrollmentAction();
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
     if (!user?.mfaPendingSecretEncrypted) throw new Error('יש להתחיל מחדש את הגדרת האימות הדו-שלבי.');
+    await consumeMfaReplacementRateLimits(session.user.id);
 
     const { decryptMfaSecret } = await import('./mfa');
     if (!verifyTotpCode(decryptMfaSecret(user.mfaPendingSecretEncrypted), parsed.code)) {
@@ -233,6 +220,24 @@ export async function confirmMfaEnrollmentAction(input: unknown): Promise<Action
   } catch (error) {
     return actionError(error);
   }
+}
+
+async function consumeMfaReplacementRateLimits(userId: string) {
+  const ip = await getRequestIp();
+  await consumeRateLimit({
+    scope: 'mfa-replacement-ip',
+    identifier: ip,
+    limit: 20,
+    windowMs: 30 * 60 * 1000,
+    blockMs: 60 * 60 * 1000,
+  });
+  await consumeRateLimit({
+    scope: 'mfa-replacement-account',
+    identifier: userId,
+    limit: 8,
+    windowMs: 30 * 60 * 1000,
+    blockMs: 60 * 60 * 1000,
+  });
 }
 
 async function notifySafely(userId: string, type: AuthTokenType, url: string) {
