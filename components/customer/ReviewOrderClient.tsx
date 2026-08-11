@@ -42,6 +42,7 @@ export function ReviewOrderClient({
   const allowedProductIds = useMemo(() => getAllowedProductIds(products), [products]);
   const preparedCart = useMemo(() => prepareCustomerCart(lastOrder.items, products), [lastOrder.items, products]);
   const [cart, setCart] = useState<Cart>(() => preparedCart.cart);
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [cartNotice, setCartNotice] = useState('');
   const [notes, setNotes] = useState('');
   const [paymentTerm, setPaymentTerm] = useState<PaymentTermValue>('NET_30');
@@ -83,6 +84,7 @@ export function ReviewOrderClient({
     setIsSubmitting(true);
     const result = await submitCustomerOrderAction({
       customerId: customer.id,
+      idempotencyKey,
       items: cartItems,
       notes,
       paymentTerm,

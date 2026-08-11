@@ -239,6 +239,8 @@ model Route {
 model Order {
   id                  String      @id @default(cuid())
   orderNumber         Int         @unique @default(autoincrement())
+  idempotencyKey      String?     @unique
+  revision            Int         @default(1)
   customerId          String
   routeId             String?
   status              OrderStatus
@@ -260,7 +262,7 @@ model Order {
   totalIncludingVat   Decimal     @default(0) @db.Decimal(10, 2)
   commercialTermsVersion String?
   commercialTermsAcceptedAt DateTime?
-  customer            Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer            Customer    @relation(fields: [customerId], references: [id], onDelete: Restrict)
   route               Route?      @relation(fields: [routeId], references: [id], onDelete: SetNull)
   lines               OrderLine[]
   notificationJobs    NotificationJob[]
@@ -268,6 +270,7 @@ model Order {
   updatedAt           DateTime    @updatedAt
 
   @@index([customerId, status])
+  @@index([customerId, deliveryWindowStart])
   @@index([routeId, status])
   @@index([deliveryWindowStart])
   @@index([submittedAt])

@@ -10,6 +10,19 @@ import {
 } from './schemas';
 
 describe('admin CRM schemas', () => {
+  it('requires an idempotency key for manual order submission', () => {
+    const input = {
+      customerId: 'cust-001',
+      idempotencyKey: '8f82b072-99be-45e7-b1aa-2ca4d92fc8d2',
+      intakeChannel: 'PHONE',
+      items: [{ productId: 'prod-a', quantity: 2 }],
+    };
+
+    expect(manualOrderMutationSchema.parse(input)).toMatchObject({ idempotencyKey: input.idempotencyKey });
+    expect(manualOrderMutationSchema.safeParse({ ...input, idempotencyKey: 'invalid' }).success).toBe(false);
+    expect(manualOrderMutationSchema.safeParse({ ...input, idempotencyKey: undefined }).success).toBe(false);
+  });
+
   it('normalizes valid customer input and notification preferences', () => {
     const parsed = customerMutationSchema.parse({
       name: '  Cafe South  ',
