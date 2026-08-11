@@ -66,10 +66,7 @@ export async function authenticateCredentials(
     if (!secondFactorValid) return null;
   }
 
-  await Promise.all([
-    clearRateLimit('login-ip', ip),
-    clearRateLimit('login-account', email),
-  ]);
+  await clearRateLimit('login-account', email);
   return {
     id: user.id,
     email: user.email,
