@@ -1,6 +1,6 @@
 'use client';
 import { Minus, Plus } from 'lucide-react';
-import { useEffect, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react';
+import { useEffect, useState, type FocusEvent, type FormEvent, type KeyboardEvent } from 'react';
 
 export function parseOrderQuantity(draft: string, min: number, step: number): number | null {
   const safeStep = Math.max(1, Math.floor(step));
@@ -58,7 +58,7 @@ export function QuantityStepper({
     event.currentTarget.select();
   }
 
-  function handleInput(event: ChangeEvent<HTMLInputElement>) {
+  function handleInput(event: FormEvent<HTMLInputElement>) {
     setDraft(event.currentTarget.value.replace(/\D/g, ''));
   }
 
@@ -96,6 +96,7 @@ export function QuantityStepper({
         value={draft}
         maxLength={6}
         onChange={handleInput}
+        onInput={handleInput}
         onFocus={handleFocus}
         onBlur={(event) => commitDraft(event.currentTarget.value)}
         onKeyDown={handleKeyDown}
