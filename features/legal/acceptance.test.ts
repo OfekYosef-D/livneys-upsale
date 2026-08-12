@@ -10,6 +10,7 @@ describe('versioned legal acceptance', () => {
 
     await recordOrderLegalAcceptances(tx as never, {
       orderId: 'order-1', customerId: 'cust-1', userId: 'user-1', acceptedAt,
+      expectedDocumentSetVersion: LEGAL_DOCUMENT_SET_VERSION,
     });
 
     expect(createMany).toHaveBeenCalledOnce();
@@ -21,6 +22,15 @@ describe('versioned legal acceptance', () => {
       contentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       acceptedAt,
     }))));
+  });
+
+  it('rejects an acceptance submitted from a stale legal review screen', async () => {
+    const createMany = vi.fn();
+    await expect(recordOrderLegalAcceptances({ legalAcceptance: { createMany } } as never, {
+      orderId: 'order-1', customerId: 'cust-1', userId: 'user-1', acceptedAt: new Date(),
+      expectedDocumentSetVersion: 'previous-version',
+    })).rejects.toMatchObject({ code: 'STALE_VERSION' });
+    expect(createMany).not.toHaveBeenCalled();
   });
 
   it('blocks only a real production deployment until counsel-approved copy is declared', () => {

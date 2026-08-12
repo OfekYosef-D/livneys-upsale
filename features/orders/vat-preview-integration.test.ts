@@ -18,7 +18,9 @@ describe('VAT preview integration', () => {
     const clientSource = fs.readFileSync(path.join(process.cwd(), 'components', 'customer', 'ReviewOrderClient.tsx'), 'utf8');
     const actionSource = fs.readFileSync(path.join(process.cwd(), 'features', 'customer-portal', 'actions.ts'), 'utf8');
     expect(clientSource).toContain('vatRatePercent,');
+    expect(clientSource).toContain('legalDocumentSetVersion: LEGAL_DOCUMENT_SET_VERSION');
     expect(actionSource).toContain('expectedVatRatePercent: parsed.vatRatePercent');
+    expect(actionSource).toContain('expectedLegalDocumentSetVersion: parsed.legalDocumentSetVersion');
   });
 });
 

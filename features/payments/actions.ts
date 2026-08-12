@@ -6,7 +6,7 @@ import { assertAdminAction } from '../../lib/authorization';
 import { recordPaymentReceipt, voidPaymentReceipt } from './service';
 import { recordPaymentReceiptSchema, voidPaymentReceiptSchema } from './schemas';
 
-export async function recordPaymentReceiptAction(input: unknown): Promise<ActionResult<{ receiptId: string }>> {
+export async function recordPaymentReceiptAction(input: unknown): Promise<ActionResult<{ receiptId: string; replayed: boolean }>> {
   try {
     const parsed = recordPaymentReceiptSchema.parse(input);
     const session = await assertAdminAction();

@@ -129,6 +129,7 @@ export async function submitCustomerOrderAction(input: SubmitCustomerOrderInput)
       replaceDraftForDeliveryWindow: true,
       actorUserId: session.user.id,
       expectedVatRatePercent: parsed.vatRatePercent,
+      expectedLegalDocumentSetVersion: parsed.legalDocumentSetVersion,
     });
 
     revalidatePath('/admin');

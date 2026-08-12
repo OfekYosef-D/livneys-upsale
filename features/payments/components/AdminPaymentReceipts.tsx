@@ -42,6 +42,7 @@ export function AdminPaymentReceipts({ orderId, total, paidTotal, outstanding, s
   const [method, setMethod] = useState<PaymentMethod>('BANK_TRANSFER');
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
     setAmount(getReceiptAmountForOutstanding(outstanding));
@@ -52,6 +53,7 @@ export function AdminPaymentReceipts({ orderId, total, paidTotal, outstanding, s
     startTransition(async () => {
       const result = await recordPaymentReceiptAction({
         orderId,
+        idempotencyKey,
         amount,
         method,
         reference: reference || null,
@@ -63,6 +65,7 @@ export function AdminPaymentReceipts({ orderId, total, paidTotal, outstanding, s
       setAmount('');
       setReference('');
       setNote('');
+      setIdempotencyKey(crypto.randomUUID());
       router.refresh();
     });
   }

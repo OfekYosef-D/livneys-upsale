@@ -27,6 +27,7 @@ import {
   type Cart,
 } from '@/lib/order-utils';
 import { getActiveOrderCustomerRedirect } from '@/features/order-additions/ui';
+import { LEGAL_DOCUMENT_SET_VERSION } from '@/features/legal/documents';
 
 export function ReviewOrderClient({
   customer,
@@ -96,6 +97,7 @@ export function ReviewOrderClient({
       paymentTerm,
       commercialTermsAccepted,
       vatRatePercent,
+      legalDocumentSetVersion: LEGAL_DOCUMENT_SET_VERSION,
     });
     setIsSubmitting(false);
 

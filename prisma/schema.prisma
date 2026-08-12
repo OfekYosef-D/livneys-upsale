@@ -472,6 +472,7 @@ model OrderActivity {
 
 model PaymentReceipt {
   id               String               @id @default(cuid())
+  idempotencyKey   String?              @unique
   orderId          String
   amount           Decimal              @db.Decimal(10, 2)
   method           PaymentMethod

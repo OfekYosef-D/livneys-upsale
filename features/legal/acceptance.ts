@@ -17,11 +17,20 @@ export function hashLegalDocument(document: LegalDocumentDefinition): string {
 
 export async function recordOrderLegalAcceptances(
   tx: LegalAcceptanceWriter,
-  input: { orderId: string; customerId: string; userId: string; acceptedAt: Date },
+  input: { orderId: string; customerId: string; userId: string; acceptedAt: Date; expectedDocumentSetVersion: string },
 ) {
+  if (input.expectedDocumentSetVersion !== LEGAL_DOCUMENT_SET_VERSION) {
+    throw new SafeActionError(
+      'STALE_VERSION',
+      '׳”׳×׳ ׳׳™׳ ׳¢׳•׳“׳›׳ ׳• ׳׳׳– ׳©׳₪׳×׳—׳×׳ ׳׳× ׳”׳׳¡׳. ׳¨׳¢׳ ׳ ׳• ׳•׳¢׳‘׳¨׳• ׳©׳•׳‘ ׳¢׳ ׳”׳ ׳•׳¡׳— ׳”׳¢׳“׳›׳ ׳™.',
+    );
+  }
   await tx.legalAcceptance.createMany({
     data: legalDocuments.map((document) => ({
-      ...input,
+      orderId: input.orderId,
+      customerId: input.customerId,
+      userId: input.userId,
+      acceptedAt: input.acceptedAt,
       documentType: document.type,
       documentVersion: document.version,
       contentHash: hashLegalDocument(document),

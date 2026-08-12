@@ -21,22 +21,38 @@ describe('manual payment receipts', () => {
         id: 'order-1', customerId: 'cust-1', orderNumber: 1007, status: 'DELIVERED', totalIncludingVat: 118,
         paymentReceipts: [{ amount: 30, status: 'RECORDED' }],
       })) },
-      paymentReceipt: { create: vi.fn(async () => ({ id: 'receipt-1' })) },
+      paymentReceipt: { findUnique: vi.fn(async () => null), create: vi.fn(async () => ({ id: 'receipt-1' })) },
       auditLog: { create: vi.fn() },
     };
     await expect(recordPaymentReceiptInTransaction(tx as never, {
-      orderId: 'order-1', amount: 50, method: 'BANK_TRANSFER', reference: 'BANK-42',
+      orderId: 'order-1', idempotencyKey: '9d31ee3f-3eb9-4cbc-b0ff-d48ed1daed71', amount: 50, method: 'BANK_TRANSFER', reference: 'BANK-42',
       receivedAt: new Date('2026-08-12T08:00:00.000Z'), note: null, actorUserId: 'admin-1',
-    })).resolves.toEqual({ receiptId: 'receipt-1' });
+    })).resolves.toEqual({ receiptId: 'receipt-1', replayed: false });
 
     expect(tx.paymentReceipt.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
-        orderId: 'order-1', amount: 50, recordedByUserId: 'admin-1', status: 'RECORDED',
+        orderId: 'order-1', idempotencyKey: '9d31ee3f-3eb9-4cbc-b0ff-d48ed1daed71', amount: 50, recordedByUserId: 'admin-1', status: 'RECORDED',
       }),
     }));
     expect(tx.auditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({
       action: 'PAYMENT_RECORDED', entityType: 'PaymentReceipt', entityId: 'receipt-1',
     }) });
+  });
+
+  it('returns the original receipt without another balance check or audit on replay', async () => {
+    const tx = {
+      order: { findUnique: vi.fn() },
+      paymentReceipt: { findUnique: vi.fn(async () => ({ id: 'receipt-existing', orderId: 'order-1' })), create: vi.fn() },
+      auditLog: { create: vi.fn() },
+    };
+
+    await expect(recordPaymentReceiptInTransaction(tx as never, {
+      orderId: 'order-1', idempotencyKey: '9d31ee3f-3eb9-4cbc-b0ff-d48ed1daed71', amount: 30, method: 'CASH',
+      reference: null, receivedAt: new Date(), note: null, actorUserId: 'admin-1',
+    })).resolves.toEqual({ receiptId: 'receipt-existing', replayed: true });
+    expect(tx.order.findUnique).not.toHaveBeenCalled();
+    expect(tx.paymentReceipt.create).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
 
   it('rejects an amount above the remaining gross balance', async () => {
@@ -45,11 +61,11 @@ describe('manual payment receipts', () => {
         id: 'order-1', customerId: 'cust-1', orderNumber: 1007, status: 'DELIVERED', totalIncludingVat: 118,
         paymentReceipts: [{ amount: 100, status: 'RECORDED' }],
       })) },
-      paymentReceipt: { create: vi.fn() },
+      paymentReceipt: { findUnique: vi.fn(async () => null), create: vi.fn() },
       auditLog: { create: vi.fn() },
     };
     await expect(recordPaymentReceiptInTransaction(tx as never, {
-      orderId: 'order-1', amount: 20, method: 'CASH', reference: null,
+      orderId: 'order-1', idempotencyKey: '7777ee3f-3eb9-4cbc-b0ff-d48ed1daed71', amount: 20, method: 'CASH', reference: null,
       receivedAt: new Date(), note: null, actorUserId: 'admin-1',
     })).rejects.toMatchObject({ code: 'PAYMENT_EXCEEDS_BALANCE' });
     expect(tx.paymentReceipt.create).not.toHaveBeenCalled();

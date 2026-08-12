@@ -95,4 +95,12 @@ describe('Prisma migration files', () => {
     expect(sql).toContain("'israel-standard-2025-01-01'");
     expect(sql).not.toMatch(/^\s*(?:DELETE\s+FROM|TRUNCATE\s+)/im);
   });
+
+  it('adds receipt idempotency forward-only without rewriting existing receipts', () => {
+    const migrationFile = path.join(process.cwd(), 'prisma', 'migrations', '20260812143000_payment_receipt_idempotency', 'migration.sql');
+    const sql = fs.readFileSync(migrationFile, 'utf8');
+    expect(sql).toContain('ADD COLUMN "idempotencyKey" TEXT');
+    expect(sql).toContain('CREATE UNIQUE INDEX "PaymentReceipt_idempotencyKey_key"');
+    expect(sql).not.toMatch(/^\s*(?:DELETE\s+FROM|TRUNCATE\s+|UPDATE\s+)/im);
+  });
 });

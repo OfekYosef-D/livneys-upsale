@@ -3,6 +3,7 @@ import { recordPaymentReceiptSchema } from './schemas';
 
 const baseReceipt = {
   orderId: 'order-1',
+  idempotencyKey: '9d31ee3f-3eb9-4cbc-b0ff-d48ed1daed71',
   method: 'CASH',
   receivedAt: new Date('2026-08-12T08:00:00.000Z'),
 };
@@ -14,5 +15,10 @@ describe('payment receipt validation', () => {
 
   it('rejects amounts with more than two decimals', () => {
     expect(() => recordPaymentReceiptSchema.parse({ ...baseReceipt, amount: 1.009 })).toThrow();
+  });
+
+  it('requires a UUID idempotency key', () => {
+    expect(recordPaymentReceiptSchema.safeParse({ ...baseReceipt, amount: 10, idempotencyKey: undefined }).success).toBe(false);
+    expect(recordPaymentReceiptSchema.safeParse({ ...baseReceipt, amount: 10, idempotencyKey: 'retry' }).success).toBe(false);
   });
 });

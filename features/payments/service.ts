@@ -10,6 +10,7 @@ type PaymentTransactionClient = Pick<Prisma.TransactionClient, 'order' | 'paymen
 
 export type RecordPaymentReceiptInput = {
   orderId: string;
+  idempotencyKey: string;
   amount: number;
   method: PaymentMethod;
   reference: string | null;
@@ -35,16 +36,38 @@ export function getPaymentSummary(totalIncludingVat: number, receipts: ReceiptLi
 }
 
 export async function recordPaymentReceipt(input: RecordPaymentReceiptInput) {
-  return prisma.$transaction(
-    (tx) => recordPaymentReceiptInTransaction(tx, input),
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-  );
+  try {
+    return await prisma.$transaction(
+      (tx) => recordPaymentReceiptInTransaction(tx, input),
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const replay = await prisma.paymentReceipt.findUnique({
+        where: { idempotencyKey: input.idempotencyKey },
+        select: { id: true, orderId: true },
+      });
+      if (replay?.orderId === input.orderId) return { receiptId: replay.id, replayed: true } as const;
+    }
+    throw error;
+  }
 }
 
 export async function recordPaymentReceiptInTransaction(
   tx: PaymentTransactionClient,
   input: RecordPaymentReceiptInput,
 ) {
+    const existingReceipt = await tx.paymentReceipt.findUnique({
+      where: { idempotencyKey: input.idempotencyKey },
+      select: { id: true, orderId: true },
+    });
+    if (existingReceipt) {
+      if (existingReceipt.orderId !== input.orderId) {
+        throw new SafeActionError('IDEMPOTENCY_CONFLICT', '׳”׳‘׳§׳©׳” ׳›׳‘׳¨ ׳©׳•׳™׳›׳” ׳׳×׳§׳‘׳•׳ ׳׳—׳¨. ׳¨׳¢׳ ׳ ׳• ׳׳× ׳”׳׳¡׳ ׳•׳ ׳¡׳• ׳©׳•׳‘.');
+      }
+      return { receiptId: existingReceipt.id, replayed: true } as const;
+    }
+
     const order = await tx.order.findUnique({
       where: { id: input.orderId },
       select: {
@@ -73,6 +96,7 @@ export async function recordPaymentReceiptInTransaction(
     const receipt = await tx.paymentReceipt.create({
       data: {
         orderId: input.orderId,
+        idempotencyKey: input.idempotencyKey,
         amount: input.amount,
         method: input.method,
         reference: normalizeText(input.reference),
@@ -100,7 +124,7 @@ export async function recordPaymentReceiptInTransaction(
         receivedAt: input.receivedAt,
       },
     });
-  return { receiptId: receipt.id };
+  return { receiptId: receipt.id, replayed: false } as const;
 }
 
 export async function voidPaymentReceipt(input: VoidPaymentReceiptInput) {

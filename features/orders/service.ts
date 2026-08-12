@@ -121,6 +121,7 @@ export async function createSubmittedOrder({
   replaceDraftForDeliveryWindow = false,
   actorUserId,
   expectedVatRatePercent,
+  expectedLegalDocumentSetVersion,
   now = new Date(),
 }: {
   customerId: string;
@@ -134,6 +135,7 @@ export async function createSubmittedOrder({
   replaceDraftForDeliveryWindow?: boolean;
   actorUserId?: string | null;
   expectedVatRatePercent?: number;
+  expectedLegalDocumentSetVersion?: string;
   now?: Date;
 }): Promise<{ orderId: string; orderNumber: number; status: string; routeId: string; replayed: boolean }> {
   const existingReplay = await prisma.order.findFirst({
@@ -192,6 +194,7 @@ export async function createSubmittedOrder({
               customerId,
               userId: actorUserId,
               acceptedAt: now,
+              expectedDocumentSetVersion: expectedLegalDocumentSetVersion ?? '',
             });
           }
           await appendAuditLog(tx, {
