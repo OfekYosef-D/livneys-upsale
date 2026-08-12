@@ -95,6 +95,7 @@ export function ReviewOrderClient({
       notes,
       paymentTerm,
       commercialTermsAccepted,
+      vatRatePercent,
     });
     setIsSubmitting(false);
 

@@ -202,6 +202,7 @@ describe('customer portal actions', () => {
       items: [{ productId: 'prod-a', qty: 2 }],
       notes: 'Call before arrival',
       paymentTerm: 'IMMEDIATE_OR_CASH',
+      vatRatePercent: 18,
       commercialTermsAccepted: true,
     });
 
@@ -214,6 +215,7 @@ describe('customer portal actions', () => {
         idempotencyKey,
         paymentTerm: 'IMMEDIATE_OR_CASH',
         commercialTermsAccepted: true,
+        expectedVatRatePercent: 18,
       }),
     );
     expect(mockedEnqueueOrderLifecycleWhatsApp).toHaveBeenCalledWith({ orderId: 'ord-customer' });
@@ -248,6 +250,7 @@ describe('customer portal actions', () => {
       idempotencyKey,
       items: [{ productId: 'prod-a', qty: 2 }],
       paymentTerm: 'NET_30',
+      vatRatePercent: 18,
       commercialTermsAccepted: true,
     });
 
@@ -291,6 +294,7 @@ describe('customer portal actions', () => {
       idempotencyKey,
       items: [{ productId: 'prod-a', qty: 2 }],
       paymentTerm: 'NET_30',
+      vatRatePercent: 18,
       commercialTermsAccepted: false,
     });
 
@@ -343,6 +347,7 @@ describe('customer portal actions', () => {
       idempotencyKey,
       items: [{ productId: 'prod-a', qty: 2 }],
       paymentTerm: 'INVALID' as 'NET_30',
+      vatRatePercent: 18,
       commercialTermsAccepted: true,
     });
 

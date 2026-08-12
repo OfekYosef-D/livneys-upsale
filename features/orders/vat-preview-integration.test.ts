@@ -12,6 +12,13 @@ describe('VAT preview integration', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'features', 'order-additions', 'components', 'AdditionCatalogClient.tsx'), 'utf8');
     expect(source).toContain('calculateVatSummary(payment.total, order.vatRatePercent)');
   });
+
+  it('submits the VAT rate that the customer reviewed', () => {
+    const clientSource = fs.readFileSync(path.join(process.cwd(), 'components', 'customer', 'ReviewOrderClient.tsx'), 'utf8');
+    const actionSource = fs.readFileSync(path.join(process.cwd(), 'features', 'customer-portal', 'actions.ts'), 'utf8');
+    expect(clientSource).toContain('vatRatePercent,');
+    expect(actionSource).toContain('expectedVatRatePercent: parsed.vatRatePercent');
+  });
 });
 
 describe('external product image integration', () => {

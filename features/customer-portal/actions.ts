@@ -128,6 +128,7 @@ export async function submitCustomerOrderAction(input: SubmitCustomerOrderInput)
       notes: parsed.notes,
       replaceDraftForDeliveryWindow: true,
       actorUserId: session.user.id,
+      expectedVatRatePercent: parsed.vatRatePercent,
     });
 
     revalidatePath('/admin');

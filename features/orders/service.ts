@@ -13,7 +13,7 @@ import {
   StaleOrderWriteError,
 } from './persistence';
 import { buildSubmittedOrderPayload, type OrderWriteContext } from './write';
-import { getEffectiveVatRate } from './tax-rates';
+import { assertVatQuoteCurrent, getEffectiveVatRate } from './tax-rates';
 
 export type OrderWriteItem = {
   productId: string;
@@ -120,6 +120,7 @@ export async function createSubmittedOrder({
   internalNote,
   replaceDraftForDeliveryWindow = false,
   actorUserId,
+  expectedVatRatePercent,
   now = new Date(),
 }: {
   customerId: string;
@@ -132,6 +133,7 @@ export async function createSubmittedOrder({
   internalNote?: string | null;
   replaceDraftForDeliveryWindow?: boolean;
   actorUserId?: string | null;
+  expectedVatRatePercent?: number;
   now?: Date;
 }): Promise<{ orderId: string; orderNumber: number; status: string; routeId: string; replayed: boolean }> {
   const existingReplay = await prisma.order.findFirst({
@@ -154,6 +156,9 @@ export async function createSubmittedOrder({
   }
 
   const context = await getOrderWriteContext(customerId, now);
+  if (expectedVatRatePercent !== undefined) {
+    assertVatQuoteCurrent(expectedVatRatePercent, context.vatRatePercent ?? 0);
+  }
   if (source === 'CUSTOMER') {
     assertLegalDocumentsApprovedForProduction();
     if (!actorUserId) throw new SafeActionError('UNAUTHORIZED', 'לא ניתן לתעד את מאשר ההזמנה. התחברו מחדש ונסו שוב.');

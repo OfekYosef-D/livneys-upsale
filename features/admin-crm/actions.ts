@@ -285,7 +285,10 @@ export async function updatePriceListAction(input: unknown): Promise<ActionResul
     await assertProductsExist(parsed.prices.map((item) => item.productId));
 
     await prisma.$transaction(async (tx) => {
-      const existing = await tx.priceList.findUnique({ where: { id: parsed.id } });
+      const existing = await tx.priceList.findUnique({
+        where: { id: parsed.id },
+        include: { items: true },
+      });
       if (!existing) {
         throw new SafeActionError('NOT_FOUND', 'המחירון לא נמצא.');
       }
@@ -331,7 +334,10 @@ export async function updatePriceListAction(input: unknown): Promise<ActionResul
         entityId: parsed.id,
         action: 'PRICE_LIST_UPDATED',
         requestId: randomUUID(),
-        before: existing,
+        before: {
+          ...existing,
+          prices: existing.items.map((item) => ({ productId: item.productId, price: item.price })),
+        },
         after: parsed,
       });
     });

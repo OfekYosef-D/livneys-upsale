@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseDeploymentEnv } from './config';
+import { LEGAL_DOCUMENT_SET_VERSION } from '../legal/documents';
 
 const validEnv = {
   DATABASE_URL: 'postgresql://user:pass@ep-example-pooler.eu-central-1.aws.neon.tech/app?sslmode=require',
@@ -36,7 +37,7 @@ describe('parseDeploymentEnv', () => {
     expect(() => parseDeploymentEnv({
       ...validEnv,
       VERCEL_ENV: 'production',
-      LEGAL_DOCUMENTS_APPROVED_VERSION: '2026-08-12-review',
+      LEGAL_DOCUMENTS_APPROVED_VERSION: LEGAL_DOCUMENT_SET_VERSION,
     })).not.toThrow();
   });
 });

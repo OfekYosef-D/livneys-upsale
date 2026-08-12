@@ -21,3 +21,12 @@ export async function getEffectiveVatRate(at: Date): Promise<{ id: string; rateP
 
   return { id: rate.id, ratePercent: Number(rate.ratePercent) };
 }
+
+export function assertVatQuoteCurrent(expectedRate: number, effectiveRate: number) {
+  if (Math.abs(expectedRate - effectiveRate) > 0.0001) {
+    throw new SafeActionError(
+      'STALE_VERSION',
+      'שיעור המע״מ השתנה מאז פתיחת הסקירה. רעננו את המסך ובדקו את הסכום המעודכן.',
+    );
+  }
+}

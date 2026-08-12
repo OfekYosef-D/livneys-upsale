@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LEGAL_DOCUMENT_SET_VERSION } from '../legal/documents';
 
 type EnvLike = Record<string, string | undefined>;
 
@@ -27,7 +28,7 @@ const deploymentEnvSchema = z.object({
   WHATSAPP_PHONE_NUMBER_ID: z.string().trim().optional(),
   WHATSAPP_APP_SECRET: z.string().trim().optional(),
 }).superRefine((env, context) => {
-  if (env.VERCEL_ENV === 'production' && env.LEGAL_DOCUMENTS_APPROVED_VERSION !== '2026-08-12-review') {
+  if (env.VERCEL_ENV === 'production' && env.LEGAL_DOCUMENTS_APPROVED_VERSION !== LEGAL_DOCUMENT_SET_VERSION) {
     context.addIssue({
       code: 'custom',
       path: ['LEGAL_DOCUMENTS_APPROVED_VERSION'],

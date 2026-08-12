@@ -3,10 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const findFirst = vi.hoisted(() => vi.fn());
 vi.mock('../../lib/db', () => ({ prisma: { taxRate: { findFirst } } }));
 
-const { getEffectiveVatRate } = await import('./tax-rates');
+const { assertVatQuoteCurrent, getEffectiveVatRate } = await import('./tax-rates');
 
 describe('dated VAT configuration', () => {
   beforeEach(() => findFirst.mockReset());
+
+  it('rejects a quote when the effective VAT rate changed before submission', () => {
+    expect(() => assertVatQuoteCurrent(17, 18)).toThrow(expect.objectContaining({ code: 'STALE_VERSION' }));
+    expect(() => assertVatQuoteCurrent(18, 18)).not.toThrow();
+  });
 
   it('selects the latest Israeli rate effective at the pricing timestamp', async () => {
     const at = new Date('2026-08-12T09:30:00.000Z');

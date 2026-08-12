@@ -20,6 +20,17 @@ vi.mock('@/lib/db', () => {
   return { prisma };
 });
 
+describe('price-list audit contract', () => {
+  it('loads existing item prices before applying updates', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const source = fs.readFileSync(path.join(process.cwd(), 'features', 'admin-crm', 'actions.ts'), 'utf8');
+    const updateBlock = source.slice(source.indexOf('export async function updatePriceListAction'), source.indexOf('export async function clonePriceListAction'));
+    expect(updateBlock).toContain('include: { items: true }');
+    expect(updateBlock).toContain('prices: existing.items');
+  });
+});
+
 vi.mock('@/lib/action-result', () => ({
   actionOk: (data: unknown) => ({ ok: true, data }),
   actionError: (error: unknown) => ({
