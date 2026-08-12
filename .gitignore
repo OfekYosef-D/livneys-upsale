@@ -11,3 +11,6 @@ next-start*.log
 .next-ui-checks/
 .vercel/
 .neon/
+.codex/
+.playwright-mcp/
+.ux-audit-chrome-profiles/

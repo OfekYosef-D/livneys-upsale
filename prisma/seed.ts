@@ -178,6 +178,7 @@ async function seedProductsAndPricing() {
       },
     });
 
+    // Questionnaire: same opening price for every institutional customer.
     await prisma.priceListItem.createMany({
       data: [
         {
@@ -188,7 +189,7 @@ async function seedProductsAndPricing() {
         {
           priceListId: 'price-list-south',
           productId: product.id,
-          price: Math.max(1, institutionalPrice - (product.recommended ? 1 : 0)),
+          price: institutionalPrice,
         },
       ],
     });
