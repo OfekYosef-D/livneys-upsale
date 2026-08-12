@@ -3,6 +3,7 @@ node_modules
 out
 dist
 .env*.local
+.env.production.neon
 .env
 *.tsbuildinfo
 npm-debug.log*
@@ -14,3 +15,5 @@ next-start*.log
 .codex/
 .playwright-mcp/
 .ux-audit-chrome-profiles/
+.env*
+.vercel

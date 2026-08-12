@@ -8,7 +8,6 @@ export default async function ContinueAfterLoginPage({ searchParams }: { searchP
 
   const query = await searchParams;
   if (session.user.role === 'ADMIN') {
-    if (!session.user.mfaEnabled) redirect('/admin/security/mfa');
     redirect(sanitizeInternalNextPath(query.next, '/admin'));
   }
   const fallback = session.user.customerId ? `/customer/${session.user.customerId}` : '/login';
