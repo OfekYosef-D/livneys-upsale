@@ -1,5 +1,6 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
@@ -8,7 +9,7 @@ import { assertOrderCanBePacked } from '../order-additions/business-rules';
 import { packOrderSafely } from '../order-additions/persistence';
 import { assertOrderStatusTransition, orderStatusValues, type OrderStatus } from '@/features/orders/utils';
 import { formatManualOrderInternalNote } from '@/features/orders/write';
-import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
+import { actionError, actionOk, SafeActionError, type ActionResult } from '@/lib/action-result';
 import { assertAdminAction } from '@/lib/authorization';
 import { prisma } from '@/lib/db';
 import { enqueueOrderLifecycleWhatsApp } from '../notifications/jobs';
@@ -16,6 +17,7 @@ import { getTemplateKeyForOrderStatus } from '../notifications/templates';
 import { revokeCustomerSessionsOnDeactivation } from './customer-access';
 import { syncCustomerLoginIdentity } from './customer-login-sync';
 import { lockCustomerAccessState } from '../auth/customer-access-lock';
+import { appendAuditLog } from '../audit/log';
 import {
   createCustomerSchema,
   createPriceListSchema,
@@ -50,7 +52,7 @@ const orderStatusMutationSchema = z.object({
 export async function createCustomerAction(input: unknown): Promise<ActionResult<{ customerId: string }>> {
   try {
     const parsed = createCustomerSchema.parse(input);
-    await assertAdminAction();
+    const session = await assertAdminAction();
     await assertRouteAndPriceList(parsed.routeId, parsed.priceListId, true);
 
     const customerId = parsed.id ?? createEntityId('cust', parsed.name);
@@ -84,6 +86,16 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
           },
         },
       });
+      await appendAuditLog(tx, {
+        actorUserId: session.user.id,
+        actorRole: 'ADMIN',
+        customerId,
+        entityType: 'Customer',
+        entityId: customerId,
+        action: 'CUSTOMER_CREATED',
+        requestId: randomUUID(),
+        after: parsed,
+      });
     });
 
     revalidateAdminCrm();
@@ -97,12 +109,12 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
 export async function updateCustomerAction(input: unknown): Promise<ActionResult<{ customerId: string }>> {
   try {
     const parsed = updateCustomerSchema.parse(input);
-    await assertAdminAction();
+    const session = await assertAdminAction();
     await assertRouteAndPriceList(parsed.routeId, parsed.priceListId, true);
 
     await prisma.$transaction(async (tx) => {
       const lockedCustomer = await lockCustomerAccessState(tx, parsed.id);
-      if (!lockedCustomer) throw new Error('הלקוח לא נמצא.');
+      if (!lockedCustomer) throw new SafeActionError('NOT_FOUND', 'הלקוח לא נמצא.');
 
       const existing = await tx.customer.findUnique({
         where: { id: parsed.id },
@@ -110,7 +122,7 @@ export async function updateCustomerAction(input: unknown): Promise<ActionResult
       });
 
       if (!existing) {
-        throw new Error('הלקוח לא נמצא.');
+        throw new SafeActionError('NOT_FOUND', 'הלקוח לא נמצא.');
       }
 
       await syncCustomerLoginIdentity(tx, {
@@ -161,6 +173,17 @@ export async function updateCustomerAction(input: unknown): Promise<ActionResult
         isActive: parsed.isActive,
         now: new Date(),
       });
+      await appendAuditLog(tx, {
+        actorUserId: session.user.id,
+        actorRole: 'ADMIN',
+        customerId: parsed.id,
+        entityType: 'Customer',
+        entityId: parsed.id,
+        action: 'CUSTOMER_UPDATED',
+        requestId: randomUUID(),
+        before: existing,
+        after: parsed,
+      });
     });
 
     revalidateAdminCrm();
@@ -174,10 +197,10 @@ export async function updateCustomerAction(input: unknown): Promise<ActionResult
 export async function toggleCustomerActiveAction(input: { id: string; isActive: boolean }): Promise<ActionResult<{ customerId: string }>> {
   try {
     const parsed = activeToggleSchema.parse(input);
-    await assertAdminAction();
+    const session = await assertAdminAction();
     await prisma.$transaction(async (tx) => {
       const existing = await lockCustomerAccessState(tx, parsed.id);
-      if (!existing) throw new Error('הלקוח לא נמצא.');
+      if (!existing) throw new SafeActionError('NOT_FOUND', 'הלקוח לא נמצא.');
 
       await tx.customer.update({
         where: { id: parsed.id },
@@ -188,6 +211,17 @@ export async function toggleCustomerActiveAction(input: { id: string; isActive: 
         wasActive: existing.isActive,
         isActive: parsed.isActive,
         now: new Date(),
+      });
+      await appendAuditLog(tx, {
+        actorUserId: session.user.id,
+        actorRole: 'ADMIN',
+        customerId: parsed.id,
+        entityType: 'Customer',
+        entityId: parsed.id,
+        action: parsed.isActive ? 'CUSTOMER_ACTIVATED' : 'CUSTOMER_DEACTIVATED',
+        requestId: randomUUID(),
+        before: { isActive: existing.isActive },
+        after: { isActive: parsed.isActive },
       });
     });
 
@@ -202,7 +236,7 @@ export async function toggleCustomerActiveAction(input: { id: string; isActive: 
 export async function createPriceListAction(input: unknown): Promise<ActionResult<{ priceListId: string }>> {
   try {
     const parsed = createPriceListSchema.parse(input);
-    await assertAdminAction();
+    const session = await assertAdminAction();
     await assertProductsExist(parsed.prices.map((item) => item.productId));
     const priceListId = parsed.id ?? createEntityId('price-list', parsed.name);
 
@@ -225,6 +259,15 @@ export async function createPriceListAction(input: unknown): Promise<ActionResul
           },
         },
       });
+      await appendAuditLog(tx, {
+        actorUserId: session.user.id,
+        actorRole: 'ADMIN',
+        entityType: 'PriceList',
+        entityId: priceListId,
+        action: 'PRICE_LIST_CREATED',
+        requestId: randomUUID(),
+        after: parsed,
+      });
     });
 
     revalidateAdminCrm();
@@ -238,13 +281,16 @@ export async function createPriceListAction(input: unknown): Promise<ActionResul
 export async function updatePriceListAction(input: unknown): Promise<ActionResult<{ priceListId: string }>> {
   try {
     const parsed = updatePriceListSchema.parse(input);
-    await assertAdminAction();
+    const session = await assertAdminAction();
     await assertProductsExist(parsed.prices.map((item) => item.productId));
 
     await prisma.$transaction(async (tx) => {
-      const existing = await tx.priceList.findUnique({ where: { id: parsed.id } });
+      const existing = await tx.priceList.findUnique({
+        where: { id: parsed.id },
+        include: { items: true },
+      });
       if (!existing) {
-        throw new Error('המחירון לא נמצא.');
+        throw new SafeActionError('NOT_FOUND', 'המחירון לא נמצא.');
       }
 
       if (parsed.isDefault) {
@@ -281,6 +327,19 @@ export async function updatePriceListAction(input: unknown): Promise<ActionResul
           },
         });
       }
+      await appendAuditLog(tx, {
+        actorUserId: session.user.id,
+        actorRole: 'ADMIN',
+        entityType: 'PriceList',
+        entityId: parsed.id,
+        action: 'PRICE_LIST_UPDATED',
+        requestId: randomUUID(),
+        before: {
+          ...existing,
+          prices: existing.items.map((item) => ({ productId: item.productId, price: item.price })),
+        },
+        after: parsed,
+      });
     });
 
     revalidateAdminCrm();
@@ -294,7 +353,7 @@ export async function updatePriceListAction(input: unknown): Promise<ActionResul
 export async function clonePriceListAction(input: unknown): Promise<ActionResult<{ priceListId: string }>> {
   try {
     const parsed = clonePriceListSchema.parse(input);
-    await assertAdminAction();
+    const session = await assertAdminAction();
 
     const source = await prisma.priceList.findUnique({
       where: { id: parsed.id },
@@ -302,23 +361,34 @@ export async function clonePriceListAction(input: unknown): Promise<ActionResult
     });
 
     if (!source) {
-      throw new Error('המחירון לא נמצא.');
+      throw new SafeActionError('NOT_FOUND', 'המחירון לא נמצא.');
     }
 
     const priceListId = createEntityId('price-list', parsed.name);
-    await prisma.priceList.create({
-      data: {
-        id: priceListId,
-        name: parsed.name,
-        description: source.description,
-        isDefault: false,
-        items: {
-          create: source.items.map((item) => ({
-            productId: item.productId,
-            price: item.price,
-          })),
+    await prisma.$transaction(async (tx) => {
+      await tx.priceList.create({
+        data: {
+          id: priceListId,
+          name: parsed.name,
+          description: source.description,
+          isDefault: false,
+          items: {
+            create: source.items.map((item) => ({
+              productId: item.productId,
+              price: item.price,
+            })),
+          },
         },
-      },
+      });
+      await appendAuditLog(tx, {
+        actorUserId: session.user.id,
+        actorRole: 'ADMIN',
+        entityType: 'PriceList',
+        entityId: priceListId,
+        action: 'PRICE_LIST_CLONED',
+        requestId: randomUUID(),
+        after: { sourcePriceListId: source.id, name: parsed.name },
+      });
     });
 
     revalidateAdminCrm();
@@ -331,7 +401,7 @@ export async function clonePriceListAction(input: unknown): Promise<ActionResult
 export async function createProductAction(input: unknown): Promise<ActionResult<{ productId: string }>> {
   try {
     const parsed = createProductSchema.parse(input);
-    await assertAdminAction();
+    const session = await assertAdminAction();
     await assertPriceListsExist(parsed.prices.map((item) => item.priceListId));
 
     const productId = parsed.id ?? createEntityId('prod', parsed.sku);
@@ -379,6 +449,15 @@ export async function createProductAction(input: unknown): Promise<ActionResult<
           });
         }
       }
+      await appendAuditLog(tx, {
+        actorUserId: session.user.id,
+        actorRole: 'ADMIN',
+        entityType: 'Product',
+        entityId: productId,
+        action: 'PRODUCT_CREATED',
+        requestId: randomUUID(),
+        after: parsed,
+      });
     });
 
     revalidateAdminCrm();
@@ -392,10 +471,15 @@ export async function createProductAction(input: unknown): Promise<ActionResult<
 export async function updateProductAction(input: unknown): Promise<ActionResult<{ productId: string }>> {
   try {
     const parsed = updateProductSchema.parse(input);
-    await assertAdminAction();
+    const session = await assertAdminAction();
     await assertPriceListsExist(parsed.prices.map((item) => item.priceListId));
 
     await prisma.$transaction(async (tx) => {
+      const existing = await tx.product.findUnique({
+        where: { id: parsed.id },
+        include: { priceListItems: true },
+      });
+      if (!existing) throw new SafeActionError('NOT_FOUND', 'המוצר לא נמצא.');
       await tx.product.update({
         where: { id: parsed.id },
         data: {
@@ -458,6 +542,22 @@ export async function updateProductAction(input: unknown): Promise<ActionResult<
           });
         }
       }
+      await appendAuditLog(tx, {
+        actorUserId: session.user.id,
+        actorRole: 'ADMIN',
+        entityType: 'Product',
+        entityId: parsed.id,
+        action: 'PRODUCT_UPDATED',
+        requestId: randomUUID(),
+        before: {
+          ...existing,
+          prices: existing.priceListItems.map((item) => ({
+            priceListId: item.priceListId,
+            price: item.price,
+          })),
+        },
+        after: parsed,
+      });
     });
 
     revalidateAdminCrm();
@@ -471,10 +571,21 @@ export async function updateProductAction(input: unknown): Promise<ActionResult<
 export async function toggleProductActiveAction(input: { id: string; isActive: boolean }): Promise<ActionResult<{ productId: string }>> {
   try {
     const parsed = activeToggleSchema.parse(input);
-    await assertAdminAction();
-    await prisma.product.update({
-      where: { id: parsed.id },
-      data: { isActive: parsed.isActive },
+    const session = await assertAdminAction();
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.product.findUnique({ where: { id: parsed.id }, select: { isActive: true } });
+      if (!existing) throw new SafeActionError('NOT_FOUND', 'המוצר לא נמצא.');
+      await tx.product.update({ where: { id: parsed.id }, data: { isActive: parsed.isActive } });
+      await appendAuditLog(tx, {
+        actorUserId: session.user.id,
+        actorRole: 'ADMIN',
+        entityType: 'Product',
+        entityId: parsed.id,
+        action: parsed.isActive ? 'PRODUCT_ACTIVATED' : 'PRODUCT_DEACTIVATED',
+        requestId: randomUUID(),
+        before: existing,
+        after: { isActive: parsed.isActive },
+      });
     });
 
     revalidateAdminCrm();
@@ -760,7 +871,7 @@ export async function toggleRecommendationActiveAction(input: { id: string; isAc
 export async function createManualOrderAction(input: unknown): Promise<ActionResult<{ orderId: string; status: string }>> {
   try {
     const parsed = manualOrderMutationSchema.parse(input);
-    await assertAdminAction();
+    const session = await assertAdminAction();
 
     const internalNote = formatManualOrderInternalNote({
       intakeChannel: parsed.intakeChannel,
@@ -772,8 +883,10 @@ export async function createManualOrderAction(input: unknown): Promise<ActionRes
       source: 'ADMIN',
       idempotencyKey: parsed.idempotencyKey,
       paymentTerm: 'NET_30',
+      expectedVatRatePercent: parsed.vatRatePercent,
       notes: parsed.notes,
       internalNote,
+      actorUserId: session.user.id,
     });
 
     revalidatePath('/admin');
@@ -794,13 +907,14 @@ export async function createManualOrderAction(input: unknown): Promise<ActionRes
 export async function updateOrderStatusAction(input: unknown): Promise<ActionResult<{ orderId: string; status: OrderStatus }>> {
   try {
     const parsed = orderStatusMutationSchema.parse(input);
-    await assertAdminAction();
+    const session = await assertAdminAction();
 
     const existing = await prisma.order.findUnique({
       where: { id: parsed.orderId },
       select: {
         id: true,
         status: true,
+        revision: true,
         customerId: true,
         routeId: true,
         additionRequests: {
@@ -811,28 +925,40 @@ export async function updateOrderStatusAction(input: unknown): Promise<ActionRes
     });
 
     if (!existing) {
-      throw new Error('ההזמנה לא נמצאה.');
+      throw new SafeActionError('NOT_FOUND', 'ההזמנה לא נמצאה.');
     }
 
     const nextStatus = assertOrderStatusTransition(existing.status, parsed.status);
     if (nextStatus === 'PACKED') {
       assertOrderCanBePacked(existing.additionRequests?.length ?? 0);
     }
-    const order = nextStatus === 'PACKED'
-      ? await prisma.$transaction(
-          (tx) => packOrderSafely(tx, existing.id),
-          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-        )
-      : await prisma.order.update({
-          where: { id: existing.id },
-          data: { status: nextStatus, revision: { increment: 1 } },
-          select: {
-            id: true,
-            status: true,
-            customerId: true,
-            routeId: true,
-          },
-        });
+    const order = await prisma.$transaction(async (tx) => {
+      const changed = nextStatus === 'PACKED'
+        ? await packOrderSafely(tx, existing.id)
+        : await (async () => {
+            const updated = await tx.order.updateMany({
+              where: { id: existing.id, status: existing.status, revision: existing.revision },
+              data: { status: nextStatus, revision: { increment: 1 } },
+            });
+            if (updated.count !== 1) throw new SafeActionError('STALE_VERSION', 'ההזמנה השתנתה. רעננו את המסך ונסו שוב.');
+            return tx.order.findUniqueOrThrow({
+              where: { id: existing.id },
+              select: { id: true, status: true, customerId: true, routeId: true },
+            });
+          })();
+      await appendAuditLog(tx, {
+        actorUserId: session.user.id,
+        actorRole: 'ADMIN',
+        customerId: existing.customerId,
+        entityType: 'Order',
+        entityId: existing.id,
+        action: 'ORDER_STATUS_CHANGED',
+        requestId: randomUUID(),
+        before: { status: existing.status },
+        after: { status: changed.status },
+      });
+      return changed;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     revalidatePath('/admin');
     revalidatePath(`/admin/orders/${order.id}`);
@@ -858,11 +984,11 @@ async function assertRouteAndPriceList(routeId: string, priceListId: string, req
   ]);
 
   if (!route || (requireActiveRoute && !route.isActive)) {
-    throw new Error('הקו לא נמצא או אינו פעיל.');
+    throw new SafeActionError('NOT_FOUND', 'הקו לא נמצא או אינו פעיל.');
   }
 
   if (!priceList) {
-    throw new Error('המחירון לא נמצא.');
+    throw new SafeActionError('NOT_FOUND', 'המחירון לא נמצא.');
   }
 }
 
@@ -872,7 +998,7 @@ async function assertProductExists(productId: string) {
   });
 
   if (!product) {
-    throw new Error('המוצר לא נמצא.');
+    throw new SafeActionError('NOT_FOUND', 'המוצר לא נמצא.');
   }
 }
 
@@ -885,7 +1011,7 @@ async function assertProductsExist(productIds: string[]) {
   });
 
   if (count !== uniqueIds.length) {
-    throw new Error('חלק מהמוצרים לא נמצאו.');
+    throw new SafeActionError('NOT_FOUND', 'חלק מהמוצרים לא נמצאו.');
   }
 }
 
@@ -898,7 +1024,7 @@ async function assertPriceListsExist(priceListIds: string[]) {
   });
 
   if (count !== uniqueIds.length) {
-    throw new Error('חלק מהמחירונים לא נמצאו.');
+    throw new SafeActionError('NOT_FOUND', 'חלק מהמחירונים לא נמצאו.');
   }
 }
 
@@ -927,7 +1053,7 @@ async function assertCustomersExist(customerIds: string[]) {
   });
 
   if (count !== uniqueIds.length) {
-    throw new Error('חלק מהלקוחות לא נמצאו.');
+    throw new SafeActionError('NOT_FOUND', 'חלק מהלקוחות לא נמצאו.');
   }
 }
 
@@ -940,7 +1066,7 @@ async function assertRoutesExist(routeIds: string[]) {
   });
 
   if (count !== uniqueIds.length) {
-    throw new Error('חלק מהקווים לא נמצאו.');
+    throw new SafeActionError('NOT_FOUND', 'חלק מהקווים לא נמצאו.');
   }
 }
 
@@ -955,11 +1081,11 @@ async function assertCustomerAndProduct(customerId: string, productId: string) {
   ]);
 
   if (!customer || !customer.isActive) {
-    throw new Error('הלקוח לא נמצא או אינו פעיל.');
+    throw new SafeActionError('NOT_FOUND', 'הלקוח לא נמצא או אינו פעיל.');
   }
 
   if (!product || !product.isActive) {
-    throw new Error('המוצר לא נמצא או אינו פעיל.');
+    throw new SafeActionError('NOT_FOUND', 'המוצר לא נמצא או אינו פעיל.');
   }
 }
 

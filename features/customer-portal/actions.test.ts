@@ -202,6 +202,8 @@ describe('customer portal actions', () => {
       items: [{ productId: 'prod-a', qty: 2 }],
       notes: 'Call before arrival',
       paymentTerm: 'IMMEDIATE_OR_CASH',
+      vatRatePercent: 18,
+      legalDocumentSetVersion: '2026-08-12-review',
       commercialTermsAccepted: true,
     });
 
@@ -214,6 +216,8 @@ describe('customer portal actions', () => {
         idempotencyKey,
         paymentTerm: 'IMMEDIATE_OR_CASH',
         commercialTermsAccepted: true,
+        expectedVatRatePercent: 18,
+        expectedLegalDocumentSetVersion: '2026-08-12-review',
       }),
     );
     expect(mockedEnqueueOrderLifecycleWhatsApp).toHaveBeenCalledWith({ orderId: 'ord-customer' });
@@ -248,6 +252,8 @@ describe('customer portal actions', () => {
       idempotencyKey,
       items: [{ productId: 'prod-a', qty: 2 }],
       paymentTerm: 'NET_30',
+      vatRatePercent: 18,
+      legalDocumentSetVersion: '2026-08-12-review',
       commercialTermsAccepted: true,
     });
 
@@ -291,6 +297,8 @@ describe('customer portal actions', () => {
       idempotencyKey,
       items: [{ productId: 'prod-a', qty: 2 }],
       paymentTerm: 'NET_30',
+      vatRatePercent: 18,
+      legalDocumentSetVersion: '2026-08-12-review',
       commercialTermsAccepted: false,
     });
 
@@ -343,6 +351,8 @@ describe('customer portal actions', () => {
       idempotencyKey,
       items: [{ productId: 'prod-a', qty: 2 }],
       paymentTerm: 'INVALID' as 'NET_30',
+      vatRatePercent: 18,
+      legalDocumentSetVersion: '2026-08-12-review',
       commercialTermsAccepted: true,
     });
 

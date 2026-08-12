@@ -50,6 +50,7 @@ $env:TURNSTILE_SECRET_KEY='<turnstile-secret>'
 $env:NEXT_PUBLIC_TURNSTILE_SITE_KEY='<turnstile-site-key>'
 $env:RESEND_API_KEY='<resend-api-key>'
 $env:EMAIL_FROM="Livney's <orders@verified-domain.example>"
+$env:LEGAL_DOCUMENTS_APPROVED_VERSION='<lawyer-approved-version>'
 $env:WHATSAPP_SEND_ENABLED='false'
 npm run deploy:check
 npm run build
@@ -109,6 +110,7 @@ npx vercel@latest env add TURNSTILE_SECRET_KEY production --sensitive
 npx vercel@latest env add NEXT_PUBLIC_TURNSTILE_SITE_KEY production --no-sensitive
 npx vercel@latest env add RESEND_API_KEY production --sensitive
 npx vercel@latest env add EMAIL_FROM production --no-sensitive
+npx vercel@latest env add LEGAL_DOCUMENTS_APPROVED_VERSION production --no-sensitive
 npx vercel@latest env add WHATSAPP_SEND_ENABLED production --no-sensitive
 
 npx vercel@latest env add DATABASE_URL preview --sensitive
@@ -121,10 +123,11 @@ npx vercel@latest env add TURNSTILE_SECRET_KEY preview --sensitive
 npx vercel@latest env add NEXT_PUBLIC_TURNSTILE_SITE_KEY preview --no-sensitive
 npx vercel@latest env add RESEND_API_KEY preview --sensitive
 npx vercel@latest env add EMAIL_FROM preview --no-sensitive
+npx vercel@latest env add LEGAL_DOCUMENTS_APPROVED_VERSION preview --no-sensitive
 npx vercel@latest env add WHATSAPP_SEND_ENABLED preview --no-sensitive
 ```
 
-Generate independent `NEXTAUTH_SECRET`, `CRON_SECRET`, and `MFA_ENCRYPTION_KEY` values for each environment. Use at least 48 random bytes for NextAuth, 32 for cron, and exactly 32 Base64-encoded random bytes for MFA encryption. Preview may use Cloudflare's documented always-pass test keys; production must use real domain-bound Turnstile keys. Verify the Resend sender before enabling account approvals: setup and reset actions deliberately refuse to report success when no live email channel exists. Set WhatsApp exactly to `false` until Meta credentials and templates are approved.
+Generate independent `NEXTAUTH_SECRET`, `CRON_SECRET`, and `MFA_ENCRYPTION_KEY` values for each environment. Use at least 48 random bytes for NextAuth, 32 for cron, and exactly 32 Base64-encoded random bytes for MFA encryption. Preview may use Cloudflare's documented always-pass test keys; production must use real domain-bound Turnstile keys. Verify the Resend sender before enabling account approvals: setup and reset actions deliberately refuse to report success when no live email channel exists. Set WhatsApp exactly to `false` until Meta credentials and templates are approved. Set `LEGAL_DOCUMENTS_APPROVED_VERSION` only after the owner and lawyer approve the exact version shown in the application; production deployment is blocked when it does not match.
 
 Password setup and reset URLs are intentionally delivered by email only. A company-wide phone number must never receive a specific user's access token; WhatsApp account-access delivery may be enabled only after the product stores and verifies a phone number for that individual user.
 

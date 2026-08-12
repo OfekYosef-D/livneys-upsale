@@ -35,6 +35,7 @@ vi.mock('@/lib/action-result', () => ({
   actionError: (error: unknown) => ({
     ok: false,
     error: error instanceof Error ? error.message : 'Unexpected error',
+    ...(error && typeof error === 'object' && 'code' in error ? { code: error.code } : {}),
   }),
 }));
 
@@ -149,6 +150,7 @@ describe('registration actions', () => {
     });
 
     expect(result.ok).toBe(false);
+    expect(result).toMatchObject({ code: 'VALIDATION_ERROR', error: 'לא ניתן לאמת את הבקשה. נסו שוב.' });
     expect(consumeRateLimitMock).toHaveBeenCalledOnce();
     expect(consumeRateLimitMock).toHaveBeenCalledWith(expect.objectContaining({
       scope: 'registration-ip', identifier: '127.0.0.1',

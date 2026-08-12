@@ -753,7 +753,7 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
   const customer = useMemo(() => data.customers.find((item) => item.id === customerId) ?? null, [customerId, data.customers]);
   const selectedItems = customer?.products.filter((product) => (items[product.id] ?? 0) > 0) ?? [];
   const pricing = useMemo(() => getCartPricingSummary(items, customer?.products ?? []), [customer?.products, items]);
-  const vat = useMemo(() => calculateVatSummary(pricing.total), [pricing.total]);
+  const vat = useMemo(() => calculateVatSummary(pricing.total, data.vatRatePercent), [data.vatRatePercent, pricing.total]);
   const productCategories = useMemo(() => getUniqueFilterValues(customer?.products ?? [], (product) => product.category), [customer?.products]);
   const visibleProducts = useMemo(() => {
     const normalizedSearch = productSearch.trim().toLowerCase();
@@ -794,6 +794,7 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
                   createManualOrderAction({
                     customerId,
                     idempotencyKey,
+                    vatRatePercent: data.vatRatePercent,
                     intakeChannel: stringValue(form, 'intakeChannel') as 'PHONE' | 'WHATSAPP' | 'ADMIN_MANUAL',
                     notes: stringValue(form, 'notes'),
                     internalNote: stringValue(form, 'internalNote'),

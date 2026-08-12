@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import { SafeActionError } from '../../lib/safe-action-error';
 
 export async function updateCustomerUserAccess(
   tx: Pick<Prisma.TransactionClient, 'user' | 'authToken'>,
@@ -8,7 +9,7 @@ export async function updateCustomerUserAccess(
     where: { id: input.userId, customerId: input.customerId, role: 'CUSTOMER' },
     data: { isActive: input.isActive, sessionVersion: { increment: 1 } },
   });
-  if (changed.count !== 1) throw new Error('המשתמש לא נמצא בחברה זו.');
+  if (changed.count !== 1) throw new SafeActionError('NOT_FOUND', 'המשתמש לא נמצא בחברה זו.');
 
   if (!input.isActive) {
     await tx.authToken.updateMany({

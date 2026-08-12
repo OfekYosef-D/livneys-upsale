@@ -1,14 +1,11 @@
 export function assertDemoSeedAllowed({
   databaseUrl,
   nodeEnv,
-  allowDestructiveDemoSeed,
 }: {
   databaseUrl: string | undefined;
   nodeEnv: string | undefined;
   allowDestructiveDemoSeed?: string;
 }) {
-  if (allowDestructiveDemoSeed === 'true') return;
-
   let hostname = '';
   try {
     hostname = databaseUrl ? new URL(databaseUrl).hostname.toLowerCase() : '';
@@ -18,7 +15,7 @@ export function assertDemoSeedAllowed({
 
   if (!databaseUrl || nodeEnv === 'production' || hostname.endsWith('.neon.tech')) {
     throw new Error(
-      'Refusing to run the destructive demo seed against a production or Neon database. Set ALLOW_DESTRUCTIVE_DEMO_SEED=true only if data loss is intentional.',
+      'Refusing to run the destructive demo seed against a production or Neon database.',
     );
   }
 }

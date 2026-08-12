@@ -3,6 +3,7 @@
 import { AuthTokenType } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
+import { SafeActionError } from '../../lib/safe-action-error';
 import { assertAdminAction } from '@/lib/authorization';
 import { prisma } from '@/lib/db';
 import { verifyRegistrationChallenge } from '../auth/captcha';
@@ -35,7 +36,7 @@ export async function createCompanyRegistrationAction(input: CompanyRegistration
       honeypot: parsed.website,
       ip,
     });
-    if (!challengeValid) throw new Error('לא ניתן לאמת את הבקשה. נסו שוב.');
+    if (!challengeValid) throw new SafeActionError('VALIDATION_ERROR', 'לא ניתן לאמת את הבקשה. נסו שוב.');
     await consumeRateLimit({
       scope: 'registration-account',
       identifier: parsed.email,
@@ -94,11 +95,11 @@ export async function convertRegistrationToCustomerAction(input: ConvertRegistra
       });
 
       if (!request) {
-        throw new Error('בקשת ההרשמה לא נמצאה.');
+        throw new SafeActionError('NOT_FOUND', 'בקשת ההרשמה לא נמצאה.');
       }
 
       if (request.status === 'CONVERTED') {
-        throw new Error('בקשת ההרשמה כבר הומרה ללקוח.');
+        throw new SafeActionError('ORDER_LOCKED', 'בקשת ההרשמה כבר הומרה ללקוח.');
       }
 
       const nextCustomerId = createEntityId('cust', request.businessName);
@@ -187,11 +188,11 @@ async function assertRouteAndPriceList(routeId: string, priceListId: string) {
   ]);
 
   if (!route || !route.isActive) {
-    throw new Error('קו החלוקה לא נמצא או אינו פעיל.');
+    throw new SafeActionError('NOT_FOUND', 'קו החלוקה לא נמצא או אינו פעיל.');
   }
 
   if (!priceList) {
-    throw new Error('המחירון לא נמצא.');
+    throw new SafeActionError('NOT_FOUND', 'המחירון לא נמצא.');
   }
 }
 

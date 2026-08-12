@@ -22,6 +22,7 @@ const { persistPendingAdditionRequest } = await import('./persistence');
 const { submitOrderAddition } = await import('./service');
 
 const context = {
+  vatRatePercent: 19,
   customer: { id: 'cust-001', routeId: 'route-001', priceListId: 'price-list-001', isActive: true },
   route: {
     id: 'route-001', isActive: true,
@@ -39,6 +40,7 @@ describe('order addition service', () => {
   it('snapshots additions with the original order payment term in a serializable transaction', async () => {
     vi.mocked(prisma.order.findFirst).mockResolvedValue({
       id: 'order-001', customerId: 'cust-001', status: 'APPROVED', revision: 7,
+      vatRatePercent: 17,
       paymentTerm: 'IMMEDIATE_OR_CASH', deliveryWindowStart: context.route.nextDeliveryAt,
       lines: [{ productId: 'product-001', quantity: 2 }],
     } as never);
@@ -58,7 +60,7 @@ describe('order addition service', () => {
     expect(result).toEqual({ requestId: 'request-001', status: 'PENDING', replayed: false });
     expect(persistPendingAdditionRequest).toHaveBeenCalledWith({}, expect.objectContaining({
       paymentTerm: 'IMMEDIATE_OR_CASH', orderRevision: 7,
-      snapshot: expect.objectContaining({ paymentDiscountTotal: 10, totalIncludingVat: 224.2 }),
+      snapshot: expect.objectContaining({ paymentDiscountTotal: 10, vatRatePercent: 17, vatTotal: 32.3, totalIncludingVat: 222.3 }),
     }));
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'Serializable' });
   });

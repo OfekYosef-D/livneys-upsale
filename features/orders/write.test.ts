@@ -200,7 +200,7 @@ describe('shared order write utilities', () => {
       vatRatePercent: 18,
       vatTotal: 119.7,
       totalIncludingVat: 784.7,
-      commercialTermsVersion: '2026-08-10',
+      commercialTermsVersion: '2026-08-12-review',
       commercialTermsAcceptedAt: new Date('2026-06-29T14:00:00.000Z'),
     });
   });
@@ -215,7 +215,7 @@ describe('shared order write utilities', () => {
         commercialTermsAccepted: false,
         now: new Date('2026-06-29T14:00:00.000Z'),
       }),
-    ).toThrow('יש לאשר שההזמנה היא עסקית ואת פרטי ההזמנה לפני השליחה.');
+    ).toThrow(expect.objectContaining({ code: 'VALIDATION_ERROR' }));
   });
 
   it('marks submitted orders after cutoff as special requests', () => {
@@ -245,7 +245,7 @@ describe('shared order write utilities', () => {
         paymentTerm: 'NET_30',
         now: new Date('2026-06-29T14:00:00.000Z'),
       }),
-    ).toThrow('Customer is inactive');
+    ).toThrow(expect.objectContaining({ code: 'ORDER_LOCKED' }));
 
     expect(() =>
       buildSubmittedOrderPayload({
@@ -261,7 +261,7 @@ describe('shared order write utilities', () => {
         paymentTerm: 'NET_30',
         now: new Date('2026-06-29T14:00:00.000Z'),
       }),
-    ).toThrow('Route is inactive');
+    ).toThrow(expect.objectContaining({ code: 'ORDER_LOCKED' }));
   });
 
   it('drops unavailable products instead of failing when building submitted order payloads', () => {

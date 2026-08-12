@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { SafeActionError } from '../../lib/safe-action-error';
 
 export const MAX_PRODUCT_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -30,7 +31,7 @@ export function getCloudinaryConfig(env: NodeJS.ProcessEnv = process.env): Cloud
   const folder = env.CLOUDINARY_PRODUCT_FOLDER?.trim() || 'livneys/products';
 
   if (!cloudName || !apiKey || !apiSecret) {
-    throw new Error('Cloudinary image upload is not configured.');
+    throw new SafeActionError('NOT_CONFIGURED', 'העלאת תמונות אינה מוגדרת כרגע.');
   }
 
   return { cloudName, apiKey, apiSecret, folder };
@@ -38,11 +39,11 @@ export function getCloudinaryConfig(env: NodeJS.ProcessEnv = process.env): Cloud
 
 export function validateProductImageFile(file: File) {
   if (!allowedImageTypes.has(file.type)) {
-    throw new Error('יש להעלות קובץ תמונה בלבד: JPG, PNG, WebP או GIF.');
+    throw new SafeActionError('VALIDATION_ERROR', 'יש להעלות קובץ תמונה בלבד: JPG, PNG, WebP או GIF.');
   }
 
   if (file.size > MAX_PRODUCT_IMAGE_BYTES) {
-    throw new Error('תמונת מוצר יכולה להיות עד 5MB.');
+    throw new SafeActionError('VALIDATION_ERROR', 'תמונת מוצר יכולה להיות עד 5MB.');
   }
 }
 

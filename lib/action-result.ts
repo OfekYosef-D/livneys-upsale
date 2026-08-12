@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { ZodError } from 'zod';
 import { AuthorizationError } from './authorization';
 import { SafeActionError } from './safe-action-error';
@@ -13,6 +14,7 @@ export type ActionResult<T> =
       ok: false;
       error: string;
       code?: string;
+      requestId?: string;
       details?: Record<string, string | number | boolean | null>;
     };
 
@@ -31,16 +33,19 @@ export function actionError(error: unknown): ActionResult<never> {
   }
 
   if (error instanceof AuthorizationError) {
-    return { ok: false, error: error.message };
+    return { ok: false, code: 'UNAUTHORIZED', error: error.message };
   }
 
   if (error instanceof ZodError) {
-    return { ok: false, error: 'הנתונים שנשלחו אינם תקינים.' };
+    return { ok: false, code: 'VALIDATION_ERROR', error: 'הנתונים שנשלחו אינם תקינים.' };
   }
 
-  if (error instanceof Error) {
-    return { ok: false, error: error.message };
-  }
-
-  return { ok: false, error: 'אירעה שגיאה לא צפויה.' };
+  const requestId = randomUUID();
+  console.error('Server action failed', { requestId, error });
+  return {
+    ok: false,
+    code: 'INTERNAL_ERROR',
+    error: 'אירעה שגיאה בלתי צפויה. נסו שוב או פנו לתמיכה.',
+    requestId,
+  };
 }

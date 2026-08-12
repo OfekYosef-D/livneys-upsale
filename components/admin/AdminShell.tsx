@@ -15,6 +15,7 @@ const navItems = [
   { href: '/admin/price-lists', label: 'מחירונים' },
   { href: '/admin/promotions', label: 'מבצעים' },
   { href: '/admin/recommendations', label: 'המלצות' },
+  { href: '/admin/audit', label: 'יומן ביקורת' },
 ];
 
 export function AdminShell({ children, title, subtitle, activeHref }: { children: React.ReactNode; title: string; subtitle?: string; activeHref?: string }) {

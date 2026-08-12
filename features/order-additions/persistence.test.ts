@@ -25,6 +25,9 @@ function makeTx() {
     orderActivity: {
       create: vi.fn(),
     },
+    auditLog: {
+      create: vi.fn(),
+    },
   };
 }
 

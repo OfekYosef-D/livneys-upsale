@@ -1,3 +1,5 @@
+import { SafeActionError } from '../../lib/safe-action-error';
+
 export type PricingEffectType = 'DISPLAY_ONLY' | 'PERCENT_OFF' | 'FIXED_AMOUNT_OFF' | 'FIXED_UNIT_PRICE' | 'BUY_X_GET_Y';
 
 export type PricingCustomer = {
@@ -145,13 +147,13 @@ export function calculateOrderPricing({
     .map((item) => {
       const product = products.find((candidate) => candidate.id === item.productId);
       if (!product || !product.isActive) {
-        throw new Error(`המוצר ${item.productId} אינו זמין להזמנה.`);
+        throw new SafeActionError('NOT_FOUND', 'המוצר המבוקש אינו זמין להזמנה.');
       }
 
       const quantity = Math.floor(item.quantity);
       const minQty = product.minQty ?? 1;
       if (quantity < minQty) {
-        throw new Error(`הכמות המינימלית עבור ${product.name} היא ${minQty}.`);
+        throw new SafeActionError('VALIDATION_ERROR', `הכמות המינימלית עבור ${product.name} היא ${minQty}.`);
       }
 
       const listUnitPrice = pricesByProductId.get(product.id) ?? product.basePrice;

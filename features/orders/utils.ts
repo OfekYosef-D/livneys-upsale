@@ -1,3 +1,5 @@
+import { SafeActionError } from '../../lib/safe-action-error';
+
 export type OrderStatus =
   | 'DRAFT'
   | 'SUBMITTED'
@@ -69,12 +71,12 @@ export function normalizeCustomerOrderItems(
 
     const minQty = product.minQty ?? 1;
     if (quantity < minQty) {
-      throw new Error(`הכמות המינימלית עבור ${product.name} היא ${minQty}.`);
+      throw new SafeActionError('VALIDATION_ERROR', `הכמות המינימלית עבור ${product.name} היא ${minQty}.`);
     }
 
     const orderMultiple = Math.max(1, Math.floor(product.orderMultiple ?? 1));
     if (orderMultiple > 1 && quantity % orderMultiple !== 0) {
-      throw new Error(`הכמות עבור ${product.name} חייבת להיות בכפולות של ${orderMultiple}.`);
+      throw new SafeActionError('VALIDATION_ERROR', `הכמות עבור ${product.name} חייבת להיות בכפולות של ${orderMultiple}.`);
     }
 
     normalized.push({ productId: item.productId, quantity });
@@ -96,19 +98,19 @@ export function createOrderSnapshotLines({
       const product = products.find((candidate) => candidate.id === item.productId);
 
       if (!product) {
-        throw new Error(`Unknown product ${item.productId}`);
+        throw new SafeActionError('NOT_FOUND', 'המוצר המבוקש אינו זמין להזמנה.');
       }
 
       const quantity = Math.floor(item.quantity);
       const minQty = product.minQty ?? 1;
 
       if (quantity < minQty) {
-        throw new Error(`Minimum quantity for ${product.name} is ${minQty}`);
+        throw new SafeActionError('VALIDATION_ERROR', `הכמות המינימלית עבור ${product.name} היא ${minQty}.`);
       }
 
       const orderMultiple = Math.max(1, Math.floor(product.orderMultiple ?? 1));
       if (orderMultiple > 1 && quantity % orderMultiple !== 0) {
-        throw new Error(`Order quantity for ${product.name} must be a multiple of ${orderMultiple}`);
+        throw new SafeActionError('VALIDATION_ERROR', `הכמות עבור ${product.name} חייבת להיות בכפולות של ${orderMultiple}.`);
       }
 
       const unitPrice = product.price;
@@ -148,7 +150,7 @@ export function getAllowedOrderStatusTransitions(current: OrderStatus): OrderSta
 
 export function assertOrderStatusTransition(current: OrderStatus, next: OrderStatus): OrderStatus {
   if (!allowedTransitions[current].includes(next)) {
-    throw new Error(`Invalid order status transition: ${current} -> ${next}`);
+    throw new SafeActionError('ORDER_LOCKED', 'לא ניתן להעביר את ההזמנה לסטטוס המבוקש.');
   }
 
   return next;

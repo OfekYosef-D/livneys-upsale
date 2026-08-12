@@ -2,6 +2,7 @@ import type { OrderSource, OrderStatus, Prisma } from '@prisma/client';
 import type { PaymentTermValue } from '@/features/orders/payment-terms';
 import { activeOrderStatuses } from '@/features/orders/utils';
 import { prisma } from '@/lib/db';
+import { getPaymentSummary } from '../payments/service';
 import type { AdminDashboardOrder, AdminOrderLine, AdminOrderSummary, AdminRouteSummary } from './types';
 
 const activeStatuses = activeOrderStatuses as OrderStatus[];
@@ -219,10 +220,35 @@ export async function getAdminOrderDetail(orderId: string) {
         include: { lines: true, reviewedBy: { select: { name: true } } },
         orderBy: [{ submittedAt: 'desc' }, { createdAt: 'desc' }],
       },
+      paymentReceipts: {
+        include: {
+          recordedBy: { select: { name: true } },
+          voidedBy: { select: { name: true } },
+        },
+        orderBy: [{ receivedAt: 'desc' }, { createdAt: 'desc' }],
+      },
+      legalAcceptances: {
+        include: { user: { select: { name: true, email: true } } },
+        orderBy: { acceptedAt: 'asc' },
+      },
     },
   });
 
   if (!order) return null;
+
+  const paymentReceipts = order.paymentReceipts.map((receipt) => ({
+    id: receipt.id,
+    amount: Number(receipt.amount),
+    method: receipt.method,
+    reference: receipt.reference,
+    receivedAt: receipt.receivedAt.toISOString(),
+    note: receipt.note,
+    status: receipt.status,
+    recordedByName: receipt.recordedBy.name,
+    voidedAt: receipt.voidedAt?.toISOString() ?? null,
+    voidedByName: receipt.voidedBy?.name ?? null,
+    voidReason: receipt.voidReason,
+  }));
 
   return {
     ...mapOrderSummary(order),
@@ -265,6 +291,17 @@ export async function getAdminOrderDetail(orderId: string) {
         unitPrice: Number(line.unitPrice),
         lineTotal: Number(line.lineTotal),
       })),
+    })),
+    paymentReceipts,
+    paymentSummary: getPaymentSummary(Number(order.totalIncludingVat), paymentReceipts),
+    legalAcceptances: order.legalAcceptances.map((acceptance) => ({
+      id: acceptance.id,
+      documentType: acceptance.documentType,
+      documentVersion: acceptance.documentVersion,
+      contentHash: acceptance.contentHash,
+      acceptedAt: acceptance.acceptedAt.toISOString(),
+      userName: acceptance.user.name,
+      userEmail: acceptance.user.email,
     })),
   };
 }

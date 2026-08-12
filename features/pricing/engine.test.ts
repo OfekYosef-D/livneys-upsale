@@ -49,6 +49,28 @@ function promo(overrides: Partial<PricingPromotion> = {}): PricingPromotion {
 }
 
 describe('pricing engine', () => {
+  it('returns safe domain errors for unavailable products and invalid quantities', () => {
+    expect(() => calculateOrderPricing({
+      customer,
+      route,
+      products,
+      priceListItems,
+      items: [{ productId: 'prod-hidden', quantity: 1 }],
+      promotions: [],
+      now,
+    })).toThrow(expect.objectContaining({ code: 'NOT_FOUND' }));
+
+    expect(() => calculateOrderPricing({
+      customer,
+      route,
+      products: [{ ...products[0], minQty: 6 }],
+      priceListItems,
+      items: [{ productId: 'prod-herb', quantity: 2 }],
+      promotions: [],
+      now,
+    })).toThrow(expect.objectContaining({ code: 'VALIDATION_ERROR' }));
+  });
+
   it('resolves catalog prices from the customer price list and active eligible promotions', () => {
     const result = resolveCatalogPricing({
       customer,

@@ -29,7 +29,7 @@ describe('institutional order business rules', () => {
         items: [{ productId: 'spread-185', quantity: 6 }],
         products,
       }),
-    ).toThrow('700');
+    ).toThrow(expect.objectContaining({ code: 'VALIDATION_ERROR', message: expect.stringContaining('700') }));
   });
 
   it('enforces product order multiples for customer and admin submissions', () => {

@@ -70,17 +70,18 @@ async function resetDemoData() {
   await prisma.notificationPreference.deleteMany();
   await prisma.customerProductRecommendation.deleteMany();
   await prisma.promotion.deleteMany();
-  await prisma.orderActivity.deleteMany();
-  await prisma.orderAdditionLine.deleteMany();
-  await prisma.orderAdditionRequest.deleteMany();
-  await prisma.orderLine.deleteMany();
-  await prisma.order.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.customer.deleteMany();
-  await prisma.priceListItem.deleteMany();
-  await prisma.priceList.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.route.deleteMany();
+  // Local development only: CASCADE also clears immutable legal, audit, and receipt rows.
+  // assertDemoSeedAllowed() makes this path unavailable for Production and Neon databases.
+  await prisma.$executeRaw`
+    TRUNCATE TABLE
+      "Order",
+      "User",
+      "Customer",
+      "PriceList",
+      "Product",
+      "Route"
+    RESTART IDENTITY CASCADE
+  `;
 }
 
 function normalizeOrderStatus(status: string, orderId: string): OrderStatus {

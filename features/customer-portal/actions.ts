@@ -9,7 +9,7 @@ import {
   StaleOrderWriteError,
 } from '@/features/orders/persistence';
 import { createSubmittedOrder, getOrderWriteContext } from '@/features/orders/service';
-import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
+import { actionError, actionOk, SafeActionError, type ActionResult } from '@/lib/action-result';
 import { assertCustomerAction } from '@/lib/authorization';
 import { prisma } from '@/lib/db';
 import { enqueueOrderLifecycleWhatsApp } from '../notifications/jobs';
@@ -54,7 +54,7 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
       promotions: context.promotions,
     });
     const snapshotLines = pricing.lines;
-    const vat = calculateVatSummary(pricing.total);
+    const vat = calculateVatSummary(pricing.total, context.vatRatePercent);
     const draftPayload = {
       order: {
         customerId: parsed.customerId,
@@ -110,12 +110,12 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
 export async function submitCustomerOrderAction(input: SubmitCustomerOrderInput): Promise<ActionResult<{ orderId: string; status: string }>> {
   try {
     const parsed = submitCustomerOrderSchema.parse(input);
-    await assertCustomerAction(parsed.customerId);
+    const session = await assertCustomerAction(parsed.customerId);
 
     const context = await getOrderWriteContext(parsed.customerId);
     const normalizedItems = normalizeCustomerOrderItems(parsed.items, context.products);
     if (normalizedItems.length === 0) {
-      throw new Error('לא ניתן לשלוח הזמנה ריקה.');
+      throw new SafeActionError('VALIDATION_ERROR', 'לא ניתן לשלוח הזמנה ריקה.');
     }
 
     const order = await createSubmittedOrder({
@@ -127,6 +127,9 @@ export async function submitCustomerOrderAction(input: SubmitCustomerOrderInput)
       commercialTermsAccepted: parsed.commercialTermsAccepted,
       notes: parsed.notes,
       replaceDraftForDeliveryWindow: true,
+      actorUserId: session.user.id,
+      expectedVatRatePercent: parsed.vatRatePercent,
+      expectedLegalDocumentSetVersion: parsed.legalDocumentSetVersion,
     });
 
     revalidatePath('/admin');

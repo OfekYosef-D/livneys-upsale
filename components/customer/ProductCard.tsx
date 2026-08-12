@@ -12,7 +12,7 @@ export function ProductCard({ product, qty, onQty }: { product: PortalProduct; q
   return (
     <article className="overflow-hidden rounded-2xl border border-black/10 bg-white">
       <div className="relative h-32 w-full bg-[#e6e1d8]">
-        <Image src={image} alt={product.name} fill sizes="(max-width: 768px) 100vw, 25vw" className="object-cover" />
+        <Image src={image} alt={product.name} fill unoptimized={Boolean(product.imageUrl?.startsWith('http'))} sizes="(max-width: 768px) 100vw, 25vw" className="object-cover" />
       </div>
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">

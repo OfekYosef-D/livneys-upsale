@@ -8,6 +8,8 @@ describe('customer order submission schema', () => {
       idempotencyKey: '9d31ee3f-3eb9-4cbc-b0ff-d48ed1daed71',
       items: [{ productId: 'product-1', qty: 2 }],
       paymentTerm: 'NET_30',
+      vatRatePercent: 18,
+      legalDocumentSetVersion: '2026-08-12-review',
       commercialTermsAccepted: true,
     };
 
@@ -16,5 +18,7 @@ describe('customer order submission schema', () => {
     });
     expect(submitCustomerOrderSchema.safeParse({ ...input, idempotencyKey: 'not-a-uuid' }).success).toBe(false);
     expect(submitCustomerOrderSchema.safeParse({ ...input, idempotencyKey: undefined }).success).toBe(false);
+    expect(submitCustomerOrderSchema.safeParse({ ...input, vatRatePercent: undefined }).success).toBe(false);
+    expect(submitCustomerOrderSchema.safeParse({ ...input, legalDocumentSetVersion: undefined }).success).toBe(false);
   });
 });

@@ -45,6 +45,25 @@ enum PaymentTerm {
   IMMEDIATE_OR_CASH
 }
 
+enum PaymentMethod {
+  BANK_TRANSFER
+  CASH
+  CHECK
+  CREDIT_CARD
+  OTHER
+}
+
+enum PaymentReceiptStatus {
+  RECORDED
+  VOIDED
+}
+
+enum LegalDocumentType {
+  COMMERCIAL_TERMS
+  PRIVACY_POLICY
+  CANCELLATION_RETURNS
+}
+
 enum OrderAdditionRequestStatus {
   DRAFT
   PENDING
@@ -91,26 +110,30 @@ enum PromotionEffectType {
 }
 
 model User {
-  id                       String                 @id @default(cuid())
-  email                    String                 @unique
-  name                     String
-  passwordHash             String?
-  role                     UserRole
-  isActive                 Boolean                @default(true)
-  sessionVersion           Int                    @default(1)
-  passwordChangedAt        DateTime?
-  mfaEnabled               Boolean                @default(false)
-  mfaSecretEncrypted       String?
+  id                        String                 @id @default(cuid())
+  email                     String                 @unique
+  name                      String
+  passwordHash              String?
+  role                      UserRole
+  isActive                  Boolean                @default(true)
+  sessionVersion            Int                    @default(1)
+  passwordChangedAt         DateTime?
+  mfaEnabled                Boolean                @default(false)
+  mfaSecretEncrypted        String?
   mfaPendingSecretEncrypted String?
-  customerId               String?
-  customer                 Customer?              @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  authTokens               AuthToken[]
-  mfaRecoveryCodes         MfaRecoveryCode[]
-  contactLogs              CustomerContactLog[]
-  reviewedAdditionRequests OrderAdditionRequest[] @relation("OrderAdditionReviewer")
-  orderActivities          OrderActivity[]
-  createdAt                DateTime               @default(now())
-  updatedAt                DateTime               @updatedAt
+  customerId                String?
+  customer                  Customer?              @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  authTokens                AuthToken[]
+  mfaRecoveryCodes          MfaRecoveryCode[]
+  contactLogs               CustomerContactLog[]
+  reviewedAdditionRequests  OrderAdditionRequest[] @relation("OrderAdditionReviewer")
+  orderActivities           OrderActivity[]
+  auditLogs                 AuditLog[]
+  recordedPaymentReceipts   PaymentReceipt[]       @relation("RecordedPaymentReceipts")
+  voidedPaymentReceipts     PaymentReceipt[]       @relation("VoidedPaymentReceipts")
+  legalAcceptances          LegalAcceptance[]
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
 
   @@index([role])
   @@index([customerId])
@@ -149,6 +172,8 @@ model Customer {
   notificationJobs       NotificationJob[]
   contactLogs            CustomerContactLog[]
   whatsappWebhookEvents  WhatsAppWebhookEvent[]
+  auditLogs              AuditLog[]
+  legalAcceptances       LegalAcceptance[]
   createdAt              DateTime                        @default(now())
   updatedAt              DateTime                        @updatedAt
 
@@ -172,22 +197,22 @@ model AuthToken {
 }
 
 model MfaRecoveryCode {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  codeHash  String   @unique
+  codeHash  String    @unique
   usedAt    DateTime?
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
 
   @@index([userId, usedAt])
 }
 
 model RateLimitBucket {
-  key          String   @id
-  count        Int      @default(0)
+  key          String    @id
+  count        Int       @default(0)
   windowStart  DateTime
   blockedUntil DateTime?
-  updatedAt    DateTime @updatedAt
+  updatedAt    DateTime  @updatedAt
 
   @@index([blockedUntil])
   @@index([updatedAt])
@@ -331,6 +356,8 @@ model Order {
   additionRequests          OrderAdditionRequest[]
   activities                OrderActivity[]
   notificationJobs          NotificationJob[]
+  paymentReceipts           PaymentReceipt[]
+  legalAcceptances          LegalAcceptance[]
   createdAt                 DateTime               @default(now())
   updatedAt                 DateTime               @updatedAt
 
@@ -441,6 +468,84 @@ model OrderActivity {
   @@index([orderId, createdAt])
   @@index([additionRequestId])
   @@index([actorUserId])
+}
+
+model PaymentReceipt {
+  id               String               @id @default(cuid())
+  idempotencyKey   String?              @unique
+  orderId          String
+  amount           Decimal              @db.Decimal(10, 2)
+  method           PaymentMethod
+  reference        String?
+  receivedAt       DateTime
+  note             String?
+  status           PaymentReceiptStatus @default(RECORDED)
+  recordedByUserId String
+  voidedAt         DateTime?
+  voidedByUserId   String?
+  voidReason       String?
+  order            Order                @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  recordedBy       User                 @relation("RecordedPaymentReceipts", fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  voidedBy         User?                @relation("VoidedPaymentReceipts", fields: [voidedByUserId], references: [id], onDelete: Restrict)
+  createdAt        DateTime             @default(now())
+
+  @@index([orderId, status, receivedAt])
+  @@index([recordedByUserId])
+  @@index([voidedByUserId])
+}
+
+model LegalAcceptance {
+  id              String            @id @default(cuid())
+  orderId         String
+  customerId      String
+  userId          String
+  documentType    LegalDocumentType
+  documentVersion String
+  contentHash     String
+  acceptedAt      DateTime
+  order           Order             @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  customer        Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  createdAt       DateTime          @default(now())
+
+  @@unique([orderId, documentType])
+  @@index([customerId, acceptedAt])
+  @@index([userId, acceptedAt])
+}
+
+model TaxRate {
+  id            String    @id
+  jurisdiction  String
+  label         String
+  ratePercent   Decimal   @db.Decimal(5, 2)
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@unique([jurisdiction, effectiveFrom])
+  @@index([jurisdiction, effectiveFrom, effectiveTo])
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  actorUserId String?
+  actorRole   String?
+  customerId  String?
+  entityType  String
+  entityId    String
+  action      String
+  before      Json?
+  after       Json?
+  metadata    Json?
+  requestId   String
+  actorUser   User?     @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([customerId, createdAt])
+  @@index([requestId])
 }
 
 model Promotion {

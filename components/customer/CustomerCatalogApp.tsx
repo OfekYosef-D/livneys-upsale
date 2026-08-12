@@ -210,7 +210,7 @@ function ProductOrderCard({ product, qty, onQty }: { product: PortalProduct; qty
     <article className="group rounded-2xl border border-black/10 bg-white p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.045)] transition hover:border-black/20">
       <div className="grid grid-cols-[5.25rem_1fr] gap-3 md:grid-cols-[6rem_1fr_12rem] md:items-center">
         <div className="relative aspect-square overflow-hidden rounded-xl bg-[#e6e1d8]">
-          <Image src={image} alt={product.name} fill sizes="96px" className="object-cover transition duration-300 group-hover:scale-[1.025]" />
+          <Image src={image} alt={product.name} fill unoptimized={Boolean(product.imageUrl?.startsWith('http'))} sizes="96px" className="object-cover transition duration-300 group-hover:scale-[1.025]" />
         </div>
 
         <div className="min-w-0">

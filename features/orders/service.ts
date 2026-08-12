@@ -1,5 +1,9 @@
 import { Prisma, type OrderSource } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { prisma } from '@/lib/db';
+import { appendAuditLog } from '../audit/log';
+import { assertLegalDocumentsApprovedForProduction, recordOrderLegalAcceptances } from '../legal/acceptance';
+import { SafeActionError } from '../../lib/safe-action-error';
 import type { PaymentTermValue } from './payment-terms';
 import {
   ActiveOrderExistsError,
@@ -9,14 +13,15 @@ import {
   StaleOrderWriteError,
 } from './persistence';
 import { buildSubmittedOrderPayload, type OrderWriteContext } from './write';
+import { assertVatQuoteCurrent, getEffectiveVatRate } from './tax-rates';
 
 export type OrderWriteItem = {
   productId: string;
   quantity: number;
 };
 
-export async function getOrderWriteContext(customerId: string): Promise<OrderWriteContext> {
-  const [customer, promotions] = await Promise.all([
+export async function getOrderWriteContext(customerId: string, at = new Date()): Promise<OrderWriteContext> {
+  const [customer, promotions, vatRate] = await Promise.all([
     prisma.customer.findUnique({
       where: { id: customerId },
       include: {
@@ -42,17 +47,19 @@ export async function getOrderWriteContext(customerId: string): Promise<OrderWri
         priceListTargets: true,
       },
     }),
+    getEffectiveVatRate(at),
   ]);
 
   if (!customer || !customer.isActive) {
-    throw new Error('לקוח לא נמצא או אינו פעיל.');
+    throw new SafeActionError('NOT_FOUND', 'הלקוח לא נמצא או אינו פעיל.');
   }
 
   if (!customer.route.isActive) {
-    throw new Error('קו החלוקה של הלקוח אינו פעיל.');
+    throw new SafeActionError('ORDER_LOCKED', 'קו החלוקה של הלקוח אינו פעיל.');
   }
 
   return {
+    vatRatePercent: vatRate.ratePercent,
     customer: {
       id: customer.id,
       routeId: customer.routeId,
@@ -112,6 +119,9 @@ export async function createSubmittedOrder({
   notes,
   internalNote,
   replaceDraftForDeliveryWindow = false,
+  actorUserId,
+  expectedVatRatePercent,
+  expectedLegalDocumentSetVersion,
   now = new Date(),
 }: {
   customerId: string;
@@ -123,6 +133,9 @@ export async function createSubmittedOrder({
   notes?: string | null;
   internalNote?: string | null;
   replaceDraftForDeliveryWindow?: boolean;
+  actorUserId?: string | null;
+  expectedVatRatePercent?: number;
+  expectedLegalDocumentSetVersion?: string;
   now?: Date;
 }): Promise<{ orderId: string; orderNumber: number; status: string; routeId: string; replayed: boolean }> {
   const existingReplay = await prisma.order.findFirst({
@@ -144,7 +157,14 @@ export async function createSubmittedOrder({
     };
   }
 
-  const context = await getOrderWriteContext(customerId);
+  const context = await getOrderWriteContext(customerId, now);
+  if (expectedVatRatePercent !== undefined) {
+    assertVatQuoteCurrent(expectedVatRatePercent, context.vatRatePercent ?? 0);
+  }
+  if (source === 'CUSTOMER') {
+    assertLegalDocumentsApprovedForProduction();
+    if (!actorUserId) throw new SafeActionError('UNAUTHORIZED', 'לא ניתן לתעד את מאשר ההזמנה. התחברו מחדש ונסו שוב.');
+  }
   const payload = buildSubmittedOrderPayload({
     context,
     items,
@@ -159,11 +179,44 @@ export async function createSubmittedOrder({
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       const persisted = await prisma.$transaction(
-        (tx) => persistSubmittedOrder(tx, {
-          payload,
-          idempotencyKey,
-          replaceDraftForDeliveryWindow,
-        }),
+        async (tx) => {
+          const result = await persistSubmittedOrder(tx, {
+            payload,
+            idempotencyKey,
+            replaceDraftForDeliveryWindow,
+          });
+          if (result.replayed) return result;
+
+          const requestId = randomUUID();
+          if (source === 'CUSTOMER' && actorUserId) {
+            await recordOrderLegalAcceptances(tx, {
+              orderId: result.order.id,
+              customerId,
+              userId: actorUserId,
+              acceptedAt: now,
+              expectedDocumentSetVersion: expectedLegalDocumentSetVersion ?? '',
+            });
+          }
+          await appendAuditLog(tx, {
+            actorUserId,
+            actorRole: source === 'CUSTOMER' ? 'CUSTOMER' : 'ADMIN',
+            customerId,
+            entityType: 'Order',
+            entityId: result.order.id,
+            action: 'ORDER_SUBMITTED',
+            requestId,
+            after: {
+              orderNumber: result.order.orderNumber,
+              status: result.order.status,
+              source,
+              deliveryWindowStart: result.order.deliveryWindowStart,
+              total: payload.order.total,
+              vatRatePercent: payload.order.vatRatePercent,
+              totalIncludingVat: payload.order.totalIncludingVat,
+            },
+          });
+          return result;
+        },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
 

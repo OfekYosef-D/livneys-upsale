@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LEGAL_DOCUMENT_SET_VERSION } from '../legal/documents';
 
 type EnvLike = Record<string, string | undefined>;
 
@@ -20,11 +21,20 @@ const deploymentEnvSchema = z.object({
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().trim().min(1),
   RESEND_API_KEY: z.string().trim().min(1),
   EMAIL_FROM: z.string().trim().min(3),
+  VERCEL_ENV: z.enum(['development', 'preview', 'production']).optional(),
+  LEGAL_DOCUMENTS_APPROVED_VERSION: z.string().trim().optional(),
   WHATSAPP_SEND_ENABLED: z.enum(['true', 'false', '1', '0']).default('false'),
   WHATSAPP_ACCESS_TOKEN: z.string().trim().optional(),
   WHATSAPP_PHONE_NUMBER_ID: z.string().trim().optional(),
   WHATSAPP_APP_SECRET: z.string().trim().optional(),
 }).superRefine((env, context) => {
+  if (env.VERCEL_ENV === 'production' && env.LEGAL_DOCUMENTS_APPROVED_VERSION !== LEGAL_DOCUMENT_SET_VERSION) {
+    context.addIssue({
+      code: 'custom',
+      path: ['LEGAL_DOCUMENTS_APPROVED_VERSION'],
+      message: 'must match the lawyer-approved legal document version before production deployment',
+    });
+  }
   if (env.WHATSAPP_SEND_ENABLED !== 'true' && env.WHATSAPP_SEND_ENABLED !== '1') return;
 
   for (const key of ['WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET'] as const) {

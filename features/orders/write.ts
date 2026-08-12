@@ -1,4 +1,5 @@
 import type { OrderSource } from '@prisma/client';
+import { SafeActionError } from '../../lib/safe-action-error';
 import { calculateOrderPricing, type PricingPriceListItem, type PricingProduct, type PricingPromotion } from '../pricing/engine';
 import { validateInstitutionalOrderRules } from './business-rules';
 import { COMMERCIAL_TERMS_VERSION } from './commercial-terms';
@@ -13,6 +14,7 @@ import {
 } from './utils';
 
 export type OrderWriteContext = {
+  vatRatePercent?: number;
   customer: {
     id: string;
     routeId: string;
@@ -78,15 +80,15 @@ export function buildSubmittedOrderPayload({
   internalNote?: string | null;
 }): SubmittedOrderPayload {
   if (source === 'CUSTOMER' && !commercialTermsAccepted) {
-    throw new Error('יש לאשר שההזמנה היא עסקית ואת פרטי ההזמנה לפני השליחה.');
+    throw new SafeActionError('VALIDATION_ERROR', 'יש לאשר שההזמנה היא עסקית ואת פרטי ההזמנה לפני השליחה.');
   }
 
   if (!context.customer.isActive) {
-    throw new Error('Customer is inactive');
+    throw new SafeActionError('ORDER_LOCKED', 'הלקוח אינו פעיל.');
   }
 
   if (!context.route.isActive) {
-    throw new Error('Route is inactive');
+    throw new SafeActionError('ORDER_LOCKED', 'קו החלוקה של הלקוח אינו פעיל.');
   }
 
   const pricing = calculateOrderPricing({
@@ -104,7 +106,7 @@ export function buildSubmittedOrderPayload({
   const lines = pricing.lines;
 
   if (lines.length === 0) {
-    throw new Error('Order must include at least one product');
+    throw new SafeActionError('VALIDATION_ERROR', 'ההזמנה חייבת לכלול לפחות מוצר אחד.');
   }
 
   validateInstitutionalOrderRules({
@@ -114,7 +116,7 @@ export function buildSubmittedOrderPayload({
     products: context.products,
   });
   const payment = calculatePaymentTermsSummary(pricing.total, paymentTerm);
-  const vat = calculateVatSummary(payment.total);
+  const vat = calculateVatSummary(payment.total, context.vatRatePercent);
 
   return {
     order: {
