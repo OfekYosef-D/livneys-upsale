@@ -97,7 +97,7 @@ export function AdditionCatalogClient({
                 const image = product.imageUrl?.startsWith('http') ? product.imageUrl : productImages[product.assetImage ?? ''] ?? fallbackProductImage;
                 return (
                   <article key={product.id} className="grid grid-cols-[4.5rem_1fr] gap-3 rounded-2xl border border-black/10 bg-white p-2.5 shadow-sm md:grid-cols-[4.5rem_1fr_10rem] md:items-center">
-                    <div className="relative aspect-square overflow-hidden rounded-xl bg-[#e6e1d8]"><Image src={image} alt={product.name} fill sizes="72px" className="object-cover" /></div>
+                    <div className="relative aspect-square overflow-hidden rounded-xl bg-[#e6e1d8]"><Image src={image} alt={product.name} fill unoptimized={Boolean(product.imageUrl?.startsWith('http'))} sizes="72px" className="object-cover" /></div>
                     <div className="min-w-0">
                       <p className="truncate text-[11px] font-black text-black/45">{product.category}</p>
                       <h2 className="truncate font-black">{product.name}</h2>

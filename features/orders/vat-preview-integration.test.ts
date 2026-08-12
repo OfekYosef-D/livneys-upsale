@@ -13,3 +13,14 @@ describe('VAT preview integration', () => {
     expect(source).toContain('calculateVatSummary(payment.total, order.vatRatePercent)');
   });
 });
+
+describe('external product image integration', () => {
+  it.each([
+    ['components', 'customer', 'ProductCard.tsx'],
+    ['components', 'customer', 'CustomerCatalogApp.tsx'],
+    ['features', 'order-additions', 'components', 'AdditionCatalogClient.tsx'],
+  ])('renders configured external images without the Next optimizer allowlist: %s', (...segments) => {
+    const source = fs.readFileSync(path.join(process.cwd(), ...segments), 'utf8');
+    expect(source).toContain("unoptimized={Boolean(product.imageUrl?.startsWith('http'))}");
+  });
+});
