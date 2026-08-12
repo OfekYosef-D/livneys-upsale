@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildCloudinarySignature,
+  getCloudinaryConfig,
   isCloudinaryConfigured,
   validateProductImageFile,
   uploadProductImageToCloudinary,
@@ -29,10 +30,20 @@ describe('Cloudinary product image upload helpers', () => {
   });
 
   it('validates product image file type and size before upload', () => {
-    expect(() => validateProductImageFile(new File(['x'], 'label.pdf', { type: 'application/pdf' }))).toThrow();
+    expect(() => validateProductImageFile(new File(['x'], 'label.pdf', { type: 'application/pdf' }))).toThrow(
+      expect.objectContaining({ code: 'VALIDATION_ERROR' }),
+    );
 
     const tooLarge = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'large.jpg', { type: 'image/jpeg' });
-    expect(() => validateProductImageFile(tooLarge)).toThrow();
+    expect(() => validateProductImageFile(tooLarge)).toThrow(
+      expect.objectContaining({ code: 'VALIDATION_ERROR' }),
+    );
+  });
+
+  it('returns a safe configuration error when image upload is unavailable', () => {
+    expect(() => getCloudinaryConfig({} as NodeJS.ProcessEnv)).toThrow(
+      expect.objectContaining({ code: 'NOT_CONFIGURED' }),
+    );
   });
 
   it('uploads image files to Cloudinary using a signed request', async () => {

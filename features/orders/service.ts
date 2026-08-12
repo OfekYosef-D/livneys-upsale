@@ -51,11 +51,11 @@ export async function getOrderWriteContext(customerId: string, at = new Date()):
   ]);
 
   if (!customer || !customer.isActive) {
-    throw new Error('לקוח לא נמצא או אינו פעיל.');
+    throw new SafeActionError('NOT_FOUND', 'הלקוח לא נמצא או אינו פעיל.');
   }
 
   if (!customer.route.isActive) {
-    throw new Error('קו החלוקה של הלקוח אינו פעיל.');
+    throw new SafeActionError('ORDER_LOCKED', 'קו החלוקה של הלקוח אינו פעיל.');
   }
 
   return {

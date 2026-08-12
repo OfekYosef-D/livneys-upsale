@@ -56,7 +56,7 @@ describe('order domain utilities', () => {
         items: [{ productId: 'prod-case', quantity: 2 }],
         products,
       }),
-    ).toThrow('Minimum quantity');
+    ).toThrow(expect.objectContaining({ code: 'VALIDATION_ERROR' }));
   });
 
   it('marks submissions after the cutoff as special requests', () => {
@@ -71,7 +71,7 @@ describe('order domain utilities', () => {
   it('enforces allowed order status transitions', () => {
     expect(assertOrderStatusTransition('SUBMITTED', 'APPROVED')).toBe('APPROVED');
     expect(() => assertOrderStatusTransition('DELIVERED', 'APPROVED')).toThrow(
-      'Invalid order status transition',
+      expect.objectContaining({ code: 'ORDER_LOCKED' }),
     );
   });
 
@@ -99,6 +99,6 @@ describe('order domain utilities', () => {
         [{ productId: 'prod-case', qty: 2 }],
         [{ id: 'prod-case', name: 'מארז מסעדה', minQty: 6 }],
       ),
-    ).toThrow('הכמות המינימלית עבור מארז מסעדה היא 6.');
+    ).toThrow(expect.objectContaining({ code: 'VALIDATION_ERROR' }));
   });
 });

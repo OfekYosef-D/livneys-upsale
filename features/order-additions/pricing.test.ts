@@ -23,6 +23,15 @@ const context = {
 };
 
 describe('order addition pricing snapshot', () => {
+  it('returns a safe validation error for an empty addition', () => {
+    expect(() => buildOrderAdditionSnapshot({
+      context,
+      items: [],
+      paymentTerm: 'NET_30',
+      now: new Date('2026-08-11T12:00:00.000Z'),
+    })).toThrow(expect.objectContaining({ code: 'VALIDATION_ERROR' }));
+  });
+
   it('uses the original immediate-payment term and snapshots VAT', () => {
     expect(buildOrderAdditionSnapshot({
       context,

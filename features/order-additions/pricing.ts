@@ -1,4 +1,5 @@
 import type { OrderWriteContext } from '../orders/write';
+import { SafeActionError } from '../../lib/safe-action-error';
 import { calculatePaymentTermsSummary, type PaymentTermValue } from '../orders/payment-terms';
 import { calculateVatSummary } from '../orders/vat';
 import { normalizeCustomerOrderItems, type OrderSnapshotLine } from '../orders/utils';
@@ -82,7 +83,7 @@ export function buildOrderAdditionSnapshot({
   };
 
   if (pricing.lines.length === 0) {
-    throw new Error('בקשת תוספת חייבת לכלול לפחות מוצר אחד.');
+    throw new SafeActionError('VALIDATION_ERROR', 'בקשת תוספת חייבת לכלול לפחות מוצר אחד.');
   }
 
   const payment = calculatePaymentTermsSummary(pricing.total, paymentTerm);

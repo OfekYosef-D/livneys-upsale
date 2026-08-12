@@ -30,6 +30,7 @@ export async function submitOrderAddition({
       status: true,
       revision: true,
       paymentTerm: true,
+      vatRatePercent: true,
       deliveryWindowStart: true,
       lines: { select: { productId: true, quantity: true } },
     },
@@ -37,7 +38,8 @@ export async function submitOrderAddition({
   if (!order) throw new SafeActionError('NOT_FOUND', 'ההזמנה לא נמצאה.');
   assertAdditionAllowed(order.status);
 
-  const context = await getOrderWriteContext(customerId, now);
+  const currentContext = await getOrderWriteContext(customerId, now);
+  const context = { ...currentContext, vatRatePercent: Number(order.vatRatePercent) };
   const snapshot = buildOrderAdditionSnapshot({
     context,
     existingItems: order.lines.flatMap((line) => line.productId

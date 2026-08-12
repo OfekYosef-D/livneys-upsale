@@ -2,6 +2,19 @@ import { describe, expect, it, vi } from 'vitest';
 import { syncCustomerLoginIdentity } from './customer-login-sync';
 
 describe('customer login identity synchronization', () => {
+  it('returns a safe validation error when removing an active login email', async () => {
+    await expect(syncCustomerLoginIdentity(
+      {} as never,
+      {
+        currentEmail: 'primary@example.com',
+        nextEmail: null,
+        nextContactName: 'Primary Contact',
+        users: [{ id: 'primary', email: 'primary@example.com' }],
+        now: new Date('2026-08-12T00:30:00.000Z'),
+      },
+    )).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+  });
+
   it('uses an existing company user as the contact login without renaming the previous login', async () => {
     const update = vi.fn();
     await syncCustomerLoginIdentity(

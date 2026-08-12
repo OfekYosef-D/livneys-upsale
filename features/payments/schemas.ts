@@ -5,7 +5,7 @@ export const paymentMethodValues = ['BANK_TRANSFER', 'CASH', 'CHECK', 'CREDIT_CA
 export const recordPaymentReceiptSchema = z.object({
   orderId: z.string().trim().min(1),
   amount: z.coerce.number().positive().max(99_999_999.99).refine(
-    (amount) => Number.isInteger(amount * 100),
+    (amount) => Math.abs((amount * 100) - Math.round(amount * 100)) < 1e-8,
     'ניתן להזין עד שתי ספרות אחרי הנקודה.',
   ),
   method: z.enum(paymentMethodValues),

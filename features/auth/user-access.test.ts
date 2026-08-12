@@ -2,6 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { updateCustomerUserAccess } from './user-access';
 
 describe('customer user access changes', () => {
+  it('returns a safe not-found error when the user does not belong to the company', async () => {
+    await expect(updateCustomerUserAccess(
+      { user: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) } } as never,
+      { customerId: 'customer-1', userId: 'missing', isActive: false, now: new Date() },
+    )).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
   it('revokes sessions and outstanding password links when disabling a user', async () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const consumeTokens = vi.fn();

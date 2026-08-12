@@ -207,7 +207,7 @@ describe('admin CRM actions', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: 'Invalid order status transition: DELIVERED -> APPROVED',
+      error: 'לא ניתן להעביר את ההזמנה לסטטוס המבוקש.',
     });
     expect(mockedOrderUpdate).not.toHaveBeenCalled();
   });

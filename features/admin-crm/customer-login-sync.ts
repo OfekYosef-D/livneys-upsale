@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import { SafeActionError } from '../../lib/safe-action-error';
 
 type CustomerLoginUser = { id: string; email: string };
 
@@ -17,7 +18,7 @@ export async function syncCustomerLoginIdentity(
   const currentLoginUser = input.users.find((user) => user.email === input.currentEmail);
   if (!input.nextEmail) {
     if (currentLoginUser) {
-      throw new Error('לא ניתן להסיר אימייל מלקוח עם חשבון התחברות.');
+      throw new SafeActionError('VALIDATION_ERROR', 'לא ניתן להסיר אימייל מלקוח עם חשבון התחברות.');
     }
     return;
   }

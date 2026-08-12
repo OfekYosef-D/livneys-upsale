@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { appendAuditLog } from './log';
 
@@ -29,6 +30,22 @@ describe('append-only audit logging', () => {
         before: { email: 'old@example.com', passwordHash: '[REDACTED]' },
         after: { email: 'new@example.com', nested: { accessToken: '[REDACTED]' } },
       }),
+    });
+  });
+
+  it('serializes Prisma Decimal values without traversing runtime internals', async () => {
+    const create = vi.fn(async (input: unknown) => input);
+
+    await appendAuditLog({ auditLog: { create } } as never, {
+      entityType: 'Product',
+      entityId: 'product-1',
+      action: 'PRODUCT_UPDATED',
+      requestId: 'request-2',
+      before: { basePrice: new Prisma.Decimal('12.34') },
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ before: { basePrice: '12.34' } }),
     });
   });
 });

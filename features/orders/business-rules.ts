@@ -1,4 +1,5 @@
 import { MINIMUM_INSTITUTIONAL_ORDER_TOTAL } from '../owner-rules/constants';
+import { SafeActionError } from '../../lib/safe-action-error';
 
 export { MINIMUM_INSTITUTIONAL_ORDER_TOTAL };
 
@@ -29,7 +30,7 @@ export function validateInstitutionalOrderRules({
   assertOrderMultiples({ items, products });
 
   if (source === 'CUSTOMER' && total < MINIMUM_INSTITUTIONAL_ORDER_TOTAL) {
-    throw new Error(`מינימום הזמנה מוסדית הוא ${MINIMUM_INSTITUTIONAL_ORDER_TOTAL} ₪ לפני מע"מ.`);
+    throw new SafeActionError('VALIDATION_ERROR', `מינימום הזמנה מוסדית הוא ${MINIMUM_INSTITUTIONAL_ORDER_TOTAL} ₪ לפני מע"מ.`);
   }
 }
 
@@ -52,7 +53,7 @@ export function assertOrderMultiples({
     if (multiple <= 1) continue;
 
     if (item.quantity % multiple !== 0) {
-      throw new Error(`הכמות עבור ${product.name} חייבת להיות בכפולות של ${multiple}.`);
+      throw new SafeActionError('VALIDATION_ERROR', `הכמות עבור ${product.name} חייבת להיות בכפולות של ${multiple}.`);
     }
   }
 }

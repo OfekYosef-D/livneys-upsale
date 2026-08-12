@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 type AuditWriter = Pick<Prisma.TransactionClient, 'auditLog'>;
 
@@ -38,6 +38,7 @@ export async function appendAuditLog(tx: AuditWriter, input: AuditLogInput) {
 
 export function sanitizeAuditValue(value: unknown): unknown {
   if (value === undefined || value === null) return undefined;
+  if (Prisma.Decimal.isDecimal(value)) return value.toJSON();
   if (value instanceof Date) return value.toISOString();
   if (Array.isArray(value)) return value.map(sanitizeAuditValue);
   if (typeof value !== 'object') return value;
