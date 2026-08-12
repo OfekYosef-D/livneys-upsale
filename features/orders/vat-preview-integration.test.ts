@@ -6,6 +6,7 @@ describe('VAT preview integration', () => {
   it('uses the configured effective rate for manual orders', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'features', 'admin-crm', 'components', 'AdminCrmManagers.tsx'), 'utf8');
     expect(source).toContain('calculateVatSummary(pricing.total, data.vatRatePercent)');
+    expect(source).toContain('vatRatePercent: data.vatRatePercent');
   });
 
   it('uses the order snapshot rate for addition previews', () => {

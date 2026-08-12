@@ -475,7 +475,10 @@ export async function updateProductAction(input: unknown): Promise<ActionResult<
     await assertPriceListsExist(parsed.prices.map((item) => item.priceListId));
 
     await prisma.$transaction(async (tx) => {
-      const existing = await tx.product.findUnique({ where: { id: parsed.id } });
+      const existing = await tx.product.findUnique({
+        where: { id: parsed.id },
+        include: { priceListItems: true },
+      });
       if (!existing) throw new SafeActionError('NOT_FOUND', 'המוצר לא נמצא.');
       await tx.product.update({
         where: { id: parsed.id },
@@ -546,7 +549,13 @@ export async function updateProductAction(input: unknown): Promise<ActionResult<
         entityId: parsed.id,
         action: 'PRODUCT_UPDATED',
         requestId: randomUUID(),
-        before: existing,
+        before: {
+          ...existing,
+          prices: existing.priceListItems.map((item) => ({
+            priceListId: item.priceListId,
+            price: item.price,
+          })),
+        },
         after: parsed,
       });
     });
@@ -874,6 +883,7 @@ export async function createManualOrderAction(input: unknown): Promise<ActionRes
       source: 'ADMIN',
       idempotencyKey: parsed.idempotencyKey,
       paymentTerm: 'NET_30',
+      expectedVatRatePercent: parsed.vatRatePercent,
       notes: parsed.notes,
       internalNote,
       actorUserId: session.user.id,

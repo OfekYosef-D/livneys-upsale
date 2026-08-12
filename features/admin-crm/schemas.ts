@@ -224,6 +224,7 @@ export const manualOrderItemSchema = z.object({
 export const manualOrderMutationSchema = z.object({
   customerId: requiredText(120),
   idempotencyKey: z.string().uuid(),
+  vatRatePercent: z.coerce.number().positive().max(100),
   items: z.array(manualOrderItemSchema).min(1),
   notes: nullableText(1000).default(null),
   internalNote: nullableText(1000).default(null),

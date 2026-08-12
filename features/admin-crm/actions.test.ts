@@ -29,6 +29,15 @@ describe('price-list audit contract', () => {
     expect(updateBlock).toContain('include: { items: true }');
     expect(updateBlock).toContain('prices: existing.items');
   });
+
+  it('loads existing product list prices before applying product updates', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const source = fs.readFileSync(path.join(process.cwd(), 'features', 'admin-crm', 'actions.ts'), 'utf8');
+    const updateBlock = source.slice(source.indexOf('export async function updateProductAction'), source.indexOf('export async function toggleProductActiveAction'));
+    expect(updateBlock).toContain('include: { priceListItems: true }');
+    expect(updateBlock).toContain('prices: existing.priceListItems');
+  });
 });
 
 vi.mock('@/lib/action-result', () => ({
@@ -114,6 +123,7 @@ describe('admin CRM actions', () => {
     const result = await actions.createManualOrderAction({
       customerId: 'cust-001',
       idempotencyKey,
+      vatRatePercent: 18,
       intakeChannel: 'PHONE',
       notes: 'Call before delivery',
       internalNote: 'Ordered with Shai',
@@ -131,6 +141,7 @@ describe('admin CRM actions', () => {
       source: 'ADMIN',
       paymentTerm: 'NET_30',
       actorUserId: 'admin',
+      expectedVatRatePercent: 18,
       notes: 'Call before delivery',
       internalNote: '[manual-order:intake=PHONE] Ordered with Shai',
     });
@@ -143,6 +154,7 @@ describe('admin CRM actions', () => {
     const result = await actions.createManualOrderAction({
       customerId: 'cust-001',
       idempotencyKey,
+      vatRatePercent: 18,
       intakeChannel: 'WHATSAPP',
       items: [{ productId: 'prod-a', quantity: 3 }],
     });

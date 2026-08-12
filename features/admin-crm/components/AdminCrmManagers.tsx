@@ -794,6 +794,7 @@ export function AdminManualOrderClient({ data }: { data: ManualOrderData }) {
                   createManualOrderAction({
                     customerId,
                     idempotencyKey,
+                    vatRatePercent: data.vatRatePercent,
                     intakeChannel: stringValue(form, 'intakeChannel') as 'PHONE' | 'WHATSAPP' | 'ADMIN_MANUAL',
                     notes: stringValue(form, 'notes'),
                     internalNote: stringValue(form, 'internalNote'),
