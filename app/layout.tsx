@@ -9,6 +9,11 @@ const heebo = Heebo({
   display: 'swap',
 });
 
+// A request-specific CSP nonce is injected by middleware. Rendering the whole
+// application tree dynamically guarantees that Next.js emits the matching
+// nonce on its runtime scripts instead of reusing nonce-less static output.
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: "Livney's B2B",
   description: "Mobile-first B2B ordering prototype for Livney's customers",
