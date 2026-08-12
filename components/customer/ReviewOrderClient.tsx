@@ -33,11 +33,13 @@ export function ReviewOrderClient({
   route,
   products,
   lastOrder,
+  vatRatePercent,
 }: {
   customer: PortalCustomer;
   route: PortalRoute;
   products: PortalProduct[];
   lastOrder: PortalOrder;
+  vatRatePercent: number;
 }) {
   const router = useRouter();
   const allowedProductIds = useMemo(() => getAllowedProductIds(products), [products]);
@@ -78,7 +80,10 @@ export function ReviewOrderClient({
     () => calculatePaymentTermsSummary(cartPricing.total, paymentTerm),
     [cartPricing.total, paymentTerm],
   );
-  const vatSummary = useMemo(() => calculateVatSummary(paymentSummary.total), [paymentSummary.total]);
+  const vatSummary = useMemo(
+    () => calculateVatSummary(paymentSummary.total, vatRatePercent),
+    [paymentSummary.total, vatRatePercent],
+  );
 
   async function submitOrder() {
     setError('');
@@ -255,7 +260,14 @@ export function ReviewOrderClient({
                     aria-describedby="commercial-order-notice"
                     className="mt-1 h-4 w-4 shrink-0 accent-black"
                   />
-                  <span>{COMMERCIAL_ORDER_DECLARATION}</span>
+                  <span>
+                    {COMMERCIAL_ORDER_DECLARATION}{' '}
+                    <Link href="/legal/commercial-terms" target="_blank" className="underline">תנאים מסחריים</Link>
+                    {' · '}
+                    <Link href="/legal/privacy" target="_blank" className="underline">פרטיות</Link>
+                    {' · '}
+                    <Link href="/legal/cancellations" target="_blank" className="underline">ביטולים והחזרות</Link>
+                  </span>
                 </label>
               </div>
               <button

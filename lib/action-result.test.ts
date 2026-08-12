@@ -21,4 +21,23 @@ describe('safe action errors', () => {
       details: { orderId: 'order-1', orderNumber: 1001 },
     });
   });
+
+  it('returns only a safe code and request id for unexpected failures', () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const result = actionError(new Error('postgresql://user:secret@db.example/internal-table'));
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'INTERNAL_ERROR',
+      error: 'אירעה שגיאה בלתי צפויה. נסו שוב או פנו לתמיכה.',
+      requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    });
+    expect(JSON.stringify(result)).not.toContain('secret');
+    expect(errorLog).toHaveBeenCalledWith('Server action failed', expect.objectContaining({
+      requestId: result.ok ? undefined : result.requestId,
+      error: expect.any(Error),
+    }));
+    errorLog.mockRestore();
+  });
 });

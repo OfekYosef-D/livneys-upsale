@@ -7,6 +7,7 @@ import { money } from '@/lib/format';
 import { AdminOrderStatusActions } from './AdminOrderStatusActions';
 import { OrderStatusPill } from './OrderStatusPill';
 import { AdminAdditionRequests } from '@/features/order-additions/components/AdminAdditionRequests';
+import { AdminPaymentReceipts } from '@/features/payments/components/AdminPaymentReceipts';
 
 type OrderData = NonNullable<Awaited<ReturnType<typeof getAdminOrderDetail>>>;
 
@@ -86,6 +87,19 @@ export function AdminOrderDetail({ order }: { order: OrderData }) {
               </p>
             )}
           </div>
+          {order.legalAcceptances.length > 0 && (
+            <div className="mt-3 rounded-xl border border-black/10 p-3 text-xs font-bold leading-5">
+              <p className="font-black">תיעוד מסמכים שאושרו</p>
+              <ul className="mt-2 space-y-1 text-black/60">
+                {order.legalAcceptances.map((acceptance) => (
+                  <li key={acceptance.id}>
+                    {legalDocumentLabel(acceptance.documentType)} · גרסה {acceptance.documentVersion} · {new Intl.DateTimeFormat('he-IL', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Jerusalem' }).format(new Date(acceptance.acceptedAt))}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 break-all text-[10px] text-black/40">Hash: {order.legalAcceptances[0]?.contentHash}</p>
+            </div>
+          )}
           {order.notes && <p className="mt-3 rounded-xl border border-black/10 p-3 text-sm font-bold">{order.notes}</p>}
           {order.internalNote && <p className="mt-3 rounded-xl bg-[#e6e1d8] p-3 text-xs font-black text-black/65">{order.internalNote}</p>}
           {['SUBMITTED', 'SPECIAL_REQUEST', 'APPROVED'].includes(order.status) && !order.additionRequests.some((request) => request.status === 'PENDING') && (
@@ -99,8 +113,24 @@ export function AdminOrderDetail({ order }: { order: OrderData }) {
       <div className="lg:col-span-2">
         <AdminAdditionRequests orderId={order.id} requests={order.additionRequests} />
       </div>
+      <div className="lg:col-span-2">
+        <AdminPaymentReceipts
+          orderId={order.id}
+          total={order.totalIncludingVat}
+          paidTotal={order.paymentSummary.paidTotal}
+          outstanding={order.paymentSummary.outstanding}
+          status={order.paymentSummary.status}
+          receipts={order.paymentReceipts}
+        />
+      </div>
     </div>
   );
+}
+
+function legalDocumentLabel(type: 'COMMERCIAL_TERMS' | 'PRIVACY_POLICY' | 'CANCELLATION_RETURNS') {
+  if (type === 'COMMERCIAL_TERMS') return 'תנאים מסחריים';
+  if (type === 'PRIVACY_POLICY') return 'מדיניות פרטיות';
+  return 'ביטולים והחזרות';
 }
 
 function MiniMetric({ label, value }: { label: string; value: string }) {

@@ -37,7 +37,7 @@ export async function submitOrderAddition({
   if (!order) throw new SafeActionError('NOT_FOUND', 'ההזמנה לא נמצאה.');
   assertAdditionAllowed(order.status);
 
-  const context = await getOrderWriteContext(customerId);
+  const context = await getOrderWriteContext(customerId, now);
   const snapshot = buildOrderAdditionSnapshot({
     context,
     existingItems: order.lines.flatMap((line) => line.productId

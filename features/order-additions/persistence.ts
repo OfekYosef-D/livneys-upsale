@@ -1,11 +1,13 @@
+import { randomUUID } from 'node:crypto';
 import type { PaymentTerm, Prisma } from '@prisma/client';
 import { SafeActionError } from '../../lib/safe-action-error';
+import { appendAuditLog } from '../audit/log';
 import { assertAdditionAllowed } from './business-rules';
 import type { OrderAdditionSnapshot } from './pricing';
 
 type AdditionPersistenceClient = Pick<
   Prisma.TransactionClient,
-  'orderAdditionRequest' | 'orderAdditionLine' | 'order' | 'orderLine' | 'orderActivity'
+  'orderAdditionRequest' | 'orderAdditionLine' | 'order' | 'orderLine' | 'orderActivity' | 'auditLog'
 >;
 
 export class StaleAdditionRequestError extends SafeActionError {
@@ -90,6 +92,15 @@ export async function persistPendingAdditionRequest(
         metadata: { edited: true, totalIncludingVat: input.snapshot.totalIncludingVat },
       },
     });
+    await appendAuditLog(tx, {
+      actorUserId: input.actorUserId ?? null,
+      customerId: input.customerId,
+      entityType: 'OrderAdditionRequest',
+      entityId: openRequest.id,
+      action: 'ORDER_ADDITION_SUBMITTED',
+      requestId: randomUUID(),
+      after: { edited: true, totalIncludingVat: input.snapshot.totalIncludingVat },
+    });
     return {
       request: await tx.orderAdditionRequest.findUniqueOrThrow({ where: { id: openRequest.id } }),
       replayed: false,
@@ -114,6 +125,15 @@ export async function persistPendingAdditionRequest(
       action: 'ADDITION_SUBMITTED',
       metadata: { edited: false, totalIncludingVat: input.snapshot.totalIncludingVat },
     },
+  });
+  await appendAuditLog(tx, {
+    actorUserId: input.actorUserId ?? null,
+    customerId: input.customerId,
+    entityType: 'OrderAdditionRequest',
+    entityId: request.id,
+    action: 'ORDER_ADDITION_SUBMITTED',
+    requestId: randomUUID(),
+    after: { edited: false, totalIncludingVat: input.snapshot.totalIncludingVat },
   });
   return { request, replayed: false };
 }
@@ -221,6 +241,17 @@ export async function approveAdditionRequest(
       metadata: { totalIncludingVat: Number(request.totalIncludingVat) },
     },
   });
+  await appendAuditLog(tx, {
+    actorUserId: input.reviewerUserId,
+    actorRole: 'ADMIN',
+    customerId: request.customerId,
+    entityType: 'OrderAdditionRequest',
+    entityId: request.id,
+    action: 'ORDER_ADDITION_APPROVED',
+    requestId: randomUUID(),
+    before: { status: request.status },
+    after: { status: 'APPROVED', totalIncludingVat: Number(request.totalIncludingVat) },
+  });
   return { orderId: request.order.id, customerId: request.customerId, replayed: false };
 }
 
@@ -259,6 +290,17 @@ export async function rejectAdditionRequest(
       action: 'ADDITION_REJECTED',
       metadata: { reason: input.reason },
     },
+  });
+  await appendAuditLog(tx, {
+    actorUserId: input.reviewerUserId,
+    actorRole: 'ADMIN',
+    customerId: request.customerId,
+    entityType: 'OrderAdditionRequest',
+    entityId: request.id,
+    action: 'ORDER_ADDITION_REJECTED',
+    requestId: randomUUID(),
+    before: { status: request.status },
+    after: { status: 'REJECTED', reason: input.reason },
   });
   return { orderId: request.order.id, customerId: request.customerId, replayed: false };
 }

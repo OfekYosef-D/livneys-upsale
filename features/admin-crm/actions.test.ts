@@ -5,14 +5,20 @@ vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
 }));
 
-vi.mock('@/lib/db', () => ({
-  prisma: {
+vi.mock('@/lib/db', () => {
+  const prisma = {
     order: {
       findUnique: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
     },
-  },
-}));
+    auditLog: { create: vi.fn() },
+    $transaction: vi.fn(),
+  };
+  prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) => callback(prisma));
+  return { prisma };
+});
 
 vi.mock('@/lib/action-result', () => ({
   actionOk: (data: unknown) => ({ ok: true, data }),
@@ -65,6 +71,8 @@ const mockedEnqueueOrderLifecycleWhatsApp = vi.mocked(enqueueOrderLifecycleWhats
 const mockedRevalidatePath = vi.mocked(revalidatePath);
 const mockedOrderFindUnique = vi.mocked(prisma.order.findUnique);
 const mockedOrderUpdate = vi.mocked(prisma.order.update);
+const mockedOrderUpdateMany = vi.mocked(prisma.order.updateMany);
+const mockedOrderFindUniqueOrThrow = vi.mocked(prisma.order.findUniqueOrThrow);
 const idempotencyKey = '8f82b072-99be-45e7-b1aa-2ca4d92fc8d2';
 
 describe('admin CRM actions', () => {
@@ -75,6 +83,8 @@ describe('admin CRM actions', () => {
     mockedRevalidatePath.mockReset();
     mockedOrderFindUnique.mockReset();
     mockedOrderUpdate.mockReset();
+    mockedOrderUpdateMany.mockReset();
+    mockedOrderFindUniqueOrThrow.mockReset();
   });
 
   it('creates manual orders through the shared order service as admin orders', async () => {
@@ -109,6 +119,7 @@ describe('admin CRM actions', () => {
       items: [{ productId: 'prod-a', quantity: 3 }],
       source: 'ADMIN',
       paymentTerm: 'NET_30',
+      actorUserId: 'admin',
       notes: 'Call before delivery',
       internalNote: '[manual-order:intake=PHONE] Ordered with Shai',
     });
@@ -137,10 +148,12 @@ describe('admin CRM actions', () => {
     mockedOrderFindUnique.mockResolvedValue({
       id: 'ord-123',
       status: 'SUBMITTED',
+      revision: 2,
       customerId: 'cust-001',
       routeId: 'route-south',
     } as never);
-    mockedOrderUpdate.mockResolvedValue({
+    mockedOrderUpdateMany.mockResolvedValue({ count: 1 });
+    mockedOrderFindUniqueOrThrow.mockResolvedValue({
       id: 'ord-123',
       status: 'APPROVED',
       customerId: 'cust-001',
@@ -158,15 +171,9 @@ describe('admin CRM actions', () => {
       ok: true,
       data: { orderId: 'ord-123', status: 'APPROVED' },
     });
-    expect(mockedOrderUpdate).toHaveBeenCalledWith({
-      where: { id: 'ord-123' },
+    expect(mockedOrderUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'ord-123', status: 'SUBMITTED', revision: 2 },
       data: { status: 'APPROVED', revision: { increment: 1 } },
-      select: {
-        id: true,
-        status: true,
-        customerId: true,
-        routeId: true,
-      },
     });
     expect(mockedRevalidatePath).toHaveBeenCalledWith('/admin');
     expect(mockedRevalidatePath).toHaveBeenCalledWith('/admin/orders/ord-123');

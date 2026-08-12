@@ -54,7 +54,7 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
       promotions: context.promotions,
     });
     const snapshotLines = pricing.lines;
-    const vat = calculateVatSummary(pricing.total);
+    const vat = calculateVatSummary(pricing.total, context.vatRatePercent);
     const draftPayload = {
       order: {
         customerId: parsed.customerId,
@@ -110,7 +110,7 @@ export async function saveDraftOrderAction(input: SaveDraftOrderInput): Promise<
 export async function submitCustomerOrderAction(input: SubmitCustomerOrderInput): Promise<ActionResult<{ orderId: string; status: string }>> {
   try {
     const parsed = submitCustomerOrderSchema.parse(input);
-    await assertCustomerAction(parsed.customerId);
+    const session = await assertCustomerAction(parsed.customerId);
 
     const context = await getOrderWriteContext(parsed.customerId);
     const normalizedItems = normalizeCustomerOrderItems(parsed.items, context.products);
@@ -127,6 +127,7 @@ export async function submitCustomerOrderAction(input: SubmitCustomerOrderInput)
       commercialTermsAccepted: parsed.commercialTermsAccepted,
       notes: parsed.notes,
       replaceDraftForDeliveryWindow: true,
+      actorUserId: session.user.id,
     });
 
     revalidatePath('/admin');

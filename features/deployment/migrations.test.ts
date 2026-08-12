@@ -75,4 +75,24 @@ describe('Prisma migration files', () => {
     expect(sql).toContain("WHERE LOWER(\"email\") LIKE '%@livneys.local'");
     expect(sql).not.toMatch(/^\s*(?:DELETE\s+FROM|TRUNCATE\s+)/im);
   });
+
+  it('adds immutable audit and legal records, receipt tracking, and dated VAT forward-only', () => {
+    const migrationFile = path.join(
+      process.cwd(),
+      'prisma',
+      'migrations',
+      '20260812120000_security_audit_operations',
+      'migration.sql',
+    );
+    const sql = fs.readFileSync(migrationFile, 'utf8');
+
+    expect(sql).toContain('CREATE TABLE "AuditLog"');
+    expect(sql).toContain('CREATE TABLE "PaymentReceipt"');
+    expect(sql).toContain('CREATE TABLE "LegalAcceptance"');
+    expect(sql).toContain('CREATE TABLE "TaxRate"');
+    expect(sql).toContain('prevent_immutable_record_change');
+    expect(sql).toContain('TaxRate_one_open_per_jurisdiction_key');
+    expect(sql).toContain("'israel-standard-2025-01-01'");
+    expect(sql).not.toMatch(/^\s*(?:DELETE\s+FROM|TRUNCATE\s+)/im);
+  });
 });

@@ -13,6 +13,7 @@ import {
 } from './utils';
 
 export type OrderWriteContext = {
+  vatRatePercent?: number;
   customer: {
     id: string;
     routeId: string;
@@ -114,7 +115,7 @@ export function buildSubmittedOrderPayload({
     products: context.products,
   });
   const payment = calculatePaymentTermsSummary(pricing.total, paymentTerm);
-  const vat = calculateVatSummary(payment.total);
+  const vat = calculateVatSummary(payment.total, context.vatRatePercent);
 
   return {
     order: {

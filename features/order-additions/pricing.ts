@@ -86,7 +86,7 @@ export function buildOrderAdditionSnapshot({
   }
 
   const payment = calculatePaymentTermsSummary(pricing.total, paymentTerm);
-  const vat = calculateVatSummary(payment.total);
+  const vat = calculateVatSummary(payment.total, context.vatRatePercent);
 
   return {
     subtotal: pricing.subtotal,

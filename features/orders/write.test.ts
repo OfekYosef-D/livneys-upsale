@@ -200,7 +200,7 @@ describe('shared order write utilities', () => {
       vatRatePercent: 18,
       vatTotal: 119.7,
       totalIncludingVat: 784.7,
-      commercialTermsVersion: '2026-08-10',
+      commercialTermsVersion: '2026-08-12-review',
       commercialTermsAcceptedAt: new Date('2026-06-29T14:00:00.000Z'),
     });
   });

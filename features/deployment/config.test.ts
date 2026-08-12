@@ -30,4 +30,13 @@ describe('parseDeploymentEnv', () => {
   it('requires Meta credentials when live WhatsApp sending is enabled', () => {
     expect(() => parseDeploymentEnv({ ...validEnv, WHATSAPP_SEND_ENABLED: 'true' })).toThrow('WHATSAPP_ACCESS_TOKEN');
   });
+
+  it('blocks a production deployment until the current legal document version is approved', () => {
+    expect(() => parseDeploymentEnv({ ...validEnv, VERCEL_ENV: 'production' })).toThrow('LEGAL_DOCUMENTS_APPROVED_VERSION');
+    expect(() => parseDeploymentEnv({
+      ...validEnv,
+      VERCEL_ENV: 'production',
+      LEGAL_DOCUMENTS_APPROVED_VERSION: '2026-08-12-review',
+    })).not.toThrow();
+  });
 });
