@@ -103,6 +103,26 @@ describe('authorization helpers', () => {
     await expect(assertAdminAction()).rejects.toThrow(AuthorizationError);
   });
 
+  it('allows admin actions without MFA enrollment because two-factor auth is optional', async () => {
+    mockedGetServerSession.mockResolvedValue({
+      user: {
+        id: 'user-admin',
+        role: 'ADMIN',
+        customerId: null,
+        sessionVersion: 1,
+        mfaEnabled: false,
+      },
+      expires: '2026-06-27T00:00:00.000Z',
+    });
+    userFindUnique.mockResolvedValue({
+      id: 'user-admin', role: 'ADMIN', customerId: null, isActive: true, sessionVersion: 1, mfaEnabled: false, customer: null,
+    });
+
+    await expect(assertAdminAction()).resolves.toMatchObject({
+      user: { role: 'ADMIN', mfaEnabled: false },
+    });
+  });
+
   it('rejects a stale session after the user session version changes', async () => {
     mockedGetServerSession.mockResolvedValue({
       user: { id: 'user-cust-001', role: 'CUSTOMER', customerId: 'cust-001', sessionVersion: 1, mfaEnabled: false },

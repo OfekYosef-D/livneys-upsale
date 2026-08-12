@@ -48,10 +48,6 @@ export async function requireAdminPage(nextPath: string) {
     redirect('/login');
   }
 
-  if (!session.user.mfaEnabled && nextPath !== '/admin/security/mfa') {
-    redirect('/admin/security/mfa');
-  }
-
   return session;
 }
 
@@ -63,7 +59,6 @@ export async function requireCustomerPage(customerId: string) {
   }
 
   if (session.user.role === 'ADMIN') {
-    if (!session.user.mfaEnabled) redirect('/admin/security/mfa');
     return session;
   }
 
@@ -77,7 +72,7 @@ export async function requireCustomerPage(customerId: string) {
 export async function assertAdminAction() {
   const session = await getValidatedSession();
 
-  if (!session?.user || session.user.role !== 'ADMIN' || !session.user.mfaEnabled) {
+  if (!session?.user || session.user.role !== 'ADMIN') {
     throw new AuthorizationError();
   }
 
