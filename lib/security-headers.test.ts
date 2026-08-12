@@ -10,10 +10,13 @@ describe('production security headers', () => {
     expect(policy).not.toContain("'unsafe-eval'");
     expect(policy).toContain("frame-ancestors 'none'");
     expect(policy).toContain("object-src 'none'");
+    expect(policy).toContain("img-src 'self' data: blob: https:");
+    expect(policy).not.toContain("img-src 'self' data: blob: https: http:");
   });
 
   it('enables eval only for the Next.js development runtime', () => {
     expect(buildContentSecurityPolicy('dev-nonce', true)).toContain("'unsafe-eval'");
+    expect(buildContentSecurityPolicy('dev-nonce', true)).toContain("img-src 'self' data: blob: https: http:");
   });
 
   it('sets clickjacking, MIME, referrer, permissions, and transport protections', () => {

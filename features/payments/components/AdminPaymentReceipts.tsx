@@ -2,10 +2,11 @@
 
 import { Banknote, Ban, CircleDollarSign } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { money } from '../../../lib/format';
 import { recordPaymentReceiptAction, voidPaymentReceiptAction } from '../actions';
 import { paymentMethodValues } from '../schemas';
+import { getReceiptAmountForOutstanding } from './receipt-amount';
 
 type PaymentMethod = (typeof paymentMethodValues)[number];
 type Receipt = {
@@ -37,10 +38,14 @@ export function AdminPaymentReceipts({ orderId, total, paidTotal, outstanding, s
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState('');
-  const [amount, setAmount] = useState(outstanding > 0 ? String(outstanding) : '');
+  const [amount, setAmount] = useState(() => getReceiptAmountForOutstanding(outstanding));
   const [method, setMethod] = useState<PaymentMethod>('BANK_TRANSFER');
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
+
+  useEffect(() => {
+    setAmount(getReceiptAmountForOutstanding(outstanding));
+  }, [outstanding]);
 
   function submitReceipt() {
     setMessage('');
@@ -55,6 +60,7 @@ export function AdminPaymentReceipts({ orderId, total, paidTotal, outstanding, s
       });
       if (!result.ok) return setMessage(result.error);
       setMessage('התקבול נרשם בהצלחה.');
+      setAmount('');
       setReference('');
       setNote('');
       router.refresh();

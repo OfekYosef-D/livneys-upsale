@@ -16,7 +16,7 @@ describe('assertDemoSeedAllowed', () => {
     })).toThrow('Refusing to run the destructive demo seed');
   });
 
-  it('requires the explicit override in production', () => {
+  it('cannot be overridden in production or on Neon', () => {
     expect(() => assertDemoSeedAllowed({
       databaseUrl: 'postgresql://postgres:postgres@localhost:5432/livneys_upsale',
       nodeEnv: 'production',
@@ -26,6 +26,12 @@ describe('assertDemoSeedAllowed', () => {
       databaseUrl: 'postgresql://user:pass@ep-example.eu-central-1.aws.neon.tech/app',
       nodeEnv: 'production',
       allowDestructiveDemoSeed: 'true',
-    })).not.toThrow();
+    })).toThrow('Refusing to run the destructive demo seed');
+
+    expect(() => assertDemoSeedAllowed({
+      databaseUrl: 'postgresql://user:pass@ep-example.eu-central-1.aws.neon.tech/app',
+      nodeEnv: 'development',
+      allowDestructiveDemoSeed: 'true',
+    })).toThrow('Refusing to run the destructive demo seed');
   });
 });

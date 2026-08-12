@@ -16,7 +16,7 @@ export function buildContentSecurityPolicy(nonce: string, development: boolean):
     "form-action 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development ? " 'unsafe-eval'" : ''} https://challenges.cloudflare.com`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://res.cloudinary.com",
+    `img-src 'self' data: blob: https:${development ? ' http:' : ''}`,
     "font-src 'self' data:",
     "connect-src 'self' https://challenges.cloudflare.com",
     "frame-src https://challenges.cloudflare.com",
