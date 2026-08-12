@@ -2,13 +2,20 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Archive, PhoneCall, UserPlus } from 'lucide-react';
+import { Archive, Check, Copy, Link2, LogIn, MessageCircle, PhoneCall, UserPlus } from 'lucide-react';
 import { useMemo, useState, useTransition } from 'react';
 import {
   convertRegistrationToCustomerAction,
   updateRegistrationStatusAction,
 } from '@/features/registration/actions';
 import type { getRegistrationManagementData } from '@/features/registration/queries';
+import {
+  buildLoginInviteMessage,
+  buildRegistrationInviteMessage,
+  buildWhatsAppUrl,
+  getLoginUrl,
+  getRegistrationUrl,
+} from '@/features/registration/share-links';
 import { refreshAfterRegistrationMutation } from './registration-admin-refresh';
 
 type RegistrationData = Awaited<ReturnType<typeof getRegistrationManagementData>>;
@@ -21,16 +28,37 @@ const statusLabels: Record<RegistrationData['requests'][number]['status'], strin
   ARCHIVED: 'בארכיון',
 };
 
-export function AdminRegistrationsClient({ data }: { data: RegistrationData }) {
+export function AdminRegistrationsClient({
+  data,
+  appOrigin,
+}: {
+  data: RegistrationData;
+  appOrigin?: string | null;
+}) {
   const [status, setStatus] = useState<StatusFilter>('all');
   const [message, setMessage] = useState('');
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const origin = appOrigin ?? null;
+  const registrationUrl = getRegistrationUrl(origin);
+  const loginUrl = getLoginUrl(origin);
   const visibleRequests = useMemo(
     () => status === 'all' ? data.requests : data.requests.filter((request) => request.status === status),
     [data.requests, status],
   );
+
+  async function copyText(key: string, text: string, success: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setMessage(success);
+      window.setTimeout(() => setCopiedKey((current) => (current === key ? null : current)), 1800);
+    } catch {
+      setMessage('לא הצלחנו להעתיק. העתיקו ידנית מהשדה.');
+    }
+  }
 
   function run(id: string, call: () => Promise<{ ok: true; data: unknown } | { ok: false; error: string }>, success: string) {
     setMessage('');
@@ -50,10 +78,12 @@ export function AdminRegistrationsClient({ data }: { data: RegistrationData }) {
   return (
     <div className="space-y-4">
       <section className="rounded-2xl border border-black/10 bg-white p-4 shadow-[0_18px_54px_rgba(0,0,0,0.05)]">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
             <h2 className="text-xl font-black">בקשות הרשמה</h2>
-            <p className="mt-1 text-sm font-bold leading-6 text-black/55">פרטים שחברות חדשות שלחו מהעמוד הציבורי, לפני פתיחת לקוח במערכת.</p>
+            <p className="mt-1 text-sm font-bold leading-6 text-black/55">
+              שלחו ללקוח חדש קישור להרשמה. אחרי פתיחת חשבון קישור כניסה מאובטח נשלח אוטומטית באימייל.
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             {(['all', 'PENDING', 'CONTACTED', 'CONVERTED', 'ARCHIVED'] as StatusFilter[]).map((item) => (
@@ -67,6 +97,28 @@ export function AdminRegistrationsClient({ data }: { data: RegistrationData }) {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <ShareCard
+            title="קישור להרשמה"
+            description="ללקוחות חדשים שעדיין לא במערכת."
+            url={registrationUrl}
+            copied={copiedKey === 'register-url'}
+            onCopy={() => copyText('register-url', registrationUrl, 'קישור ההרשמה הועתק.')}
+            whatsappHref={buildWhatsAppUrl(null, buildRegistrationInviteMessage(origin))}
+            whatsappLabel="שלח בוואטסאפ"
+          />
+          <ShareCard
+            title="קישור להתחברות"
+            description="ללקוחות קיימים או אחרי פתיחת חשבון."
+            url={loginUrl}
+            copied={copiedKey === 'login-url'}
+            onCopy={() => copyText('login-url', loginUrl, 'קישור ההתחברות הועתק.')}
+            whatsappHref={buildWhatsAppUrl(null, buildLoginInviteMessage(origin))}
+            whatsappLabel="שלח בוואטסאפ"
+            icon="login"
+          />
         </div>
       </section>
 
@@ -103,6 +155,15 @@ export function AdminRegistrationsClient({ data }: { data: RegistrationData }) {
                   {request.openingOrderNotes && <p><b>פתיחה:</b> {request.openingOrderNotes}</p>}
                 </div>
               )}
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <a href={buildWhatsAppUrl(request.phone, buildRegistrationInviteMessage(origin))} target="_blank" rel="noreferrer" className={secondaryButtonClass}>
+                  <MessageCircle aria-hidden="true" size={14} /> שלח קישור הרשמה
+                </a>
+                <a href={buildWhatsAppUrl(request.phone, buildLoginInviteMessage(origin))} target="_blank" rel="noreferrer" className={secondaryButtonClass}>
+                  <LogIn aria-hidden="true" size={14} /> שלח קישור כניסה
+                </a>
+              </div>
 
               {request.convertedCustomerId ? (
                 <Link href={`/admin/customers/${request.convertedCustomerId}`} className="mt-3 inline-flex min-h-10 items-center justify-center rounded-full bg-black px-4 text-sm font-black text-white">
@@ -142,7 +203,7 @@ export function AdminRegistrationsClient({ data }: { data: RegistrationData }) {
                             routeId: stringValue(form, 'routeId'),
                             priceListId: stringValue(form, 'priceListId'),
                           }),
-                        'הבקשה הומרה ללקוח פעיל.',
+                        'הבקשה הומרה ללקוח פעיל. קישור להגדרת חשבון נשלח לאימייל הלקוח.',
                       );
                     }}
                   >
@@ -158,6 +219,52 @@ export function AdminRegistrationsClient({ data }: { data: RegistrationData }) {
           ))}
         </section>
       )}
+    </div>
+  );
+}
+
+function ShareCard({
+  title,
+  description,
+  url,
+  copied,
+  onCopy,
+  whatsappHref,
+  whatsappLabel,
+  icon = 'link',
+}: {
+  title: string;
+  description: string;
+  url: string;
+  copied: boolean;
+  onCopy: () => void;
+  whatsappHref: string;
+  whatsappLabel: string;
+  icon?: 'link' | 'login';
+}) {
+  return (
+    <div className="rounded-2xl bg-[#f7f5f1] p-3">
+      <div className="flex items-start gap-2">
+        <span className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-black ring-1 ring-black/10">
+          {icon === 'login' ? <LogIn aria-hidden="true" size={15} /> : <Link2 aria-hidden="true" size={15} />}
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-black">{title}</p>
+          <p className="mt-0.5 text-xs font-bold text-black/50">{description}</p>
+        </div>
+      </div>
+      <p className="mt-3 break-all rounded-xl bg-white px-3 py-2 text-xs font-bold text-black/70 ring-1 ring-black/5" dir="ltr">
+        {url}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button type="button" onClick={onCopy} className={secondaryButtonClass}>
+          {copied ? <Check aria-hidden="true" size={14} /> : <Copy aria-hidden="true" size={14} />}
+          {copied ? 'הועתק' : 'העתק קישור'}
+        </button>
+        <a href={whatsappHref} target="_blank" rel="noreferrer" className={secondaryButtonClass}>
+          <MessageCircle aria-hidden="true" size={14} /> {whatsappLabel}
+        </a>
+      </div>
     </div>
   );
 }
@@ -190,3 +297,6 @@ function stringValue(form: FormData, name: string): string {
 }
 
 const fieldClass = 'w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-black focus:ring-2 focus:ring-black/10';
+
+const secondaryButtonClass =
+  'inline-flex min-h-9 items-center justify-center gap-1 rounded-full bg-white px-3 text-xs font-black ring-1 ring-black/10 hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-black/25';
