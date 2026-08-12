@@ -42,7 +42,7 @@ export function AdditionCatalogClient({
   const cartItems = getCartItems(cart, new Set(products.map((product) => product.id)));
   const pricing = getIncrementalCartPricingSummary(cart, products, order.items);
   const payment = calculatePaymentTermsSummary(pricing.total, order.paymentTerm);
-  const vat = calculateVatSummary(payment.total);
+  const vat = calculateVatSummary(payment.total, order.vatRatePercent);
 
   async function submit() {
     setError('');

@@ -1,4 +1,5 @@
 import { resolveCatalogPricing } from '@/features/pricing/engine';
+import { getEffectiveVatRate } from '@/features/orders/tax-rates';
 import { prisma } from '@/lib/db';
 
 export async function getCustomerManagementData() {
@@ -339,8 +340,8 @@ export async function getRecommendationManagementData() {
   };
 }
 
-export async function getManualOrderData() {
-  const [customers, activePromotions] = await Promise.all([
+export async function getManualOrderData(at = new Date()) {
+  const [customers, activePromotions, vatRate] = await Promise.all([
     prisma.customer.findMany({
       where: { isActive: true },
       include: {
@@ -370,6 +371,7 @@ export async function getManualOrderData() {
         priceListTargets: true,
       },
     }),
+    getEffectiveVatRate(at),
   ]);
   const promotions = activePromotions.map((promotion) => ({
     id: promotion.id,
@@ -392,6 +394,7 @@ export async function getManualOrderData() {
   }));
 
   return {
+    vatRatePercent: vatRate.ratePercent,
     customers: customers
       .filter((customer) => customer.route.isActive)
       .map((customer) => {
@@ -417,6 +420,7 @@ export async function getManualOrderData() {
             price: Number(item.price),
           })),
           promotions,
+          now: at,
         });
         const pricedProductsById = new Map(pricedCatalog.products.map((product) => [product.id, product]));
 
