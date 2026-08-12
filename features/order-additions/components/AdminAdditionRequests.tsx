@@ -26,19 +26,19 @@ type RequestData = {
   lines: Array<{ id: string; productName: string; quantity: number; unitPrice: number; lineTotal: number }>;
 };
 
-export function AdminAdditionRequests({ orderId, requests }: { orderId: string; requests: RequestData[] }) {
+export function AdminAdditionRequests({ requests }: { requests: RequestData[] }) {
   if (requests.length === 0) return null;
   return (
     <section className="rounded-2xl border border-black/10 bg-white p-4 shadow-[0_18px_54px_rgba(0,0,0,0.05)]">
       <div className="flex items-center gap-2"><PlusCircle size={20} /><div><p className="text-xs font-black text-black/45">שינויים לאחר השליחה</p><h2 className="text-xl font-black">בקשות תוספת</h2></div></div>
       <div className="mt-3 grid gap-3">
-        {requests.map((request) => <AdminAdditionRequest key={request.id} orderId={orderId} request={request} />)}
+        {requests.map((request) => <AdminAdditionRequest key={request.id} request={request} />)}
       </div>
     </section>
   );
 }
 
-function AdminAdditionRequest({ orderId, request }: { orderId: string; request: RequestData }) {
+function AdminAdditionRequest({ request }: { request: RequestData }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [reason, setReason] = useState('');
@@ -79,7 +79,6 @@ function AdminAdditionRequest({ orderId, request }: { orderId: string; request: 
           )}
           {request.reviewedAt && <p className="mt-3 text-[11px] font-bold text-black/45">טופלה {new Intl.DateTimeFormat('he-IL', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Jerusalem' }).format(new Date(request.reviewedAt))}{request.reviewedByName ? ` על ידי ${request.reviewedByName}` : ''}</p>}
           {message && <p className="mt-2 text-xs font-black text-black/60">{message}</p>}
-          <span className="sr-only">{orderId}</span>
         </div>
       </div>
     </article>

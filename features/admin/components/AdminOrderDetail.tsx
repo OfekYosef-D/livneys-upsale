@@ -111,7 +111,7 @@ export function AdminOrderDetail({ order }: { order: OrderData }) {
         </section>
       </aside>
       <div className="lg:col-span-2">
-        <AdminAdditionRequests orderId={order.id} requests={order.additionRequests} />
+        <AdminAdditionRequests requests={order.additionRequests} />
       </div>
       <div className="lg:col-span-2">
         <AdminPaymentReceipts
