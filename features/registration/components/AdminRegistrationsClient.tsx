@@ -12,12 +12,15 @@ import { Panel, PanelHeader } from '@/components/ui/Panel';
 import { formatDateTime } from '@/lib/datetime';
 import { paths } from '@/lib/paths';
 import { buildWhatsAppUrl } from '@/lib/whatsapp-link';
+import { AccessLinkShare } from '../../auth/components/AccessLinkShare';
+import type { AccountAccessLink } from '../../auth/notifications';
 import { convertRegistrationToCustomerAction, updateRegistrationStatusAction } from '../actions';
 import type { getRegistrationManagementData } from '../queries';
 import { buildLoginInviteMessage, buildRegistrationInviteMessage, getLoginUrl, getRegistrationUrl } from '../share-links';
 
 type Data = Awaited<ReturnType<typeof getRegistrationManagementData>>;
 type Request = Data['requests'][number];
+type Converted = { request: Request; link: AccountAccessLink };
 
 const statusLabels: Record<Request['status'], { label: string; tone: 'warning' | 'info' | 'success' | 'muted' }> = {
   PENDING: { label: 'חדשה', tone: 'warning' },
@@ -29,6 +32,8 @@ const statusLabels: Record<Request['status'], { label: string; tone: 'warning' |
 export function AdminRegistrationsClient({ data, appOrigin }: { data: Data; appOrigin: string }) {
   const action = useServerAction();
   const [filter, setFilter] = useState<'open' | Request['status']>('open');
+  // The converted request leaves the open list, so its access link is shown above it.
+  const [converted, setConverted] = useState<Converted | null>(null);
   const visible = data.requests.filter((request) => (filter === 'open' ? request.status === 'PENDING' || request.status === 'CONTACTED' : request.status === filter));
 
   return (
@@ -42,6 +47,12 @@ export function AdminRegistrationsClient({ data, appOrigin }: { data: Data; appO
       </Panel>
 
       <ActionFeedback feedback={action.feedback} />
+      {converted && (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">{converted.request.businessName} נפתח כלקוח.</p>
+          <AccessLinkShare link={converted.link} contact={converted.request.contactName} phone={converted.request.phone} />
+        </div>
+      )}
 
       <Panel>
         <PanelHeader
@@ -58,7 +69,7 @@ export function AdminRegistrationsClient({ data, appOrigin }: { data: Data; appO
           <EmptyState title="אין בקשות" description="בקשות חדשות מהטופס באתר יופיעו כאן." />
         ) : (
           <div className="divide-y divide-[var(--pantry-line)]">
-            {visible.map((request) => <RequestCard key={request.id} request={request} data={data} action={action} />)}
+            {visible.map((request) => <RequestCard key={request.id} request={request} data={data} action={action} onConverted={setConverted} />)}
           </div>
         )}
       </Panel>
@@ -66,7 +77,12 @@ export function AdminRegistrationsClient({ data, appOrigin }: { data: Data; appO
   );
 }
 
-function RequestCard({ request, data, action }: { request: Request; data: Data; action: ReturnType<typeof useServerAction> }) {
+function RequestCard({ request, data, action, onConverted }: {
+  request: Request;
+  data: Data;
+  action: ReturnType<typeof useServerAction>;
+  onConverted: (converted: Converted) => void;
+}) {
   const status = statusLabels[request.status];
   const setStatus = (next: 'CONTACTED' | 'ARCHIVED') =>
     action.run(() => updateRegistrationStatusAction({ id: request.id, status: next }), { success: next === 'ARCHIVED' ? 'הבקשה הועברה לארכיון.' : 'סומן שנוצר קשר.' }, `${request.id}:${next}`);
@@ -113,7 +129,7 @@ function RequestCard({ request, data, action }: { request: Request; data: Data; 
               const form = new FormData(event.currentTarget);
               action.run(
                 () => convertRegistrationToCustomerAction({ requestId: request.id, routeId: formValue.text(form, 'routeId'), priceListId: formValue.text(form, 'priceListId') }),
-                { success: `נפתח לקוח והקישור להגדרת סיסמה נשלח ל-${request.email}.` },
+                { onSuccess: ({ link }) => onConverted({ request, link }) },
                 `${request.id}:convert`,
               );
             }}

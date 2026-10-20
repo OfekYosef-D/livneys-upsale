@@ -14,7 +14,7 @@ Target: Vercel (Frankfurt, `fra1`) + Neon PostgreSQL (Frankfurt), email via Rese
 | `NEXTAUTH_SECRET` | yes | ≥ 48 random bytes |
 | `CRON_SECRET` | yes | ≥ 32 random bytes; Vercel cron sends it as a bearer token |
 | `MFA_ENCRYPTION_KEY` | yes | exactly 32 random bytes, base64 (`openssl rand -base64 32`) |
-| `RESEND_API_KEY`, `EMAIL_FROM` | yes | Sender domain must be verified in Resend (SPF/DKIM DNS records) |
+| `RESEND_API_KEY`, `EMAIL_FROM` | optional | Sender domain must be verified in Resend (SPF/DKIM DNS records). Without them nothing is emailed: login links are sent by the team over WhatsApp (see §4) |
 | `EMAIL_REPLY_TO` | no | Where customer replies go (e.g. the owner's inbox) |
 | `TURNSTILE_SECRET_KEY`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | yes | Bot protection on the public sign-up form |
 | `LEGAL_DOCUMENTS_APPROVED_VERSION` | yes in production | Must equal `LEGAL_DOCUMENT_SET_VERSION` in `features/legal/documents.ts`. Customer orders are refused until a lawyer approves that exact wording |
@@ -48,7 +48,7 @@ Sign in at `/login` and (recommended) enable two-factor authentication under **�
 2. **מוצרים** – add products (price before VAT, minimum, case multiple, photo).
 3. **קווי חלוקה** – one route per delivery day: delivery weekday, order cut-off weekday + time. The weekly schedule then rolls forward automatically.
 4. **הודעות ותזכורות** – create the weekly reminder (e.g. email, all routes, 48 hours before delivery).
-5. **לקוחות** – create each pilot customer (with email) → open the customer → **הוספת משתמש**. The customer receives a password-setup email.
+5. **לקוחות** – create each pilot customer → open the customer → **הוספת משתמש** (the email is their username) → **שליחה בוואטסאפ** sends the one-time password-setup link from your phone (it is also emailed when email is configured). A customer who forgets the password gets a new link the same way (**קישור לאיפוס סיסמה**).
    Alternatively share the registration link from **בקשות הצטרפות** and convert requests into customers.
 
 ## 5. Smoke test before inviting customers

@@ -11,6 +11,7 @@ const issueAuthToken = vi.hoisted(() => vi.fn());
 const issueAuthTokenInTransaction = vi.hoisted(() => vi.fn());
 const assertDeliveryConfigured = vi.hoisted(() => vi.fn());
 const sendAccountAccessEmail = vi.hoisted(() => vi.fn());
+const deliverAccountAccessLink = vi.hoisted(() => vi.fn());
 const assertAdminAction = vi.hoisted(() => vi.fn());
 const mfa = vi.hoisted(() => ({
   decryptMfaSecret: vi.fn(),
@@ -44,6 +45,7 @@ vi.mock('./tokens', async (importOriginal) => ({
 vi.mock('./notifications', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./notifications')>()),
   assertAccountAccessDeliveryConfigured: assertDeliveryConfigured,
+  deliverAccountAccessLink,
   sendAccountAccessEmail,
 }));
 vi.mock('./mfa', () => mfa);
@@ -56,8 +58,8 @@ const { AccountAccessDeliveryError } = await import('./notifications');
 const {
   confirmMfaEnrollmentAction,
   inviteCustomerUserAction,
+  issueCustomerAccessLinkAction,
   requestPasswordResetAction,
-  resendCustomerUserSetupAction,
   setCustomerUserActiveAction,
   setPasswordWithTokenAction,
   startMfaEnrollmentAction,
@@ -70,8 +72,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.$reset();
   [consumeRateLimit, assertPasswordTokenUsable, consumePasswordToken, issueAuthToken, issueAuthTokenInTransaction,
-    sendAccountAccessEmail, ...Object.values(mfa)].forEach((mock) => mock.mockReset());
+    sendAccountAccessEmail, deliverAccountAccessLink, ...Object.values(mfa)].forEach((mock) => mock.mockReset());
   sendAccountAccessEmail.mockResolvedValue(undefined);
+  deliverAccountAccessLink.mockImplementation(async ({ url, type }) => ({ url, type, emailed: false }));
   assertAdminAction.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
   consumeRateLimit.mockResolvedValue({ remaining: 3 });
   compare.mockResolvedValue(false);
@@ -200,27 +203,23 @@ describe('customer user administration', () => {
     expect(db.user.create).not.toHaveBeenCalled();
   });
 
-  it('refuses to invite when account email delivery is not configured', async () => {
-    assertDeliveryConfigured.mockImplementation(() => { throw new AccountAccessDeliveryError('not configured'); });
-    await expect(inviteCustomerUserAction({ customerId: 'c-1', name: 'Buyer', email: 'b@example.com' }))
-      .resolves.toEqual({ ok: false, code: 'DELIVERY_UNAVAILABLE', error: 'not configured' });
-    expect(db.$transaction).not.toHaveBeenCalled();
-  });
-
-  it('invites a passwordless user under the customer lock, audits it and emails the setup link', async () => {
+  it('invites a passwordless user under the customer lock, audits it and returns the setup link to share', async () => {
     db.$queryRaw.mockResolvedValue([{ id: 'c-1', isActive: true }]);
     db.user.create.mockResolvedValue({ id: 'u-9', name: 'Buyer', email: 'b@example.com', role: 'CUSTOMER' });
     issueAuthTokenInTransaction.mockResolvedValue({ url: 'https://example.com/setup-password?token=t' });
 
     await expect(inviteCustomerUserAction({ customerId: 'c-1', name: 'Buyer', email: 'B@Example.com' }))
-      .resolves.toEqual({ ok: true, data: { userId: 'u-9' } });
+      .resolves.toEqual({
+        ok: true,
+        data: { userId: 'u-9', link: { url: 'https://example.com/setup-password?token=t', type: 'PASSWORD_SETUP', emailed: false } },
+      });
     expect(db.user.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ customerId: 'c-1', email: 'b@example.com', passwordHash: null, role: 'CUSTOMER' }),
     });
     expect(db.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ action: 'CUSTOMER_USER_INVITED', entityId: 'u-9', actorUserId: 'admin-1' }),
     });
-    expect(sendAccountAccessEmail).toHaveBeenCalledWith({
+    expect(deliverAccountAccessLink).toHaveBeenCalledWith({
       userId: 'u-9', type: 'PASSWORD_SETUP', url: 'https://example.com/setup-password?token=t',
     });
   });
@@ -237,16 +236,7 @@ describe('customer user administration', () => {
     db.user.create.mockRejectedValue(Object.assign(new Error('Unique constraint'), { code: 'P2002' }));
     await expect(inviteCustomerUserAction({ customerId: 'c-1', name: 'Buyer', email: 'b@example.com' }))
       .resolves.toMatchObject({ ok: false, code: 'CONFLICT' });
-    expect(sendAccountAccessEmail).not.toHaveBeenCalled();
-  });
-
-  it('reports a delivery failure after the invite was saved', async () => {
-    db.$queryRaw.mockResolvedValue([{ id: 'c-1', isActive: true }]);
-    db.user.create.mockResolvedValue({ id: 'u-9', name: 'Buyer', email: 'b@example.com', role: 'CUSTOMER' });
-    issueAuthTokenInTransaction.mockResolvedValue({ url: 'https://example.com/setup-password?token=t' });
-    sendAccountAccessEmail.mockRejectedValue(new AccountAccessDeliveryError());
-    await expect(inviteCustomerUserAction({ customerId: 'c-1', name: 'Buyer', email: 'b@example.com' }))
-      .resolves.toMatchObject({ ok: false, code: 'DELIVERY_UNAVAILABLE' });
+    expect(deliverAccountAccessLink).not.toHaveBeenCalled();
   });
 
   it('deactivates a user, revokes open links and audits the change', async () => {
@@ -277,29 +267,34 @@ describe('customer user administration', () => {
       .resolves.toMatchObject({ ok: false, code: 'NOT_FOUND' });
   });
 
-  it('resends setup only to an active, passwordless user of an active customer', async () => {
+  it('issues access links only for an active user of an active customer', async () => {
     db.user.findFirst.mockResolvedValue(null);
-
-    await expect(resendCustomerUserSetupAction({ customerId: 'customer-1', userId: 'user-1' })).resolves.toMatchObject({ ok: false });
+    await expect(issueCustomerAccessLinkAction({ customerId: 'customer-1', userId: 'user-1' })).resolves.toMatchObject({ ok: false });
     expect(db.user.findFirst).toHaveBeenCalledWith({
       where: {
         id: 'user-1', customerId: 'customer-1', role: 'CUSTOMER', isActive: true,
         customer: { is: { isActive: true } },
       },
     });
-    expect(issueAuthToken).not.toHaveBeenCalled();
+    expect(issueAuthTokenInTransaction).not.toHaveBeenCalled();
+  });
+
+  it('issues a setup link before a password exists and a reset link after, auditing each', async () => {
+    db.user.findFirst.mockResolvedValue({ id: 'user-1', passwordHash: null });
+    issueAuthTokenInTransaction.mockResolvedValue({ url: 'https://example.com/setup-password?token=n' });
+    await expect(issueCustomerAccessLinkAction({ customerId: 'customer-1', userId: 'user-1' })).resolves.toMatchObject({
+      ok: true, data: { userId: 'user-1', link: { type: 'PASSWORD_SETUP', url: 'https://example.com/setup-password?token=n' } },
+    });
+    expect(db.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: 'CUSTOMER_ACCESS_LINK_ISSUED', entityId: 'user-1', customerId: 'customer-1' }),
+    });
 
     db.user.findFirst.mockResolvedValue({ id: 'user-1', passwordHash: 'already-set' });
-    await expect(resendCustomerUserSetupAction({ customerId: 'customer-1', userId: 'user-1' })).resolves.toMatchObject({ ok: false });
-    expect(issueAuthToken).not.toHaveBeenCalled();
-
-    db.user.findFirst.mockResolvedValue({ id: 'user-1', passwordHash: null });
-    issueAuthToken.mockResolvedValue({ url: 'https://example.com/setup-password?token=n' });
-    await expect(resendCustomerUserSetupAction({ customerId: 'customer-1', userId: 'user-1' }))
-      .resolves.toEqual({ ok: true, data: { userId: 'user-1' } });
-    expect(sendAccountAccessEmail).toHaveBeenCalledWith({
-      userId: 'user-1', type: 'PASSWORD_SETUP', url: 'https://example.com/setup-password?token=n',
+    issueAuthTokenInTransaction.mockResolvedValue({ url: 'https://example.com/reset-password?token=r' });
+    await expect(issueCustomerAccessLinkAction({ customerId: 'customer-1', userId: 'user-1' })).resolves.toMatchObject({
+      ok: true, data: { link: { type: 'PASSWORD_RESET' } },
     });
+    expect(issueAuthTokenInTransaction).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ userId: 'user-1', type: 'PASSWORD_RESET' }));
   });
 });
 

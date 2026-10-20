@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { AppError } from '@/lib/errors';
 import { getEmailConfig, isEmailConfigured, sendEmailMessage } from '../notifications/email';
 
-/** Account links are security-sensitive, so they go by email only and are never queued as dry runs. */
+/** Account links are security-sensitive, so they are never queued as dry runs. */
 export class AccountAccessDeliveryError extends AppError {
   constructor(message = 'החשבון נשמר, אך לא ניתן היה לשלוח את קישור הגישה. נסו "שליחת קישור מחדש" מכרטיס הלקוח.') {
     super('DELIVERY_UNAVAILABLE', message);
@@ -41,5 +41,23 @@ export async function sendAccountAccessEmail({ userId, type, url }: { userId: st
     if (error instanceof AccountAccessDeliveryError) throw error;
     console.error('Account access email delivery failed', { userId, type, error });
     throw new AccountAccessDeliveryError();
+  }
+}
+
+export type AccountAccessLink = { url: string; type: AuthTokenType; emailed: boolean };
+
+/**
+ * Admin-issued account links. The link always comes back to the admin, who sends it to the customer
+ * (WhatsApp from their own phone); it is also emailed when email delivery is configured.
+ */
+export async function deliverAccountAccessLink(input: { userId: string; type: AuthTokenType; url: string }): Promise<AccountAccessLink> {
+  const link = { url: input.url, type: input.type };
+  if (!isEmailConfigured()) return { ...link, emailed: false };
+  try {
+    await sendAccountAccessEmail(input);
+    return { ...link, emailed: true };
+  } catch (error) {
+    if (error instanceof AccountAccessDeliveryError) return { ...link, emailed: false };
+    throw error;
   }
 }

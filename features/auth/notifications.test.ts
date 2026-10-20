@@ -13,7 +13,7 @@ vi.mock('@/features/notifications/email', () => ({
 const { prisma } = await import('@/lib/db');
 const db = asMock(prisma);
 const { actionError } = await import('@/lib/action-result');
-const { AccountAccessDeliveryError, assertAccountAccessDeliveryConfigured, sendAccountAccessEmail } = await import('./notifications');
+const { AccountAccessDeliveryError, assertAccountAccessDeliveryConfigured, deliverAccountAccessLink, sendAccountAccessEmail } = await import('./notifications');
 
 const resetRequest = { userId: 'admin-1', type: 'PASSWORD_RESET' as const, url: 'https://example.com/reset-password?token=raw' };
 
@@ -65,6 +65,24 @@ describe('account access delivery', () => {
       code: 'DELIVERY_UNAVAILABLE',
       message: expect.not.stringContaining('internal details'),
     });
+    errorLog.mockRestore();
+  });
+
+  it('hands admin-issued links back without email, and emails them too when configured', async () => {
+    isConfigured.mockReturnValue(false);
+    await expect(deliverAccountAccessLink(resetRequest)).resolves.toEqual({ url: resetRequest.url, type: 'PASSWORD_RESET', emailed: false });
+    expect(sendEmail).not.toHaveBeenCalled();
+
+    isConfigured.mockReturnValue(true);
+    sendEmail.mockResolvedValue({ mode: 'live', providerMessageId: 'email-1' });
+    await expect(deliverAccountAccessLink(resetRequest)).resolves.toMatchObject({ emailed: true });
+  });
+
+  it('still returns the link when the email provider fails', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    isConfigured.mockReturnValue(true);
+    sendEmail.mockRejectedValue(new Error('provider down'));
+    await expect(deliverAccountAccessLink(resetRequest)).resolves.toMatchObject({ url: resetRequest.url, emailed: false });
     errorLog.mockRestore();
   });
 });
