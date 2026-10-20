@@ -1,9 +1,9 @@
+/** Business rules agreed with the owner. Changing a value here changes behaviour everywhere. */
+
+/** Minimum customer order, in ₪ after promotions and before VAT. Manual (admin) orders are exempt. */
 export const MINIMUM_INSTITUTIONAL_ORDER_TOTAL = 700;
 
-export const PRICES_BEFORE_VAT_LABEL = 'מחירי המחירון לפני מע״מ';
-
-export const INSTITUTIONAL_PRICING_NOTICE =
-  'המחירון מיועד ללקוחות עסקיים ומוסדיים. הסכום כולל מע״מ מוצג בסל ובסיכום ההזמנה.';
+export const INSTITUTIONAL_PRICING_NOTICE = 'המחירים ליחידה לפני מע״מ. הסכום כולל מע״מ מוצג בסל ובסיכום ההזמנה.';
 
 export const institutionalBusinessTypes = [
   'מעדניות',

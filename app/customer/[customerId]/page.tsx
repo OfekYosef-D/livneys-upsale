@@ -1,24 +1,18 @@
-import { CustomerCatalogApp } from '@/components/customer/CustomerCatalogApp';
+import { redirect } from 'next/navigation';
+import { CatalogClient } from '@/features/customer-portal/components/CatalogClient';
 import { getCustomerPortalData } from '@/features/customer-portal/queries';
 import { requireCustomerPage } from '@/lib/authorization';
-import { redirect } from 'next/navigation';
+import { paths } from '@/lib/paths';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CustomerHome(props: { params: Promise<{ customerId: string }> }) {
-  const params = await props.params;
-  await requireCustomerPage(params.customerId);
-  const data = await getCustomerPortalData(params.customerId);
-  if (data.activeOrderForDelivery) {
-    redirect(`/customer/${params.customerId}/orders/${data.activeOrderForDelivery.orderNumber}`);
-  }
+export default async function CustomerCatalogPage(props: { params: Promise<{ customerId: string }> }) {
+  const { customerId } = await props.params;
+  await requireCustomerPage(customerId);
+  const data = await getCustomerPortalData(customerId);
 
-  return (
-    <CustomerCatalogApp
-      customer={data.customer}
-      route={data.route}
-      products={data.products}
-      lastOrder={data.lastOrder}
-    />
-  );
+  // One order per delivery: once placed, the customer manages it (and its additions) instead.
+  if (data.activeOrder) redirect(paths.customer.order(customerId, data.activeOrder.orderNumber));
+
+  return <CatalogClient data={data} />;
 }

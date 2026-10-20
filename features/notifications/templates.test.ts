@@ -1,85 +1,100 @@
 import { describe, expect, it } from 'vitest';
-import {
-  buildOrderTemplatePayload,
-  buildReminderTemplatePayload,
-  getTemplateKeyForOrderStatus,
-} from './templates';
+import { formatDate } from '@/lib/datetime';
+import { formatMoney } from '@/lib/money';
+import { buildAdditionDecisionContent, buildOrderStatusContent, buildReminderContent, getTemplateKeyForOrderStatus } from './templates';
 
-describe('notification templates', () => {
-  it('maps order statuses to lifecycle WhatsApp template keys', () => {
-    expect(getTemplateKeyForOrderStatus('SUBMITTED')).toBe('ORDER_RECEIVED');
-    expect(getTemplateKeyForOrderStatus('SPECIAL_REQUEST')).toBe('ORDER_SPECIAL_REQUEST');
-    expect(getTemplateKeyForOrderStatus('APPROVED')).toBe('ORDER_APPROVED');
-    expect(getTemplateKeyForOrderStatus('PACKED')).toBe('ORDER_PACKED');
-    expect(getTemplateKeyForOrderStatus('DELIVERED')).toBe('ORDER_DELIVERED');
-    expect(getTemplateKeyForOrderStatus('CANCELLED')).toBe('ORDER_CANCELLED');
-    expect(getTemplateKeyForOrderStatus('DRAFT')).toBeNull();
+const baseUrl = 'https://orders.example.com';
+const customer = { id: 'cust-001', name: 'קפה דרום', contact: 'דנה' };
+const deliveryWindowStart = new Date('2026-07-02T05:00:00.000Z');
+const order = { orderNumber: 1042, totalIncludingVat: 1234.5, deliveryWindowStart };
+
+function parameterNames(parameters: unknown[]) {
+  return parameters.map((parameter) => (parameter as { name: string }).name);
+}
+
+describe('getTemplateKeyForOrderStatus', () => {
+  it.each([
+    ['SUBMITTED', 'ORDER_RECEIVED'],
+    ['SPECIAL_REQUEST', 'ORDER_SPECIAL_REQUEST'],
+    ['APPROVED', 'ORDER_APPROVED'],
+    ['PACKED', 'ORDER_PACKED'],
+    ['DELIVERED', 'ORDER_DELIVERED'],
+    ['CANCELLED', 'ORDER_CANCELLED'],
+  ] as const)('maps %s to %s', (status, key) => {
+    expect(getTemplateKeyForOrderStatus(status)).toBe(key);
   });
 
-  it('builds named order received variables for approved Meta templates', () => {
-    const payload = buildOrderTemplatePayload({
-      templateKey: 'ORDER_RECEIVED',
-      baseUrl: 'https://orders.example.com',
-      customer: { id: 'cust-001', name: 'Cafe South', contact: 'Dana' },
-      order: {
-        orderNumber: 1001,
-        status: 'SUBMITTED',
-        totalIncludingVat: 145.73,
-        deliveryWindowStart: new Date('2026-07-01T08:00:00.000Z'),
-      },
-    });
+  it('does not notify for draft orders', () => {
+    expect(getTemplateKeyForOrderStatus('DRAFT' as never)).toBeNull();
+  });
+});
 
-    expect(payload.bodyParameters).toEqual([
-      { name: 'customer_name', text: 'Dana' },
-      { name: 'order_id', text: '#1001' },
-      { name: 'delivery_date', text: '01/07/2026' },
-    ]);
-    expect(payload.previewMessage).toContain('Cafe South');
-    expect(payload.previewMessage).toContain('#1001');
-    expect(payload.previewMessage).not.toContain('ord-1');
+describe('buildOrderStatusContent', () => {
+  it('renders a Hebrew email with order number, date, total and link', () => {
+    const content = buildOrderStatusContent({ templateKey: 'ORDER_APPROVED', baseUrl, customer, order });
+
+    expect(content.templateKey).toBe('ORDER_APPROVED');
+    expect(content.subject).toContain('הזמנה אושרה');
+    expect(content.subject).toContain('#1042');
+    expect(content.text).toContain('שלום דנה,');
+    expect(content.text).toContain('#1042 (קפה דרום)');
+    expect(content.text).toContain(formatDate(deliveryWindowStart));
+    expect(content.text).toContain(formatMoney(1234.5));
+    expect(content.text).toContain('https://orders.example.com/customer/cust-001/orders/1042');
   });
 
-  it('builds extended order lifecycle variables for non-received statuses', () => {
-    const payload = buildOrderTemplatePayload({
-      templateKey: 'ORDER_APPROVED',
-      baseUrl: 'https://orders.example.com',
-      customer: { id: 'cust-001', name: 'Cafe South', contact: 'Dana' },
-      order: {
-        orderNumber: 1001,
-        status: 'APPROVED',
-        totalIncludingVat: 145.73,
-        deliveryWindowStart: new Date('2026-07-01T08:00:00.000Z'),
-      },
-    });
-
-    expect(payload.bodyParameters).toEqual([
-      { name: 'customer_name', text: 'Dana' },
-      { name: 'business_name', text: 'Cafe South' },
-      { name: 'order_id', text: '#1001' },
-      { name: 'delivery_date', text: '01/07/2026' },
-      { name: 'order_total', text: '₪145.73' },
-      { name: 'order_link', text: 'https://orders.example.com/customer/cust-001' },
+  it('uses the three approved parameters for ORDER_RECEIVED', () => {
+    const content = buildOrderStatusContent({ templateKey: 'ORDER_RECEIVED', baseUrl, customer, order });
+    expect(content.whatsappParameters).toEqual([
+      { name: 'customer_name', text: 'דנה' },
+      { name: 'order_id', text: '#1042' },
+      { name: 'delivery_date', text: formatDate(deliveryWindowStart) },
     ]);
   });
 
-  it('builds reminder template variables for route cutoffs', () => {
-    const payload = buildReminderTemplatePayload({
-      baseUrl: 'https://orders.example.com',
-      customer: { id: 'cust-001', name: 'Cafe South', contact: 'Dana' },
-      route: {
-        name: 'South',
-        nextDeliveryAt: new Date('2026-07-01T08:00:00.000Z'),
-        nextCutoffAt: new Date('2026-06-30T15:00:00.000Z'),
-      },
-    });
-
-    expect(payload.bodyParameters).toEqual([
-      { name: 'customer_name', text: 'Dana' },
-      { name: 'business_name', text: 'Cafe South' },
-      { name: 'route_name', text: 'South' },
-      { name: 'delivery_date', text: '01/07/2026' },
-      { name: 'cutoff_datetime', text: '30/06/2026, 18:00' },
-      { name: 'order_link', text: 'https://orders.example.com/customer/cust-001' },
+  it('uses six named parameters for other lifecycle statuses', () => {
+    const content = buildOrderStatusContent({ templateKey: 'ORDER_PACKED', baseUrl, customer, order });
+    expect(parameterNames(content.whatsappParameters)).toEqual([
+      'customer_name', 'business_name', 'order_id', 'delivery_date', 'order_total', 'order_link',
     ]);
+    expect(content.whatsappParameters).toContainEqual({ name: 'order_link', text: 'https://orders.example.com/customer/cust-001/orders/1042' });
+    expect(content.whatsappParameters).toContainEqual({ name: 'business_name', text: 'קפה דרום' });
+  });
+});
+
+describe('buildReminderContent', () => {
+  it('renders the reminder with route, cutoff and link and six named parameters', () => {
+    const deliveryAt = new Date('2026-07-02T05:00:00.000Z');
+    const cutoffAt = new Date('2026-06-30T15:00:00.000Z');
+    const content = buildReminderContent({ baseUrl, customer, routeName: 'דרום', deliveryAt, cutoffAt });
+
+    expect(content.templateKey).toBe('ORDER_REMINDER');
+    expect(content.subject).toContain('תזכורת');
+    expect(content.text).toContain('קו דרום');
+    expect(content.text).toContain('https://orders.example.com/customer/cust-001');
+    expect(parameterNames(content.whatsappParameters)).toEqual([
+      'customer_name', 'business_name', 'route_name', 'delivery_date', 'cutoff_datetime', 'order_link',
+    ]);
+    expect(content.whatsappParameters).toContainEqual({ name: 'delivery_date', text: formatDate(deliveryAt) });
+  });
+});
+
+describe('buildAdditionDecisionContent', () => {
+  it('builds the approved message', () => {
+    const content = buildAdditionDecisionContent({ baseUrl, customer, orderNumber: 1042, decision: 'APPROVED', rejectionReason: null });
+    expect(content.templateKey).toBe('ORDER_ADDITION_APPROVED');
+    expect(content.text).toContain('אושרה');
+    expect(content.text).toContain('https://orders.example.com/customer/cust-001/orders/1042');
+    expect(content.whatsappParameters).toEqual(['דנה', '#1042']);
+  });
+
+  it('builds the rejected message with the reason, or a default reason', () => {
+    const withReason = buildAdditionDecisionContent({ baseUrl, customer, orderNumber: 1042, decision: 'REJECTED', rejectionReason: 'המלאי אזל' });
+    expect(withReason.templateKey).toBe('ORDER_ADDITION_REJECTED');
+    expect(withReason.text).toContain('סיבה: המלאי אזל');
+    expect(withReason.whatsappParameters).toEqual(['דנה', '#1042', 'המלאי אזל']);
+
+    const withoutReason = buildAdditionDecisionContent({ baseUrl, customer, orderNumber: 1042, decision: 'REJECTED', rejectionReason: '' });
+    expect(withoutReason.whatsappParameters[2]).toBe('לא צוינה סיבה');
   });
 });

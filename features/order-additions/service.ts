@@ -1,80 +1,76 @@
-import { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/db';
+import { NotFoundError } from '@/lib/errors';
+import { runSerializable } from '@/lib/transactions';
+import type { RecordAudit } from '../audit/log';
+import type { OrderItem } from '../orders/quantity';
 import { getOrderWriteContext } from '../orders/service';
-import { isRetryableOrderWriteError } from '../orders/persistence';
-import { SafeActionError } from '../../lib/safe-action-error';
-import { prisma } from '../../lib/db';
-import { assertAdditionAllowed } from './business-rules';
-import { persistPendingAdditionRequest } from './persistence';
+import { approveAdditionRequest, assertAdditionAllowed, persistPendingAdditionRequest, rejectAdditionRequest } from './persistence';
 import { buildOrderAdditionSnapshot } from './pricing';
+
+type Actor = { userId: string; audit: RecordAudit };
 
 export async function submitOrderAddition({
   customerId,
   orderId,
   idempotencyKey,
   items,
-  actorUserId,
+  actor,
   now = new Date(),
 }: {
   customerId: string;
   orderId: string;
   idempotencyKey: string;
-  items: Array<{ productId: string; quantity: number }>;
-  actorUserId?: string | null;
+  items: OrderItem[];
+  actor: Actor;
   now?: Date;
-}): Promise<{ requestId: string; status: string; replayed: boolean }> {
+}): Promise<{ requestId: string; replayed: boolean }> {
   const order = await prisma.order.findFirst({
     where: { id: orderId, customerId },
-    select: {
-      id: true,
-      customerId: true,
-      status: true,
-      revision: true,
-      paymentTerm: true,
-      vatRatePercent: true,
-      deliveryWindowStart: true,
-      lines: { select: { productId: true, quantity: true } },
-    },
+    select: { id: true, status: true, paymentTerm: true, vatRatePercent: true, lines: { select: { productId: true, quantity: true } } },
   });
-  if (!order) throw new SafeActionError('NOT_FOUND', 'ההזמנה לא נמצאה.');
+  if (!order) throw new NotFoundError('ההזמנה לא נמצאה.');
   assertAdditionAllowed(order.status);
 
-  const currentContext = await getOrderWriteContext(customerId, now);
-  const context = { ...currentContext, vatRatePercent: Number(order.vatRatePercent) };
+  // Additions are billed at the VAT rate the original order was placed with.
+  const context = { ...(await getOrderWriteContext(customerId, now)), vatRatePercent: Number(order.vatRatePercent) };
   const snapshot = buildOrderAdditionSnapshot({
     context,
-    existingItems: order.lines.flatMap((line) => line.productId
-      ? [{ productId: line.productId, quantity: line.quantity }]
-      : []),
+    existingItems: order.lines.flatMap((line) => (line.productId ? [{ productId: line.productId, quantity: line.quantity }] : [])),
     items,
     paymentTerm: order.paymentTerm,
     now,
   });
-  let persisted: Awaited<ReturnType<typeof persistPendingAdditionRequest>> | null = null;
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      persisted = await prisma.$transaction(
-        (tx) => persistPendingAdditionRequest(tx, {
-          orderId: order.id,
-          customerId,
-          orderRevision: order.revision,
-          paymentTerm: order.paymentTerm,
-          idempotencyKey,
-          snapshot,
-          now,
-          actorUserId,
-        }),
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-      );
-      break;
-    } catch (error) {
-      if (!isRetryableOrderWriteError(error) || attempt === 3) throw error;
-    }
-  }
-  if (!persisted) throw new Error('Addition persistence retry loop exited unexpectedly.');
 
-  return {
-    requestId: persisted.request.id,
-    status: persisted.request.status,
-    replayed: persisted.replayed,
-  };
+  const { request, replayed } = await runSerializable((tx) =>
+    persistPendingAdditionRequest(tx, {
+      orderId: order.id,
+      customerId,
+      paymentTerm: order.paymentTerm,
+      idempotencyKey,
+      snapshot,
+      now,
+      actorUserId: actor.userId,
+      audit: actor.audit,
+    }));
+  return { requestId: request.id, replayed };
+}
+
+export function reviewOrderAddition({
+  requestId,
+  decision,
+  reason,
+  actor,
+  now = new Date(),
+}: {
+  requestId: string;
+  decision: 'APPROVED' | 'REJECTED';
+  reason: string | null;
+  actor: Actor;
+  now?: Date;
+}) {
+  const input = { requestId, reviewerUserId: actor.userId, now, audit: actor.audit };
+  return runSerializable((tx) =>
+    decision === 'APPROVED'
+      ? approveAdditionRequest(tx, input)
+      : rejectAdditionRequest(tx, { ...input, reason: reason ?? '' }));
 }

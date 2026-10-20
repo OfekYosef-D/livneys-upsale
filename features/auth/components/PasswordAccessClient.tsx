@@ -1,92 +1,87 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { FormEvent, useState, useTransition } from 'react';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { useState, useTransition, type ReactNode } from 'react';
+import { Button } from '@/components/ui/Button';
+import { formValue, TextField } from '@/components/ui/Field';
+import { Notice } from '@/components/ui/Notice';
 import { requestPasswordResetAction, setPasswordWithTokenAction } from '../actions';
+import { PASSWORD_HINT } from '../password-policy';
 
 export function ForgotPasswordClient() {
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
+
   return (
-    <AuthCard title="איפוס סיסמה" description="נשלח קישור חד-פעמי אם קיים חשבון פעיל עבור הכתובת.">
-      <form onSubmit={(event) => {
-        event.preventDefault();
-        const email = new FormData(event.currentTarget).get('email');
-        startTransition(async () => {
-          const result = await requestPasswordResetAction({ email });
-          setMessage(result.ok ? result.data.message : result.error);
-        });
-      }} className="space-y-3">
-        <Input name="email" label="אימייל" type="email" autoComplete="email" required />
-        {message && <p role="status" className="rounded-xl bg-[#e6e1d8] p-3 text-sm font-bold">{message}</p>}
-        <SubmitButton pending={pending}>שליחת קישור מאובטח</SubmitButton>
+    <AuthCard title="שכחתי סיסמה" description="נשלח אליכם במייל קישור לבחירת סיסמה חדשה.">
+      <form
+        className="space-y-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const email = formValue.text(new FormData(event.currentTarget), 'email');
+          startTransition(async () => {
+            const result = await requestPasswordResetAction({ email });
+            setMessage(result.ok ? { ok: true, text: result.data.message } : { ok: false, text: result.error });
+          });
+        }}
+      >
+        <TextField name="email" label="אימייל" type="email" dir="ltr" autoComplete="email" required />
+        {message && <Notice tone={message.ok ? 'success' : 'danger'}>{message.text}</Notice>}
+        <Button type="submit" fullWidth pending={pending} pendingLabel="שולחים…">שליחת קישור</Button>
       </form>
     </AuthCard>
   );
 }
 
 export function PasswordTokenClient({ token, type }: { token: string; type: 'setup' | 'reset' }) {
-  const router = useRouter();
-  const [message, setMessage] = useState('');
-  const [complete, setComplete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
+
   return (
-    <AuthCard
-      title={type === 'setup' ? 'הגדרת סיסמה' : 'בחירת סיסמה חדשה'}
-      description="הסיסמה חייבת לכלול לפחות 12 תווים, אות גדולה, אות קטנה, מספר ותו מיוחד."
-    >
-      {complete ? (
-        <div className="space-y-3 rounded-xl bg-emerald-50 p-4 text-emerald-900">
-          <CheckCircle2 />
-          <p className="font-black">הסיסמה נשמרה וכל החיבורים הישנים בוטלו.</p>
-          <button onClick={() => router.push('/login')} className="font-black underline">מעבר לכניסה</button>
-        </div>
+    <AuthCard title={type === 'setup' ? 'ברוכים הבאים! בחרו סיסמה' : 'בחירת סיסמה חדשה'} description={PASSWORD_HINT}>
+      {done ? (
+        <Notice tone="success" icon={<CheckCircle2 size={18} />} title="הסיסמה נשמרה">
+          <Link href="/login" className="font-semibold underline">כניסה לחשבון</Link>
+        </Notice>
       ) : (
-        <form onSubmit={(event) => {
-          event.preventDefault();
-          const form = new FormData(event.currentTarget);
-          startTransition(async () => {
-            const result = await setPasswordWithTokenAction({
-              token,
-              type,
-              password: form.get('password'),
-              passwordConfirmation: form.get('passwordConfirmation'),
+        <form
+          className="space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            startTransition(async () => {
+              const result = await setPasswordWithTokenAction({
+                token,
+                type,
+                password: formValue.text(form, 'password'),
+                passwordConfirmation: formValue.text(form, 'passwordConfirmation'),
+              });
+              if (result.ok) setDone(true);
+              else setError(result.error);
             });
-            if (result.ok) setComplete(true);
-            else setMessage(result.error);
-          });
-        }} className="space-y-3">
-          <Input name="password" label="סיסמה חדשה" type="password" autoComplete="new-password" required />
-          <Input name="passwordConfirmation" label="אימות סיסמה" type="password" autoComplete="new-password" required />
-          {message && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-800">{message}</p>}
-          <SubmitButton pending={pending}>שמירת הסיסמה</SubmitButton>
+          }}
+        >
+          <TextField name="password" label="סיסמה" type="password" autoComplete="new-password" required minLength={10} />
+          <TextField name="passwordConfirmation" label="הקלדה חוזרת של הסיסמה" type="password" autoComplete="new-password" required />
+          {error && <Notice tone="danger">{error}</Notice>}
+          <Button type="submit" fullWidth pending={pending} pendingLabel="שומרים…">שמירת הסיסמה</Button>
         </form>
       )}
     </AuthCard>
   );
 }
 
-function AuthCard({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+function AuthCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return (
-    <main className="app-surface min-h-screen px-3 py-6 text-black">
-      <section className="mx-auto max-w-md rounded-2xl border border-black/10 bg-white p-5 shadow-[0_18px_55px_rgba(0,0,0,0.07)]">
-        <p className="text-xs font-black text-black/45">Livney&apos;s B2B</p>
-        <h1 className="mt-1 text-2xl font-black">{title}</h1>
-        <p className="mt-2 text-sm font-bold leading-6 text-black/60">{description}</p>
+    <main className="app-surface grid min-h-screen place-items-center px-3 py-6 text-black">
+      <section className="ui-panel w-full max-w-md p-5">
+        <h1 className="text-xl font-semibold">{title}</h1>
+        <p className="mt-1 text-sm leading-6 text-black/60">{description}</p>
         <div className="mt-5">{children}</div>
-        <Link href="/login" className="mt-4 inline-flex items-center gap-1 text-xs font-black underline">חזרה לכניסה <ArrowLeft size={14} /></Link>
+        <Link href="/login" className="mt-4 inline-flex items-center gap-1 text-xs font-semibold underline">חזרה לכניסה <ArrowLeft size={14} /></Link>
       </section>
     </main>
   );
-}
-
-function Input(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
-  const { label, ...inputProps } = props;
-  return <label className="block"><span className="mb-1 block text-xs font-black">{label}</span><input {...inputProps} className="h-11 w-full rounded-xl border border-black/12 px-3 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-black/25" /></label>;
-}
-
-function SubmitButton({ pending, children }: { pending: boolean; children: React.ReactNode }) {
-  return <button disabled={pending} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white disabled:bg-black/30">{pending ? 'מבצעים...' : children}</button>;
 }

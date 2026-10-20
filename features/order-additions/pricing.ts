@@ -1,107 +1,69 @@
-import type { OrderWriteContext } from '../orders/write';
-import { SafeActionError } from '../../lib/safe-action-error';
-import { calculatePaymentTermsSummary, type PaymentTermValue } from '../orders/payment-terms';
-import { calculateVatSummary } from '../orders/vat';
-import { normalizeCustomerOrderItems, type OrderSnapshotLine } from '../orders/utils';
-import { calculateOrderPricing } from '../pricing/engine';
+import { ValidationError } from '@/lib/errors';
+import { roundCurrency } from '@/lib/money';
+import { applyPromotion, summarizeLines, type PricedLine } from '../pricing/engine';
+import type { OrderItem } from '../orders/quantity';
+import { calculateOrderTotals, type OrderTotals, type PaymentTermValue } from '../orders/totals';
+import { priceOrderItems, type OrderWriteContext } from '../orders/write';
 
-export type OrderAdditionSnapshot = {
-  subtotal: number;
-  discountTotal: number;
-  paymentDiscountPercent: number;
-  paymentDiscountTotal: number;
-  total: number;
-  vatRatePercent: number;
-  vatTotal: number;
-  totalIncludingVat: number;
-  lines: OrderSnapshotLine[];
-};
+export type OrderAdditionSnapshot = OrderTotals & { lines: PricedLine[] };
 
+/**
+ * Prices only the extra units, but evaluates promotions on the combined quantity so that a
+ * deal reached thanks to the addition (e.g. "buy 12 get 2") is honoured. The discount already
+ * granted on the original quantity is subtracted, so nothing is discounted twice. The original
+ * order's payment term and VAT rate are kept.
+ */
 export function buildOrderAdditionSnapshot({
   context,
-  existingItems = [],
+  existingItems,
   items,
   paymentTerm,
   now,
 }: {
   context: OrderWriteContext;
-  existingItems?: Array<{ productId: string; quantity: number }>;
-  items: Array<{ productId: string; quantity: number }>;
+  existingItems: readonly OrderItem[];
+  items: readonly OrderItem[];
   paymentTerm: PaymentTermValue;
   now: Date;
 }): OrderAdditionSnapshot {
-  const normalizedItems = normalizeCustomerOrderItems(items, context.products);
-  const existingQuantities = existingItems.reduce((quantities, item) => {
-    if (item.quantity > 0) quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
-    return quantities;
-  }, new Map<string, number>());
-  const pricingInput = {
-    customer: context.customer,
-    route: context.route,
-    products: context.products,
-    priceListItems: context.priceListItems,
-    promotions: context.promotions,
-    now,
-  };
-  const combinedPricing = calculateOrderPricing({
-    ...pricingInput,
-    items: normalizedItems.map((item) => ({
-      ...item,
-      quantity: item.quantity + (existingQuantities.get(item.productId) ?? 0),
-    })),
-  });
-  const baselinePricing = calculateOrderPricing({
-    ...pricingInput,
-    items: normalizedItems.flatMap((item) => {
-      const quantity = existingQuantities.get(item.productId) ?? 0;
-      return quantity > 0 ? [{ productId: item.productId, quantity }] : [];
-    }),
-  });
-  const baselineByProductId = new Map(baselinePricing.lines.map((line) => [line.productId, line]));
-  const additionQuantityByProductId = new Map(normalizedItems.map((item) => [item.productId, item.quantity]));
-  const lines = combinedPricing.lines.map((combinedLine) => {
-    const quantity = additionQuantityByProductId.get(combinedLine.productId) ?? 0;
-    const lineSubtotal = roundCurrency(combinedLine.listUnitPrice * quantity);
-    const baselineDiscount = baselineByProductId.get(combinedLine.productId)?.discountTotal ?? 0;
-    const discountTotal = Math.min(lineSubtotal, Math.max(0, roundCurrency(combinedLine.discountTotal - baselineDiscount)));
+  const additions = priceOrderItems(context, items, now).lines;
+  if (additions.length === 0) throw new ValidationError('בקשת תוספת חייבת לכלול לפחות מוצר אחד.');
+
+  const existingQuantity = new Map<string, number>();
+  for (const item of existingItems) {
+    existingQuantity.set(item.productId, (existingQuantity.get(item.productId) ?? 0) + item.quantity);
+  }
+
+  const combinedLines = new Map(
+    priceOrderItems(
+      context,
+      additions.map((line) => ({ productId: line.productId, quantity: line.quantity + (existingQuantity.get(line.productId) ?? 0) })),
+      now,
+    ).lines.map((line) => [line.productId, line]),
+  );
+
+  const lines = additions.map((addition): PricedLine => {
+    const combined = combinedLines.get(addition.productId) ?? addition;
+    const existing = existingQuantity.get(addition.productId) ?? 0;
+    const alreadyGranted = existing > 0 && combined.promotionSnapshot
+      ? applyPromotion(combined.promotionSnapshot, combined.listUnitPrice, existing).discountTotal
+      : 0;
+    const lineSubtotal = roundCurrency(combined.listUnitPrice * addition.quantity);
+    const discountTotal = Math.min(lineSubtotal, Math.max(0, roundCurrency(combined.discountTotal - alreadyGranted)));
 
     return {
-      ...combinedLine,
-      quantity,
+      ...combined,
+      quantity: addition.quantity,
       lineSubtotal,
       discountTotal,
       lineTotal: roundCurrency(lineSubtotal - discountTotal),
-      promotionId: discountTotal > 0 ? combinedLine.promotionId : null,
-      promotionSnapshot: discountTotal > 0 ? combinedLine.promotionSnapshot : null,
+      promotionId: discountTotal > 0 ? combined.promotionId : null,
+      promotionSnapshot: discountTotal > 0 ? combined.promotionSnapshot : null,
     };
   });
-  const pricing = {
-    lines,
-    subtotal: roundCurrency(lines.reduce((sum, line) => sum + line.lineSubtotal, 0)),
-    discountTotal: roundCurrency(lines.reduce((sum, line) => sum + line.discountTotal, 0)),
-    total: roundCurrency(lines.reduce((sum, line) => sum + line.lineTotal, 0)),
-  };
-
-  if (pricing.lines.length === 0) {
-    throw new SafeActionError('VALIDATION_ERROR', 'בקשת תוספת חייבת לכלול לפחות מוצר אחד.');
-  }
-
-  const payment = calculatePaymentTermsSummary(pricing.total, paymentTerm);
-  const vat = calculateVatSummary(payment.total, context.vatRatePercent);
 
   return {
-    subtotal: pricing.subtotal,
-    discountTotal: pricing.discountTotal,
-    paymentDiscountPercent: payment.paymentDiscountPercent,
-    paymentDiscountTotal: payment.paymentDiscountTotal,
-    total: payment.total,
-    vatRatePercent: vat.vatRatePercent,
-    vatTotal: vat.vatTotal,
-    totalIncludingVat: vat.totalIncludingVat,
-    lines: pricing.lines,
+    ...calculateOrderTotals({ ...summarizeLines(lines), paymentTerm, vatRatePercent: context.vatRatePercent }),
+    lines,
   };
-}
-
-function roundCurrency(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }

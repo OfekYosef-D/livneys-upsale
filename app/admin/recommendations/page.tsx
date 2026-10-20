@@ -1,17 +1,18 @@
 import { AdminShell } from '@/components/admin/AdminShell';
-import { AdminRecommendationsManager } from '@/features/admin-crm/components/AdminCrmManagers';
+import { RecommendationsManager } from '@/features/admin-crm/components/RecommendationsManager';
 import { getRecommendationManagementData } from '@/features/admin-crm/queries';
-import { requireAdmin } from '@/lib/admin-guard';
+import { requireAdminPage } from '@/lib/authorization';
+import { paths } from '@/lib/paths';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminRecommendationsPage() {
-  await requireAdmin('/admin/recommendations');
+export default async function Page() {
+  await requireAdminPage(paths.admin.recommendations);
   const data = await getRecommendationManagementData();
 
   return (
-    <AdminShell title="המלצות לקוח" subtitle="שיוך ידני של מוצרי אפסייל ללקוחות ללא מנוע המלצות מורכב." activeHref="/admin/recommendations">
-      <AdminRecommendationsManager data={data} />
+    <AdminShell title="המלצות ללקוחות" activeHref={paths.admin.recommendations}>
+      <RecommendationsManager data={data} />
     </AdminShell>
   );
 }

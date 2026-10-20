@@ -1,78 +1,70 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { asMock } from '@/test/prisma-mock';
 
-const userFindUnique = vi.hoisted(() => vi.fn());
 const sendEmail = vi.hoisted(() => vi.fn());
-const getEmail = vi.hoisted(() => vi.fn());
-const sendWhatsApp = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/db', () => ({ prisma: { user: { findUnique: userFindUnique } } }));
-vi.mock('@/features/notifications/email', () => ({ getEmailConfig: getEmail, sendEmailMessage: sendEmail }));
-vi.mock('@/features/notifications/config', () => ({ getWhatsAppConfig: vi.fn(), resolveWhatsAppTemplateName: vi.fn() }));
-vi.mock('@/features/notifications/phone', () => ({ normalizePhoneToE164: vi.fn(() => null) }));
-vi.mock('@/features/notifications/sender', () => ({ sendWhatsAppTemplate: sendWhatsApp }));
+const isConfigured = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/db', async () => (await import('@/test/prisma-mock')).prismaModule());
+vi.mock('@/features/notifications/email', () => ({
+  getEmailConfig: vi.fn(() => ({ apiKey: 're_live', from: 'orders@example.com', replyTo: null })),
+  isEmailConfigured: isConfigured,
+  sendEmailMessage: sendEmail,
+}));
 
-const { AccountAccessDeliveryError, assertAccountAccessDeliveryConfigured, sendAccountAccessNotifications } = await import('./notifications');
+const { prisma } = await import('@/lib/db');
+const db = asMock(prisma);
+const { actionError } = await import('@/lib/action-result');
+const { AccountAccessDeliveryError, assertAccountAccessDeliveryConfigured, sendAccountAccessEmail } = await import('./notifications');
+
+const resetRequest = { userId: 'admin-1', type: 'PASSWORD_RESET' as const, url: 'https://example.com/reset-password?token=raw' };
 
 describe('account access delivery', () => {
-  beforeEach(() => { userFindUnique.mockReset(); sendEmail.mockReset(); getEmail.mockReset(); sendWhatsApp.mockReset(); });
+  beforeEach(() => {
+    db.$reset();
+    sendEmail.mockReset();
+    isConfigured.mockReset();
+    db.user.findUnique.mockResolvedValue({ email: 'admin@example.com', name: 'Admin' });
+  });
 
   it('refuses account creation when live email delivery is not configured', () => {
-    getEmail.mockReturnValue({ apiKey: null, from: null });
+    isConfigured.mockReturnValue(false);
     expect(() => assertAccountAccessDeliveryConfigured()).toThrow(AccountAccessDeliveryError);
-    getEmail.mockReturnValue({ apiKey: 're_live', from: 'orders@example.com' });
+    isConfigured.mockReturnValue(true);
     expect(() => assertAccountAccessDeliveryConfigured()).not.toThrow();
   });
 
-  it('does not report a dry-run notification as delivered', async () => {
-    getEmail.mockReturnValue({ apiKey: null, from: null });
-    sendEmail.mockResolvedValue({ mode: 'dry-run', providerMessageId: null });
-    userFindUnique.mockResolvedValue({
-      id: 'admin-1', email: 'admin@example.com', name: 'Admin', customer: null,
-    });
-    await expect(sendAccountAccessNotifications({
-      userId: 'admin-1', type: 'PASSWORD_RESET', url: 'https://example.com/reset-password?token=raw',
-    })).rejects.toBeInstanceOf(AccountAccessDeliveryError);
+  it('is an AppError so actions show its Hebrew message with code DELIVERY_UNAVAILABLE', () => {
+    const result = actionError(new AccountAccessDeliveryError());
+    expect(result).toMatchObject({ ok: false, code: 'DELIVERY_UNAVAILABLE' });
+    expect(result).not.toHaveProperty('requestId');
   });
 
-  it('reports delivery only after the email provider accepts the message', async () => {
-    getEmail.mockReturnValue({ apiKey: 're_live', from: 'orders@example.com' });
+  it('does not report a dry-run notification as delivered', async () => {
+    sendEmail.mockResolvedValue({ mode: 'dry-run', providerMessageId: null });
+    await expect(sendAccountAccessEmail(resetRequest)).rejects.toBeInstanceOf(AccountAccessDeliveryError);
+  });
+
+  it('resolves only after the email provider accepts the message, sending the link to the user email', async () => {
     sendEmail.mockResolvedValue({ mode: 'live', providerMessageId: 'email-1' });
-    userFindUnique.mockResolvedValue({
-      id: 'admin-1', email: 'admin@example.com', name: 'Admin', customer: null,
-    });
-    await expect(sendAccountAccessNotifications({
-      userId: 'admin-1', type: 'PASSWORD_RESET', url: 'https://example.com/reset-password?token=raw',
-    })).resolves.toMatchObject({ delivered: true, email: 'live' });
+    await expect(sendAccountAccessEmail(resetRequest)).resolves.toBeUndefined();
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(sendEmail.mock.calls[0][0]).toMatchObject({ to: 'admin@example.com' });
+    expect(sendEmail.mock.calls[0][0].text).toContain(resetRequest.url);
+  });
+
+  it('fails when the user no longer exists', async () => {
+    db.user.findUnique.mockResolvedValue(null);
+    await expect(sendAccountAccessEmail(resetRequest)).rejects.toBeInstanceOf(AccountAccessDeliveryError);
+    expect(sendEmail).not.toHaveBeenCalled();
   });
 
   it('surfaces a safe retryable error when the live provider rejects delivery', async () => {
-    getEmail.mockReturnValue({ apiKey: 're_live', from: 'orders@example.com' });
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     sendEmail.mockRejectedValue(new Error('provider response with internal details'));
-    userFindUnique.mockResolvedValue({
-      id: 'admin-1', email: 'admin@example.com', name: 'Admin', customer: null,
-    });
-    await expect(sendAccountAccessNotifications({
-      userId: 'admin-1', type: 'PASSWORD_RESET', url: 'https://example.com/reset-password?token=raw',
-    })).rejects.toMatchObject({
+    await expect(sendAccountAccessEmail(resetRequest)).rejects.toMatchObject({
       name: 'AccountAccessDeliveryError',
+      code: 'DELIVERY_UNAVAILABLE',
       message: expect.not.stringContaining('internal details'),
     });
-  });
-
-  it('never sends a personal access token to the company-wide WhatsApp number', async () => {
-    getEmail.mockReturnValue({ apiKey: 're_live', from: 'orders@example.com' });
-    sendEmail.mockResolvedValue({ mode: 'live', providerMessageId: 'email-1' });
-    userFindUnique.mockResolvedValue({
-      id: 'buyer-2', email: 'buyer2@example.com', name: 'Buyer Two',
-      customer: {
-        isActive: true,
-        phone: '050-0000000',
-        notificationPreference: { whatsappEnabled: true },
-      },
-    });
-
-    await expect(sendAccountAccessNotifications({
-      userId: 'buyer-2', type: 'PASSWORD_SETUP', url: 'https://example.com/setup-password?token=personal',
-    })).resolves.toMatchObject({ delivered: true, email: 'live', whatsapp: 'skipped' });
-    expect(sendWhatsApp).not.toHaveBeenCalled();
+    errorLog.mockRestore();
   });
 });

@@ -1,281 +1,200 @@
-import { Prisma, type OrderSource } from '@prisma/client';
-import { randomUUID } from 'node:crypto';
+import type { OrderSource } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { appendAuditLog } from '../audit/log';
+import { AppError, NotFoundError, StaleVersionError } from '@/lib/errors';
+import { runSerializable } from '@/lib/transactions';
+import type { RecordAudit } from '../audit/log';
+import { buildCatalogPricingInput, customerCatalogInclude } from '../catalog/customer-catalog';
 import { assertLegalDocumentsApprovedForProduction, recordOrderLegalAcceptances } from '../legal/acceptance';
-import { SafeActionError } from '../../lib/safe-action-error';
-import type { PaymentTermValue } from './payment-terms';
+import { loadActivePromotions } from '../pricing/promotions';
+import { resolveRouteSchedule } from '../routes/schedule';
 import {
   ActiveOrderExistsError,
-  IdempotencyKeyConflictError,
-  isRetryableOrderWriteError,
+  assertReplayMatches,
+  cancelDraftOrder,
+  findOrderByIdempotencyKey,
+  findOrderForDeliveryWindow,
+  persistDraftOrder,
   persistSubmittedOrder,
-  StaleOrderWriteError,
 } from './persistence';
-import { buildSubmittedOrderPayload, type OrderWriteContext } from './write';
+import type { OrderItem } from './quantity';
+import { assertOrderStatusTransition, type OrderStatus } from './status';
 import { assertVatQuoteCurrent, getEffectiveVatRate } from './tax-rates';
+import type { PaymentTermValue } from './totals';
+import { buildDraftOrder, buildSubmittedOrder, type OrderWriteContext } from './write';
 
-export type OrderWriteItem = {
-  productId: string;
-  quantity: number;
-};
+export type OrderActor = { userId: string; audit: RecordAudit };
 
-export async function getOrderWriteContext(customerId: string, at = new Date()): Promise<OrderWriteContext> {
+export async function getOrderWriteContext(customerId: string, at: Date = new Date()): Promise<OrderWriteContext> {
   const [customer, promotions, vatRate] = await Promise.all([
-    prisma.customer.findUnique({
-      where: { id: customerId },
-      include: {
-        route: true,
-        priceList: {
-          include: {
-            items: {
-              include: {
-                product: true,
-              },
-            },
-          },
-        },
-      },
-    }),
-    prisma.promotion.findMany({
-      where: { isActive: true },
-      include: {
-        productTargets: true,
-        categoryTargets: true,
-        customerTargets: true,
-        routeTargets: true,
-        priceListTargets: true,
-      },
-    }),
+    prisma.customer.findUnique({ where: { id: customerId }, include: customerCatalogInclude }),
+    loadActivePromotions(prisma),
     getEffectiveVatRate(at),
   ]);
 
-  if (!customer || !customer.isActive) {
-    throw new SafeActionError('NOT_FOUND', 'הלקוח לא נמצא או אינו פעיל.');
-  }
-
-  if (!customer.route.isActive) {
-    throw new SafeActionError('ORDER_LOCKED', 'קו החלוקה של הלקוח אינו פעיל.');
-  }
+  if (!customer?.isActive) throw new NotFoundError('הלקוח לא נמצא או אינו פעיל.');
+  if (!customer.route.isActive) throw new AppError('DELIVERY_UNAVAILABLE', 'קו החלוקה של הלקוח אינו פעיל כרגע. פנו לצוות ליבני׳ס.');
 
   return {
+    customerId: customer.id,
+    routeId: customer.routeId,
+    schedule: resolveRouteSchedule(customer.route, at),
     vatRatePercent: vatRate.ratePercent,
-    customer: {
-      id: customer.id,
-      routeId: customer.routeId,
-      priceListId: customer.priceListId,
-      isActive: customer.isActive,
-    },
-    route: {
-      id: customer.route.id,
-      isActive: customer.route.isActive,
-      nextDeliveryAt: customer.route.nextDeliveryAt,
-      nextCutoffAt: customer.route.nextCutoffAt,
-    },
-    products: customer.priceList.items
-      .filter((item) => item.product.isActive)
-      .map((item) => ({
-        id: item.productId,
-        name: item.product.name,
-        category: item.product.category,
-        basePrice: Number(item.product.basePrice),
-        isActive: item.product.isActive,
-        minQty: item.product.minQty,
-        orderMultiple: item.product.orderMultiple,
-      })),
-    priceListItems: customer.priceList.items.map((item) => ({
-      productId: item.productId,
-      price: Number(item.price),
-    })),
-    promotions: promotions.map((promotion) => ({
-      id: promotion.id,
-      title: promotion.title,
-      tag: promotion.tag,
-      description: promotion.description,
-      effectType: promotion.effectType,
-      discountValue: promotion.discountValue === null ? null : Number(promotion.discountValue),
-      buyQuantity: promotion.buyQuantity,
-      freeQuantity: promotion.freeQuantity,
-      priority: promotion.priority,
-      startsAt: promotion.startsAt,
-      endsAt: promotion.endsAt,
-      isActive: promotion.isActive,
-      productIds: [...new Set([promotion.productId, ...promotion.productTargets.map((target) => target.productId)].filter(Boolean) as string[])],
-      categories: promotion.categoryTargets.map((target) => target.category),
-      customerIds: promotion.customerTargets.map((target) => target.customerId),
-      routeIds: promotion.routeTargets.map((target) => target.routeId),
-      priceListIds: promotion.priceListTargets.map((target) => target.priceListId),
-    })),
+    pricing: buildCatalogPricingInput(customer, promotions),
   };
 }
 
-export async function createSubmittedOrder({
-  customerId,
-  items,
-  source,
-  idempotencyKey,
-  paymentTerm,
-  commercialTermsAccepted = false,
-  notes,
-  internalNote,
-  replaceDraftForDeliveryWindow = false,
-  actorUserId,
-  expectedVatRatePercent,
-  expectedLegalDocumentSetVersion,
-  now = new Date(),
-}: {
+export type SubmitOrderInput = {
   customerId: string;
-  items: OrderWriteItem[];
+  items: OrderItem[];
   source: OrderSource;
   idempotencyKey: string;
   paymentTerm: PaymentTermValue;
   commercialTermsAccepted?: boolean;
   notes?: string | null;
   internalNote?: string | null;
-  replaceDraftForDeliveryWindow?: boolean;
-  actorUserId?: string | null;
+  /** The VAT rate and legal version the user saw; a mismatch means the review screen is stale. */
   expectedVatRatePercent?: number;
   expectedLegalDocumentSetVersion?: string;
+  actor: OrderActor;
   now?: Date;
-}): Promise<{ orderId: string; orderNumber: number; status: string; routeId: string; replayed: boolean }> {
-  const existingReplay = await prisma.order.findFirst({
-    where: {
-      idempotencyKey,
-      customerId,
-      customer: { isActive: true },
-    },
-    select: { id: true, orderNumber: true, status: true, routeId: true },
+};
+
+export type SubmittedOrder = { orderId: string; orderNumber: number; status: OrderStatus; replayed: boolean };
+
+/** Idempotent: re-sending the same key returns the original order instead of creating a duplicate. */
+export async function submitOrder(input: SubmitOrderInput): Promise<SubmittedOrder> {
+  const now = input.now ?? new Date();
+  const replay = await prisma.order.findFirst({
+    where: { idempotencyKey: input.idempotencyKey, customerId: input.customerId },
+    select: { id: true, orderNumber: true, status: true },
   });
+  if (replay) return { orderId: replay.id, orderNumber: replay.orderNumber, status: replay.status, replayed: true };
 
-  if (existingReplay?.routeId) {
-    return {
-      orderId: existingReplay.id,
-      orderNumber: existingReplay.orderNumber,
-      status: existingReplay.status,
-      routeId: existingReplay.routeId,
-      replayed: true,
-    };
-  }
+  const context = await getOrderWriteContext(input.customerId, now);
+  if (input.expectedVatRatePercent !== undefined) assertVatQuoteCurrent(input.expectedVatRatePercent, context.vatRatePercent);
+  if (input.source === 'CUSTOMER') assertLegalDocumentsApprovedForProduction();
 
-  const context = await getOrderWriteContext(customerId, now);
-  if (expectedVatRatePercent !== undefined) {
-    assertVatQuoteCurrent(expectedVatRatePercent, context.vatRatePercent ?? 0);
-  }
-  if (source === 'CUSTOMER') {
-    assertLegalDocumentsApprovedForProduction();
-    if (!actorUserId) throw new SafeActionError('UNAUTHORIZED', 'לא ניתן לתעד את מאשר ההזמנה. התחברו מחדש ונסו שוב.');
-  }
-  const payload = buildSubmittedOrderPayload({
+  const snapshot = buildSubmittedOrder({
     context,
-    items,
-    source,
-    paymentTerm,
-    commercialTermsAccepted,
+    items: input.items,
+    source: input.source,
+    paymentTerm: input.paymentTerm,
+    commercialTermsAccepted: input.commercialTermsAccepted,
+    notes: input.notes,
+    internalNote: input.internalNote,
     now,
-    notes,
-    internalNote,
   });
+  const deliveryWindowStart = snapshot.order.deliveryWindowStart;
 
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      const persisted = await prisma.$transaction(
-        async (tx) => {
-          const result = await persistSubmittedOrder(tx, {
-            payload,
-            idempotencyKey,
-            replaceDraftForDeliveryWindow,
-          });
-          if (result.replayed) return result;
+  const { order, replayed } = await runSerializable(
+    async (tx) => {
+      const result = await persistSubmittedOrder(tx, {
+        snapshot,
+        idempotencyKey: input.idempotencyKey,
+        replaceDraft: input.source === 'CUSTOMER',
+      });
+      if (result.replayed) return result;
 
-          const requestId = randomUUID();
-          if (source === 'CUSTOMER' && actorUserId) {
-            await recordOrderLegalAcceptances(tx, {
-              orderId: result.order.id,
-              customerId,
-              userId: actorUserId,
-              acceptedAt: now,
-              expectedDocumentSetVersion: expectedLegalDocumentSetVersion ?? '',
-            });
-          }
-          await appendAuditLog(tx, {
-            actorUserId,
-            actorRole: source === 'CUSTOMER' ? 'CUSTOMER' : 'ADMIN',
-            customerId,
-            entityType: 'Order',
-            entityId: result.order.id,
-            action: 'ORDER_SUBMITTED',
-            requestId,
-            after: {
-              orderNumber: result.order.orderNumber,
-              status: result.order.status,
-              source,
-              deliveryWindowStart: result.order.deliveryWindowStart,
-              total: payload.order.total,
-              vatRatePercent: payload.order.vatRatePercent,
-              totalIncludingVat: payload.order.totalIncludingVat,
-            },
-          });
-          return result;
-        },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-      );
-
-      return {
-        orderId: persisted.order.id,
-        orderNumber: persisted.order.orderNumber,
-        status: persisted.order.status,
-        routeId: context.route.id,
-        replayed: persisted.replayed,
-      };
-    } catch (error) {
-      const isConcurrentWrite = error instanceof StaleOrderWriteError || isRetryableOrderWriteError(error);
-      if (!isConcurrentWrite) throw error;
-
-      const replayedOrder = await prisma.order.findUnique({
-        where: { idempotencyKey },
-        select: {
-          id: true,
-          orderNumber: true,
-          status: true,
-          routeId: true,
-          customerId: true,
-          deliveryWindowStart: true,
+      if (input.source === 'CUSTOMER') {
+        await recordOrderLegalAcceptances(tx, {
+          orderId: result.order.id,
+          customerId: input.customerId,
+          userId: input.actor.userId,
+          acceptedAt: now,
+          expectedDocumentSetVersion: input.expectedLegalDocumentSetVersion ?? '',
+        });
+      }
+      await input.actor.audit(tx, {
+        customerId: input.customerId,
+        entityType: 'Order',
+        entityId: result.order.id,
+        action: 'ORDER_SUBMITTED',
+        after: {
+          orderNumber: result.order.orderNumber,
+          status: result.order.status,
+          source: input.source,
+          deliveryWindowStart,
+          total: snapshot.order.total,
+          vatRatePercent: snapshot.order.vatRatePercent,
+          totalIncludingVat: snapshot.order.totalIncludingVat,
         },
       });
-
-      if (replayedOrder) {
-        if (
-          replayedOrder.customerId !== customerId
-          || replayedOrder.deliveryWindowStart.getTime() !== context.route.nextDeliveryAt.getTime()
-        ) {
-          throw new IdempotencyKeyConflictError();
+      return result;
+    },
+    {
+      // A concurrent request may have committed the same submit, or another order for this window.
+      onConflict: async () => {
+        const committed = await findOrderByIdempotencyKey(prisma, input.idempotencyKey);
+        if (committed) {
+          assertReplayMatches(committed, input.customerId, deliveryWindowStart);
+          return { order: committed, replayed: true };
         }
+        const active = await findOrderForDeliveryWindow(prisma, input.customerId, deliveryWindowStart);
+        if (active && active.status !== 'DRAFT') throw new ActiveOrderExistsError(active);
+        return undefined;
+      },
+    },
+  );
 
-        return {
-          orderId: replayedOrder.id,
-          orderNumber: replayedOrder.orderNumber,
-          status: replayedOrder.status,
-          routeId: replayedOrder.routeId ?? context.route.id,
-          replayed: true,
-        };
-      }
+  return { orderId: order.id, orderNumber: order.orderNumber, status: order.status, replayed };
+}
 
-      const activeOrder = await prisma.order.findFirst({
-        where: {
-          customerId,
-          deliveryWindowStart: context.route.nextDeliveryAt,
-          status: { not: 'CANCELLED' },
-        },
-        select: { id: true, orderNumber: true, status: true },
-      });
+/** Keeps the customer's cart server-side between the catalog and the review screen. */
+export async function saveDraftOrder(customerId: string, items: OrderItem[], now: Date = new Date()): Promise<{ orderId: string | null }> {
+  const context = await getOrderWriteContext(customerId, now);
+  const snapshot = buildDraftOrder({ context, items, now });
 
-      if (activeOrder && activeOrder.status !== 'DRAFT') {
-        throw new ActiveOrderExistsError(activeOrder.id, activeOrder.orderNumber, activeOrder.status);
-      }
-
-      if (attempt === 3) throw error;
-    }
+  if (!snapshot) {
+    await runSerializable((tx) => cancelDraftOrder(tx, customerId, context.schedule.deliveryAt));
+    return { orderId: null };
   }
 
-  throw new Error('Order submission retry loop exited unexpectedly.');
+  const order = await runSerializable((tx) => persistDraftOrder(tx, snapshot));
+  return { orderId: order.id };
+}
+
+/** Admin workflow transition with optimistic locking; packing is blocked while an addition awaits review. */
+export async function changeOrderStatus({
+  orderId,
+  status,
+  audit,
+}: {
+  orderId: string;
+  status: OrderStatus;
+  audit: RecordAudit;
+}): Promise<{ orderId: string; customerId: string; status: OrderStatus }> {
+  return runSerializable(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        status: true,
+        revision: true,
+        customerId: true,
+        additionRequests: { where: { status: 'PENDING' }, select: { id: true } },
+      },
+    });
+    if (!order) throw new NotFoundError('ההזמנה לא נמצאה.');
+
+    assertOrderStatusTransition(order.status, status);
+    if (status === 'PACKED' && order.additionRequests.length > 0) {
+      throw new AppError('ORDER_LOCKED', 'יש לאשר או לדחות את בקשת התוספת לפני אריזת ההזמנה.');
+    }
+
+    const updated = await tx.order.updateMany({
+      where: { id: order.id, status: order.status, revision: order.revision },
+      data: { status, revision: { increment: 1 } },
+    });
+    if (updated.count !== 1) throw new StaleVersionError('ההזמנה השתנתה. רעננו את המסך ונסו שוב.');
+
+    await audit(tx, {
+      customerId: order.customerId,
+      entityType: 'Order',
+      entityId: order.id,
+      action: 'ORDER_STATUS_CHANGED',
+      before: { status: order.status },
+      after: { status },
+    });
+    return { orderId: order.id, customerId: order.customerId, status };
+  });
 }

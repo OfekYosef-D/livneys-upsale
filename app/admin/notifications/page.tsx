@@ -1,19 +1,18 @@
 import { AdminShell } from '@/components/admin/AdminShell';
 import { AdminNotificationsClient } from '@/features/notifications/components/AdminNotificationsClient';
 import { getNotificationManagementData } from '@/features/notifications/queries';
-import { requireAdmin } from '@/lib/admin-guard';
+import { requireAdminPage } from '@/lib/authorization';
+import { paths } from '@/lib/paths';
 
 export const dynamic = 'force-dynamic';
 
-export default async function NotificationsPage(props: { searchParams?: Promise<{ q?: string }> }) {
-  const searchParams = await props.searchParams;
-  await requireAdmin('/admin/notifications');
-  const data = await getNotificationManagementData();
-  const initialSearch = typeof searchParams?.q === 'string' ? searchParams.q : '';
+export default async function NotificationsPage(props: { searchParams: Promise<{ q?: string }> }) {
+  await requireAdminPage(paths.admin.notifications());
+  const [data, { q }] = await Promise.all([getNotificationManagementData(), props.searchParams]);
 
   return (
-    <AdminShell title="הודעות WhatsApp" subtitle="תקלות, הודעות שמחכות לשליחה ותזכורות לפני חלוקה במקום אחד." activeHref="/admin/notifications">
-      <AdminNotificationsClient data={data} initialSearch={initialSearch} />
+    <AdminShell title="הודעות ותזכורות" activeHref={paths.admin.notifications()}>
+      <AdminNotificationsClient data={data} initialSearch={q ?? ''} />
     </AdminShell>
   );
 }

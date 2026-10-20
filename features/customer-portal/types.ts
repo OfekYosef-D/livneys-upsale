@@ -1,89 +1,57 @@
-import type { PaymentTermValue } from '../orders/payment-terms';
+import type { OrderAdditionRequestStatus } from '@prisma/client';
+import type { CatalogProduct } from '../catalog/customer-catalog';
+import type { OrderTotals } from '../orders/totals';
+import type { OrderView } from '../orders/view-model';
 
 export type PortalCustomer = {
   id: string;
   name: string;
   contact: string;
-  phone: string;
-  region: string;
-  address: string;
-  notes?: string | null;
 };
 
-export type PortalRoute = {
-  id: string;
-  name: string;
-  nextDelivery: string;
-  deadline: string;
-  opsContactName?: string | null;
-  opsContactPhone?: string | null;
+export type PortalSchedule = {
+  routeName: string;
+  deliveryAt: string;
+  cutoffAt: string;
+  isPastCutoff: boolean;
+  opsContactName: string | null;
+  opsContactPhone: string | null;
 };
 
-export type PortalProduct = {
-  id: string;
-  sku: string;
-  name: string;
-  category: string;
-  listPrice: number;
-  price: number;
-  unit: string;
-  caseSize: string;
-  minQty: number;
-  orderMultiple: number;
-  assetImage?: string | null;
-  imageUrl?: string | null;
-  stockLabel?: string | null;
-  description?: string | null;
-  recommended?: boolean;
-  isRecommended?: boolean;
-  isPreviousOrder?: boolean;
-  promoLabel?: string;
-  promotion?: {
-    id: string;
-    title: string;
-    tag: string;
-    description: string;
-    effectType: 'DISPLAY_ONLY' | 'PERCENT_OFF' | 'FIXED_AMOUNT_OFF' | 'FIXED_UNIT_PRICE' | 'BUY_X_GET_Y';
-    discountValue: number | null;
-    buyQuantity: number | null;
-    freeQuantity: number | null;
-  } | null;
+export type PortalProduct = CatalogProduct & {
+  isRecommended: boolean;
+  isPreviousOrder: boolean;
 };
 
-export type PortalOrder = {
-  id: string;
+/** Where the initial cart comes from: this week's saved draft, or a re-order of the last order. */
+export type CartSeed = {
+  source: 'DRAFT' | 'PREVIOUS_ORDER' | 'EMPTY';
   orderNumber: number | null;
-  customerId: string;
-  date: string;
-  status: string;
-  subtotal: number;
-  discountTotal: number;
-  paymentTerm: PaymentTermValue;
-  paymentDiscountPercent: number;
-  paymentDiscountTotal: number;
-  total: number;
-  vatRatePercent: number;
-  vatTotal: number;
-  totalIncludingVat: number;
-  commercialTermsVersion: string | null;
-  commercialTermsAcceptedAt: string | null;
-  items: {
-    productId: string;
-    productName?: string;
-    qty: number;
-    listUnitPrice?: number;
-    unitPrice?: number;
-    lineSubtotal?: number;
-    discountTotal?: number;
-    lineTotal?: number;
-    promotionLabel?: string;
-  }[];
+  lines: Array<{ productId: string | null; quantity: number }>;
 };
 
 export type CustomerPortalData = {
   customer: PortalCustomer;
-  route: PortalRoute;
+  schedule: PortalSchedule;
   products: PortalProduct[];
-  lastOrder: PortalOrder;
-  activeOrderForDelivery: { id: string; orderNumber: number } | null;
+  vatRatePercent: number;
+  cartSeed: CartSeed;
+  /** The order already placed for the upcoming delivery, if any. */
+  activeOrder: { id: string; orderNumber: number } | null;
+};
+
+export type AdditionRequestView = OrderTotals & {
+  id: string;
+  status: OrderAdditionRequestStatus;
+  rejectionReason: string | null;
+  submittedAt: string;
+  reviewedAt: string | null;
+  reviewedByName: string | null;
+  lines: Array<{ id: string; productId: string | null; productName: string; quantity: number; unitPrice: number; lineTotal: number }>;
+};
+
+export type CustomerOrderDetail = {
+  order: OrderView;
+  canAddItems: boolean;
+  latestAddition: AdditionRequestView | null;
 };

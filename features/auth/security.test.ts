@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { hashAuthToken, passwordSchema, sanitizeInternalNextPath } from './security';
+import { passwordSchema } from './schema';
+import { hashAuthToken, sanitizeInternalNextPath } from './security';
 
 describe('authentication security helpers', () => {
-  it('requires a strong password', () => {
-    expect(passwordSchema.safeParse('StrongPass!2026').success).toBe(true);
-    expect(passwordSchema.safeParse('livneys-demo').success).toBe(false);
-    expect(passwordSchema.safeParse('alllowercasepassword1!').success).toBe(false);
-    expect(passwordSchema.safeParse(`Aa1!${'א'.repeat(35)}`).success).toBe(false);
+  it('requires a long password with a letter and a digit, without composition rules', () => {
+    expect(passwordSchema.safeParse('bakery jam 2026').success).toBe(true);
+    expect(passwordSchema.safeParse('ממרח טעים 123').success).toBe(true);
+    expect(passwordSchema.safeParse('short1').success).toBe(false);
+    expect(passwordSchema.safeParse('no digits at all').success).toBe(false);
+    expect(passwordSchema.safeParse('1234567890').success).toBe(false);
+    expect(passwordSchema.safeParse(`a1${'א'.repeat(40)}`).success).toBe(false);
   });
 
   it('hashes raw authentication tokens before persistence', () => {

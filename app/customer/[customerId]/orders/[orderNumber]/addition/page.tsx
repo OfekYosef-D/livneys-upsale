@@ -1,33 +1,33 @@
 import { notFound, redirect } from 'next/navigation';
 import { AdditionCatalogClient } from '@/features/order-additions/components/AdditionCatalogClient';
-import { getCustomerOrderAdditionData } from '@/features/order-additions/queries';
-import { getCustomerPortalData } from '@/features/customer-portal/queries';
+import { isAdditionEditable } from '@/features/order-additions/view-model';
+import { getCustomerOrderDetail, getCustomerPortalData } from '@/features/customer-portal/queries';
+import { parseOrderNumber } from '@/features/orders/status';
 import { requireCustomerPage } from '@/lib/authorization';
+import { paths } from '@/lib/paths';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CustomerOrderAdditionPage({ params }: { params: Promise<{ customerId: string; orderNumber: string }> }) {
-  const { customerId, orderNumber: rawOrderNumber } = await params;
+export default async function CustomerOrderAdditionPage(props: { params: Promise<{ customerId: string; orderNumber: string }> }) {
+  const { customerId, orderNumber } = await props.params;
   await requireCustomerPage(customerId);
-  const orderNumber = Number(rawOrderNumber);
-  if (!Number.isSafeInteger(orderNumber) || orderNumber < 1) notFound();
+  const number = parseOrderNumber(orderNumber);
+  if (!number) notFound();
 
-  const [portal, data] = await Promise.all([
-    getCustomerPortalData(customerId),
-    getCustomerOrderAdditionData(customerId, orderNumber),
-  ]);
-  if (!data) notFound();
-  if (!data.canAddItems) redirect(`/customer/${customerId}/orders/${orderNumber}`);
+  const [portal, detail] = await Promise.all([getCustomerPortalData(customerId), getCustomerOrderDetail(customerId, number)]);
+  if (!detail) notFound();
+  const orderHref = paths.customer.order(customerId, number);
+  if (!detail.canAddItems) redirect(orderHref);
 
-  const editableLines = data.additionRequest && ['DRAFT', 'PENDING'].includes(data.additionRequest.status)
-    ? data.additionRequest.lines
-    : [];
+  const pendingAddition = detail.latestAddition && isAdditionEditable(detail.latestAddition.status) ? detail.latestAddition : null;
   return (
     <AdditionCatalogClient
-      customer={portal.customer}
+      customerId={customerId}
       products={portal.products}
-      order={data.order}
-      initialLines={editableLines}
+      order={detail.order}
+      initialLines={pendingAddition?.lines ?? []}
+      mode="customer"
+      returnHref={orderHref}
     />
   );
 }

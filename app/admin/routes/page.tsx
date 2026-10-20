@@ -1,17 +1,18 @@
 import { AdminShell } from '@/components/admin/AdminShell';
-import { AdminRoutesManager } from '@/features/admin-crm/components/AdminCrmManagers';
+import { RoutesManager } from '@/features/admin-crm/components/RoutesManager';
 import { getRouteManagementData } from '@/features/admin-crm/queries';
-import { requireAdmin } from '@/lib/admin-guard';
+import { requireAdminPage } from '@/lib/authorization';
+import { paths } from '@/lib/paths';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminRoutesPage() {
-  await requireAdmin('/admin/routes');
+export default async function Page() {
+  await requireAdminPage(paths.admin.routes);
   const data = await getRouteManagementData();
 
   return (
-    <AdminShell title="ניהול קווים" subtitle="חלונות חלוקה, דדליינים, נהגים ואנשי קשר תפעוליים." activeHref="/admin/routes">
-      <AdminRoutesManager data={data} />
+    <AdminShell title="קווי חלוקה" activeHref={paths.admin.routes}>
+      <RoutesManager data={data} />
     </AdminShell>
   );
 }

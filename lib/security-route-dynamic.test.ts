@@ -1,11 +1,12 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('next/font/google', () => ({ Heebo: () => ({ variable: 'font-heebo', className: 'font-heebo' }) }));
+vi.mock('@/components/ui/NavigationProgress', () => ({ NavigationProgress: () => null }));
 
 describe('nonce CSP rendering contract', () => {
-  it('forces the root application tree to render per request', () => {
-    const source = fs.readFileSync(path.join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
+  it('forces the root application tree to render per request', async () => {
+    const layout = await import('@/app/layout');
 
-    expect(source).toContain("export const dynamic = 'force-dynamic'");
+    expect(layout.dynamic).toBe('force-dynamic');
   });
 });

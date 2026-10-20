@@ -1,302 +1,167 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Archive, Check, Copy, Link2, LogIn, MessageCircle, PhoneCall, UserPlus } from 'lucide-react';
-import { useMemo, useState, useTransition } from 'react';
-import {
-  convertRegistrationToCustomerAction,
-  updateRegistrationStatusAction,
-} from '@/features/registration/actions';
-import type { getRegistrationManagementData } from '@/features/registration/queries';
-import {
-  buildLoginInviteMessage,
-  buildRegistrationInviteMessage,
-  buildWhatsAppUrl,
-  getLoginUrl,
-  getRegistrationUrl,
-} from '@/features/registration/share-links';
-import { refreshAfterRegistrationMutation } from './registration-admin-refresh';
+import { Archive, Check, Copy, MessageCircle, PhoneCall, UserPlus } from 'lucide-react';
+import { useState } from 'react';
+import { useServerAction } from '@/components/hooks/useServerAction';
+import { Badge } from '@/components/ui/Badge';
+import { Button, buttonClassName } from '@/components/ui/Button';
+import { formValue, SelectField } from '@/components/ui/Field';
+import { ActionFeedback, EmptyState } from '@/components/ui/Notice';
+import { Panel, PanelHeader } from '@/components/ui/Panel';
+import { formatDateTime } from '@/lib/datetime';
+import { paths } from '@/lib/paths';
+import { buildWhatsAppUrl } from '@/lib/whatsapp-link';
+import { convertRegistrationToCustomerAction, updateRegistrationStatusAction } from '../actions';
+import type { getRegistrationManagementData } from '../queries';
+import { buildLoginInviteMessage, buildRegistrationInviteMessage, getLoginUrl, getRegistrationUrl } from '../share-links';
 
-type RegistrationData = Awaited<ReturnType<typeof getRegistrationManagementData>>;
-type StatusFilter = 'all' | RegistrationData['requests'][number]['status'];
+type Data = Awaited<ReturnType<typeof getRegistrationManagementData>>;
+type Request = Data['requests'][number];
 
-const statusLabels: Record<RegistrationData['requests'][number]['status'], string> = {
-  PENDING: 'חדש',
-  CONTACTED: 'נוצר קשר',
-  CONVERTED: 'הומר ללקוח',
-  ARCHIVED: 'בארכיון',
+const statusLabels: Record<Request['status'], { label: string; tone: 'warning' | 'info' | 'success' | 'muted' }> = {
+  PENDING: { label: 'חדשה', tone: 'warning' },
+  CONTACTED: { label: 'נוצר קשר', tone: 'info' },
+  CONVERTED: { label: 'נפתח לקוח', tone: 'success' },
+  ARCHIVED: { label: 'בארכיון', tone: 'muted' },
 };
 
-export function AdminRegistrationsClient({
-  data,
-  appOrigin,
-}: {
-  data: RegistrationData;
-  appOrigin?: string | null;
-}) {
-  const [status, setStatus] = useState<StatusFilter>('all');
-  const [message, setMessage] = useState('');
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const router = useRouter();
-  const origin = appOrigin ?? null;
-  const registrationUrl = getRegistrationUrl(origin);
-  const loginUrl = getLoginUrl(origin);
-  const visibleRequests = useMemo(
-    () => status === 'all' ? data.requests : data.requests.filter((request) => request.status === status),
-    [data.requests, status],
-  );
-
-  async function copyText(key: string, text: string, success: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedKey(key);
-      setMessage(success);
-      window.setTimeout(() => setCopiedKey((current) => (current === key ? null : current)), 1800);
-    } catch {
-      setMessage('לא הצלחנו להעתיק. העתיקו ידנית מהשדה.');
-    }
-  }
-
-  function run(id: string, call: () => Promise<{ ok: true; data: unknown } | { ok: false; error: string }>, success: string) {
-    setMessage('');
-    setPendingId(id);
-    startTransition(async () => {
-      const result = await call();
-      setPendingId(null);
-      if (result.ok) {
-        setMessage(success);
-      } else {
-        setMessage(result.error);
-      }
-      refreshAfterRegistrationMutation(router);
-    });
-  }
+export function AdminRegistrationsClient({ data, appOrigin }: { data: Data; appOrigin: string }) {
+  const action = useServerAction();
+  const [filter, setFilter] = useState<'open' | Request['status']>('open');
+  const visible = data.requests.filter((request) => (filter === 'open' ? request.status === 'PENDING' || request.status === 'CONTACTED' : request.status === filter));
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-black/10 bg-white p-4 shadow-[0_18px_54px_rgba(0,0,0,0.05)]">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
-            <h2 className="text-xl font-black">בקשות הרשמה</h2>
-            <p className="mt-1 text-sm font-bold leading-6 text-black/55">
-              שלחו ללקוח חדש קישור להרשמה. אחרי פתיחת חשבון קישור כניסה מאובטח נשלח אוטומטית באימייל.
-            </p>
+      <Panel>
+        <PanelHeader title="קישורים לשיתוף" description="שלחו ללקוחות פוטנציאליים קישור להרשמה, או ללקוחות קיימים קישור כניסה." />
+        <div className="divide-y divide-[var(--pantry-line)]">
+          <ShareRow title="הרשמה" url={getRegistrationUrl(appOrigin)} message={buildRegistrationInviteMessage(appOrigin)} />
+          <ShareRow title="כניסה" url={getLoginUrl(appOrigin)} message={buildLoginInviteMessage(appOrigin)} />
+        </div>
+      </Panel>
+
+      <ActionFeedback feedback={action.feedback} />
+
+      <Panel>
+        <PanelHeader
+          title="בקשות הצטרפות"
+          actions={(
+            <select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)} aria-label="סינון בקשות" className="ui-field min-h-9 w-auto">
+              <option value="open">פתוחות</option>
+              <option value="CONVERTED">נפתח לקוח</option>
+              <option value="ARCHIVED">ארכיון</option>
+            </select>
+          )}
+        />
+        {visible.length === 0 ? (
+          <EmptyState title="אין בקשות" description="בקשות חדשות מהטופס באתר יופיעו כאן." />
+        ) : (
+          <div className="divide-y divide-[var(--pantry-line)]">
+            {visible.map((request) => <RequestCard key={request.id} request={request} data={data} action={action} />)}
           </div>
-          <div className="flex flex-wrap gap-2">
-            {(['all', 'PENDING', 'CONTACTED', 'CONVERTED', 'ARCHIVED'] as StatusFilter[]).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setStatus(item)}
-                className={`min-h-9 rounded-full px-3 text-xs font-black focus-visible:ring-2 focus-visible:ring-black/25 ${status === item ? 'bg-black text-white' : 'bg-[#e6e1d8] text-black hover:bg-black hover:text-white'}`}
-              >
-                {item === 'all' ? 'הכל' : statusLabels[item]}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          <ShareCard
-            title="קישור להרשמה"
-            description="ללקוחות חדשים שעדיין לא במערכת."
-            url={registrationUrl}
-            copied={copiedKey === 'register-url'}
-            onCopy={() => copyText('register-url', registrationUrl, 'קישור ההרשמה הועתק.')}
-            whatsappHref={buildWhatsAppUrl(null, buildRegistrationInviteMessage(origin))}
-            whatsappLabel="שלח בוואטסאפ"
-          />
-          <ShareCard
-            title="קישור להתחברות"
-            description="ללקוחות קיימים או אחרי פתיחת חשבון."
-            url={loginUrl}
-            copied={copiedKey === 'login-url'}
-            onCopy={() => copyText('login-url', loginUrl, 'קישור ההתחברות הועתק.')}
-            whatsappHref={buildWhatsAppUrl(null, buildLoginInviteMessage(origin))}
-            whatsappLabel="שלח בוואטסאפ"
-            icon="login"
-          />
-        </div>
-      </section>
-
-      {message && <p className="rounded-xl bg-[#e6e1d8] p-3 text-sm font-black" aria-live="polite">{message}</p>}
-
-      {visibleRequests.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-black/15 bg-white p-8 text-center">
-          <p className="text-base font-black">אין בקשות מתאימות</p>
-          <p className="mt-1 text-sm font-bold text-black/45">נסו לשנות סינון סטטוס.</p>
-        </div>
-      ) : (
-        <section className="grid min-w-0 gap-4 xl:grid-cols-2">
-          {visibleRequests.map((request) => (
-            <article key={request.id} className="min-w-0 rounded-2xl border border-black/10 bg-white p-4 shadow-[0_18px_54px_rgba(0,0,0,0.05)]">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="break-words text-base font-black">{request.businessName}</p>
-                  <p className="mt-1 break-words text-xs font-bold text-black/50">{request.businessType} · {request.contactName} · {request.phone}</p>
-                  <p className="break-words text-xs font-bold text-black/45">{request.email}</p>
-                </div>
-                <span className="shrink-0 rounded-full bg-[#e6e1d8] px-3 py-1 text-xs font-black">{statusLabels[request.status]}</span>
-              </div>
-
-              <div className="mt-3 grid gap-2 text-xs font-bold text-black/60 md:grid-cols-2">
-                <Info label="שם לחשבונית" value={request.invoiceName || request.businessName} />
-                <Info label="כתובת" value={request.address} />
-                <Info label="הנהלת חשבונות" value={[request.accountingContactName, request.accountingEmail, request.accountingPhone].filter(Boolean).join(' · ') || 'לא נמסר'} />
-                <Info label="נשלח" value={new Intl.DateTimeFormat('he-IL', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(request.createdAt))} />
-              </div>
-
-              {(request.deliveryNotes || request.openingOrderNotes) && (
-                <div className="mt-3 rounded-xl bg-[#f7f5f1] p-3 text-sm font-bold leading-6 text-black/65">
-                  {request.deliveryNotes && <p><b>חלוקה:</b> {request.deliveryNotes}</p>}
-                  {request.openingOrderNotes && <p><b>פתיחה:</b> {request.openingOrderNotes}</p>}
-                </div>
-              )}
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <a href={buildWhatsAppUrl(request.phone, buildRegistrationInviteMessage(origin))} target="_blank" rel="noreferrer" className={secondaryButtonClass}>
-                  <MessageCircle aria-hidden="true" size={14} /> שלח קישור הרשמה
-                </a>
-                <a href={buildWhatsAppUrl(request.phone, buildLoginInviteMessage(origin))} target="_blank" rel="noreferrer" className={secondaryButtonClass}>
-                  <LogIn aria-hidden="true" size={14} /> שלח קישור כניסה
-                </a>
-              </div>
-
-              {request.convertedCustomerId ? (
-                <Link href={`/admin/customers/${request.convertedCustomerId}`} className="mt-3 inline-flex min-h-10 items-center justify-center rounded-full bg-black px-4 text-sm font-black text-white">
-                  צפייה בלקוח
-                </Link>
-              ) : (
-                <div className="mt-4 space-y-3 border-t border-black/10 pt-3">
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => run(request.id, () => updateRegistrationStatusAction({ id: request.id, status: 'CONTACTED' }), 'הבקשה סומנה כנוצר קשר.')}
-                      disabled={isPending && pendingId === request.id}
-                      className="inline-flex min-h-9 flex-1 items-center justify-center gap-1 rounded-full bg-[#e6e1d8] px-3 text-xs font-black hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-black/25 sm:flex-none"
-                    >
-                      <PhoneCall aria-hidden="true" size={14} /> נוצר קשר
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => run(request.id, () => updateRegistrationStatusAction({ id: request.id, status: 'ARCHIVED' }), 'הבקשה הועברה לארכיון.')}
-                      disabled={isPending && pendingId === request.id}
-                      className="inline-flex min-h-9 flex-1 items-center justify-center gap-1 rounded-full bg-white px-3 text-xs font-black ring-1 ring-black/10 hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-black/25 sm:flex-none"
-                    >
-                      <Archive aria-hidden="true" size={14} /> ארכיון
-                    </button>
-                  </div>
-
-                  <form
-                    className="grid min-w-0 gap-2 md:grid-cols-2 md:items-end"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      const form = new FormData(event.currentTarget);
-                      run(
-                        request.id,
-                        () =>
-                          convertRegistrationToCustomerAction({
-                            requestId: request.id,
-                            routeId: stringValue(form, 'routeId'),
-                            priceListId: stringValue(form, 'priceListId'),
-                          }),
-                        'הבקשה הומרה ללקוח פעיל. קישור להגדרת חשבון נשלח לאימייל הלקוח.',
-                      );
-                    }}
-                  >
-                    <Select name="routeId" label="קו חלוקה" options={data.routes.map((route) => ({ value: route.id, label: route.name }))} />
-                    <Select name="priceListId" label="מחירון" options={data.priceLists.map((priceList) => ({ value: priceList.id, label: `${priceList.name}${priceList.isDefault ? ' · ברירת מחדל' : ''}` }))} />
-                    <button type="submit" disabled={isPending && pendingId === request.id} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-full bg-black px-3 text-xs font-black text-white focus-visible:ring-2 focus-visible:ring-black/25 disabled:bg-black/30 md:col-span-2">
-                      <UserPlus aria-hidden="true" size={14} /> פתיחת לקוח ושליחת קישור מאובטח
-                    </button>
-                  </form>
-                </div>
-              )}
-            </article>
-          ))}
-        </section>
-      )}
+        )}
+      </Panel>
     </div>
   );
 }
 
-function ShareCard({
-  title,
-  description,
-  url,
-  copied,
-  onCopy,
-  whatsappHref,
-  whatsappLabel,
-  icon = 'link',
-}: {
-  title: string;
-  description: string;
-  url: string;
-  copied: boolean;
-  onCopy: () => void;
-  whatsappHref: string;
-  whatsappLabel: string;
-  icon?: 'link' | 'login';
-}) {
+function RequestCard({ request, data, action }: { request: Request; data: Data; action: ReturnType<typeof useServerAction> }) {
+  const status = statusLabels[request.status];
+  const setStatus = (next: 'CONTACTED' | 'ARCHIVED') =>
+    action.run(() => updateRegistrationStatusAction({ id: request.id, status: next }), { success: next === 'ARCHIVED' ? 'הבקשה הועברה לארכיון.' : 'סומן שנוצר קשר.' }, `${request.id}:${next}`);
+
   return (
-    <div className="rounded-2xl bg-[#f7f5f1] p-3">
-      <div className="flex items-start gap-2">
-        <span className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-black ring-1 ring-black/10">
-          {icon === 'login' ? <LogIn aria-hidden="true" size={15} /> : <Link2 aria-hidden="true" size={15} />}
+    <details className="group">
+      <summary className="grid cursor-pointer list-none gap-1 px-4 py-3 hover:bg-[var(--pantry-soft)] md:grid-cols-[1fr_10rem_7rem]">
+        <span>
+          <span className="block font-medium">{request.businessName}</span>
+          <span className="text-xs text-black/55">{request.contactName} · <span dir="ltr">{request.phone}</span> · {request.email}</span>
         </span>
-        <div className="min-w-0">
-          <p className="text-sm font-black">{title}</p>
-          <p className="mt-0.5 text-xs font-bold text-black/50">{description}</p>
+        <span className="text-xs text-black/55">{request.businessType} · {formatDateTime(request.createdAt)}</span>
+        <Badge tone={status.tone}>{status.label}</Badge>
+      </summary>
+      <div className="space-y-3 border-t border-[var(--pantry-line)] bg-[var(--pantry-soft)] px-4 py-4 text-sm">
+        <dl className="grid gap-2 text-xs md:grid-cols-2">
+          <Info label="כתובת" value={request.address} />
+          <Info label="שם לחשבונית" value={request.invoiceName ?? request.businessName} />
+          <Info label="הנהלת חשבונות" value={[request.accountingContactName, request.accountingEmail, request.accountingPhone].filter(Boolean).join(' · ') || '—'} />
+          {request.deliveryNotes && <Info label="אילוצי חלוקה" value={request.deliveryNotes} />}
+          {request.openingOrderNotes && <Info label="להזמנה ראשונה" value={request.openingOrderNotes} />}
+        </dl>
+
+        <div className="flex flex-wrap gap-2">
+          <a href={`tel:${request.phone}`} className={buttonClassName({ variant: 'outline', size: 'sm' })}><PhoneCall size={13} /> חיוג</a>
+          <a href={buildWhatsAppUrl(request.phone, `שלום ${request.contactName}, כאן ליבני'ס – קיבלנו את בקשת ההצטרפות של ${request.businessName}.`)} target="_blank" rel="noreferrer" className={buttonClassName({ variant: 'outline', size: 'sm' })}>
+            <MessageCircle size={13} /> וואטסאפ
+          </a>
+          {request.convertedCustomerId ? (
+            <Link href={paths.admin.customer(request.convertedCustomerId)} className={buttonClassName({ size: 'sm' })}>לכרטיס הלקוח</Link>
+          ) : (
+            <>
+              {request.status === 'PENDING' && <Button size="sm" variant="secondary" icon={<PhoneCall size={13} />} pending={action.isPending(`${request.id}:CONTACTED`)} onClick={() => setStatus('CONTACTED')}>סימון: נוצר קשר</Button>}
+              <Button size="sm" variant="ghost" icon={<Archive size={13} />} pending={action.isPending(`${request.id}:ARCHIVED`)} onClick={() => setStatus('ARCHIVED')}>לארכיון</Button>
+            </>
+          )}
         </div>
+
+        {!request.convertedCustomerId && (
+          <form
+            className="grid gap-2 rounded-md border border-[var(--pantry-line)] bg-white p-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const form = new FormData(event.currentTarget);
+              action.run(
+                () => convertRegistrationToCustomerAction({ requestId: request.id, routeId: formValue.text(form, 'routeId'), priceListId: formValue.text(form, 'priceListId') }),
+                { success: `נפתח לקוח והקישור להגדרת סיסמה נשלח ל-${request.email}.` },
+                `${request.id}:convert`,
+              );
+            }}
+          >
+            <SelectField name="routeId" label="קו חלוקה" options={data.routes.map((route) => ({ value: route.id, label: route.name }))} />
+            <SelectField name="priceListId" label="מחירון" defaultValue={data.priceLists.find((list) => list.isDefault)?.id} options={data.priceLists.map((list) => ({ value: list.id, label: list.name }))} />
+            <Button type="submit" icon={<UserPlus size={15} />} pending={action.isPending(`${request.id}:convert`)} disabled={data.routes.length === 0}>פתיחת לקוח</Button>
+          </form>
+        )}
       </div>
-      <p className="mt-3 break-all rounded-xl bg-white px-3 py-2 text-xs font-bold text-black/70 ring-1 ring-black/5" dir="ltr">
-        {url}
-      </p>
-      <div className="mt-2 flex flex-wrap gap-2">
-        <button type="button" onClick={onCopy} className={secondaryButtonClass}>
-          {copied ? <Check aria-hidden="true" size={14} /> : <Copy aria-hidden="true" size={14} />}
-          {copied ? 'הועתק' : 'העתק קישור'}
-        </button>
-        <a href={whatsappHref} target="_blank" rel="noreferrer" className={secondaryButtonClass}>
-          <MessageCircle aria-hidden="true" size={14} /> {whatsappLabel}
-        </a>
-      </div>
+    </details>
+  );
+}
+
+function ShareRow({ title, url, message }: { title: string; url: string; message: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
+      <span className="w-14 text-xs font-semibold">{title}</span>
+      <span className="min-w-0 flex-1 truncate text-xs text-black/55" dir="ltr">{url}</span>
+      <Button
+        size="sm"
+        variant="outline"
+        icon={copied ? <Check size={13} /> : <Copy size={13} />}
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(url);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1800);
+          } catch {
+            window.prompt('העתיקו את הקישור:', url);
+          }
+        }}
+      >
+        {copied ? 'הועתק' : 'העתקה'}
+      </Button>
+      <a href={buildWhatsAppUrl(null, message)} target="_blank" rel="noreferrer" className={buttonClassName({ variant: 'outline', size: 'sm' })}>
+        <MessageCircle size={13} /> שליחה בוואטסאפ
+      </a>
     </div>
   );
 }
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <p className="min-w-0">
-      <span className="block text-[11px] font-black text-black/40">{label}</span>
-      <span className="break-words">{value}</span>
-    </p>
+    <div className="min-w-0">
+      <dt className="text-[11px] font-semibold text-black/45">{label}</dt>
+      <dd className="break-words">{value}</dd>
+    </div>
   );
 }
-
-function Select({ name, label, options }: { name: string; label: string; options: { value: string; label: string }[] }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-black text-black/50">{label}</span>
-      <select name={name} className={fieldClass}>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>{option.label}</option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function stringValue(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === 'string' ? value : '';
-}
-
-const fieldClass = 'w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-black focus:ring-2 focus:ring-black/10';
-
-const secondaryButtonClass =
-  'inline-flex min-h-9 items-center justify-center gap-1 rounded-full bg-white px-3 text-xs font-black ring-1 ring-black/10 hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-black/25';

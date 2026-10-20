@@ -1,77 +1,86 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { FormEvent, useState, useTransition } from 'react';
+import { UserPlus } from 'lucide-react';
+import { useServerAction } from '@/components/hooks/useServerAction';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { formValue, TextField } from '@/components/ui/Field';
+import { ActionFeedback } from '@/components/ui/Notice';
+import { Panel, PanelHeader } from '@/components/ui/Panel';
 import { inviteCustomerUserAction, resendCustomerUserSetupAction, setCustomerUserActiveAction } from '../actions';
-import { completeSuccessfulInvite, refreshAfterInviteFailure } from './customer-users-manager-helpers';
 
 type Account = { id: string; name: string; email: string; isActive: boolean; setupComplete: boolean };
 
+/** Login accounts of one company. Invites are emailed as one-time links; the team never sees passwords. */
 export function CustomerUsersManager({ customerId, accounts }: { customerId: string; accounts: Account[] }) {
-  const [message, setMessage] = useState('');
-  const [pending, startTransition] = useTransition();
-  const router = useRouter();
+  const action = useServerAction();
+
   return (
-    <section className="rounded-2xl border border-black/10 bg-white p-4 shadow-[0_18px_54px_rgba(0,0,0,0.05)]">
-      <h2 className="text-base font-black">משתמשי החברה</h2>
-      <ul className="mt-2 space-y-2">
+    <Panel>
+      <PanelHeader title="משתמשים עם גישה" description="כל משתמש מקבל קישור אישי להגדרת סיסמה במייל." />
+      <ul className="divide-y divide-[var(--pantry-line)]">
+        {accounts.length === 0 && <li className="p-4 text-xs text-black/50">עדיין אין משתמשים. הוסיפו משתמש כדי שהלקוח יוכל להזמין באתר.</li>}
         {accounts.map((account) => (
-          <li key={account.id} className="rounded-xl bg-[#e6e1d8] p-3 text-sm">
-            <p className="font-black">{account.name}</p>
-            <p className="break-all font-bold text-black/60" dir="ltr">{account.email}</p>
-            <p className="mt-1 text-xs font-black">{!account.isActive ? 'מושבת' : account.setupComplete ? 'פעיל' : 'ממתין להגדרת סיסמה'}</p>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => startTransition(async () => {
-                const result = await setCustomerUserActiveAction({ customerId, userId: account.id, isActive: !account.isActive });
-                setMessage(result.ok ? (account.isActive ? 'המשתמש הושבת וכל החיבורים שלו בוטלו.' : 'המשתמש הופעל מחדש.') : result.error);
-                if (result.ok) router.refresh();
-              })}
-              className="mt-2 text-xs font-black underline underline-offset-4"
-            >
-              {account.isActive ? 'השבתת משתמש' : 'הפעלת משתמש'}
-            </button>
-            {account.isActive && !account.setupComplete && (
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => startTransition(async () => {
-                  const result = await resendCustomerUserSetupAction({ customerId, userId: account.id });
-                  setMessage(result.ok ? 'נשלח קישור מאובטח חדש.' : result.error);
-                })}
-                className="mt-2 mr-3 text-xs font-black underline underline-offset-4"
+          <li key={account.id} className="space-y-1.5 px-4 py-3 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-semibold">{account.name}</p>
+              <Badge tone={!account.isActive ? 'muted' : account.setupComplete ? 'success' : 'warning'}>
+                {!account.isActive ? 'מושבת' : account.setupComplete ? 'פעיל' : 'טרם הגדיר סיסמה'}
+              </Badge>
+            </div>
+            <p className="break-all text-xs text-black/60" dir="ltr">{account.email}</p>
+            <div className="flex flex-wrap gap-1">
+              {account.isActive && !account.setupComplete && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  pending={action.isPending(`resend:${account.id}`)}
+                  disabled={action.pending}
+                  onClick={() => action.run(() => resendCustomerUserSetupAction({ customerId, userId: account.id }), { success: 'נשלח קישור חדש במייל.' }, `resend:${account.id}`)}
+                >
+                  שליחת קישור מחדש
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                pending={action.isPending(`toggle:${account.id}`)}
+                disabled={action.pending}
+                onClick={() => {
+                  if (account.isActive && !window.confirm(`להשבית את ${account.name}? המשתמש יתנתק מיד.`)) return;
+                  action.run(
+                    () => setCustomerUserActiveAction({ customerId, userId: account.id, isActive: !account.isActive }),
+                    { success: account.isActive ? 'המשתמש הושבת ונותק מכל המכשירים.' : 'המשתמש הופעל מחדש.' },
+                    `toggle:${account.id}`,
+                  );
+                }}
               >
-                שליחת קישור מחדש
-              </button>
-            )}
+                {account.isActive ? 'השבתה' : 'הפעלה'}
+              </Button>
+            </div>
           </li>
         ))}
       </ul>
-      <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        const form = event.currentTarget;
-        const values = new FormData(form);
-        startTransition(async () => {
-          const result = await inviteCustomerUserAction({ customerId, name: values.get('name'), email: values.get('email') });
-          if (result.ok) {
-            setMessage('המשתמש נוסף ונשלח אליו קישור להגדרת סיסמה.');
-            completeSuccessfulInvite(form, router);
-          }
-          else {
-            setMessage(result.error);
-            refreshAfterInviteFailure(router);
-          }
-        });
-      }} className="mt-4 space-y-2 border-t border-black/10 pt-4">
-        <p className="text-xs font-black">הוספת משתמש מורשה נוסף</p>
-        <input name="name" required placeholder="שם מלא" className={fieldClass} />
-        <input name="email" type="email" required placeholder="אימייל" autoComplete="off" className={fieldClass} dir="ltr" />
-        <button disabled={pending} className="min-h-10 w-full rounded-full bg-black px-4 text-xs font-black text-white disabled:bg-black/30">{pending ? 'שולחים...' : 'הוספה ושליחת קישור'}</button>
-        {message && <p role="status" className="rounded-xl bg-white p-2 text-xs font-bold">{message}</p>}
+
+      <form
+        className="space-y-2 border-t border-[var(--pantry-line)] p-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const form = event.currentTarget;
+          const values = new FormData(form);
+          action.run(
+            () => inviteCustomerUserAction({ customerId, name: formValue.text(values, 'name'), email: formValue.text(values, 'email') }),
+            { success: 'המשתמש נוסף ונשלח אליו קישור להגדרת סיסמה.', onSuccess: () => form.reset() },
+            'invite',
+          );
+        }}
+      >
+        <p className="text-xs font-semibold">הוספת משתמש</p>
+        <TextField name="name" label="שם מלא" required autoComplete="off" />
+        <TextField name="email" label="אימייל" type="email" required autoComplete="off" dir="ltr" />
+        <Button type="submit" fullWidth pending={action.isPending('invite')} disabled={action.pending} icon={<UserPlus size={15} />}>הוספה ושליחת קישור</Button>
+        <ActionFeedback feedback={action.feedback} />
       </form>
-    </section>
+    </Panel>
   );
 }
-
-const fieldClass = 'h-10 w-full rounded-xl border border-black/12 bg-white px-3 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-black/25';

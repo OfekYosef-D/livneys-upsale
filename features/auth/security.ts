@@ -1,20 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { z } from 'zod';
+export { BCRYPT_MAX_PASSWORD_BYTES, isBcryptPasswordLengthSafe } from './password-policy';
 
-export const BCRYPT_MAX_PASSWORD_BYTES = 72;
+export const BCRYPT_ROUNDS = 12;
 
-export function isBcryptPasswordLengthSafe(value: string): boolean {
-  return Buffer.byteLength(value, 'utf8') <= BCRYPT_MAX_PASSWORD_BYTES;
-}
-
-export const passwordSchema = z.string()
-  .min(12, 'הסיסמה חייבת להכיל לפחות 12 תווים.')
-  .max(128, 'הסיסמה ארוכה מדי.')
-  .regex(/[a-z]/, 'הסיסמה חייבת לכלול אות קטנה באנגלית.')
-  .regex(/[A-Z]/, 'הסיסמה חייבת לכלול אות גדולה באנגלית.')
-  .regex(/[0-9]/, 'הסיסמה חייבת לכלול ספרה.')
-  .regex(/[^A-Za-z0-9]/, 'הסיסמה חייבת לכלול תו מיוחד.')
-  .refine(isBcryptPasswordLengthSafe, 'הסיסמה ארוכה מ-72 בתים ואינה נתמכת באופן בטוח.');
+/** Compared against when the account does not exist, so response time does not reveal which emails are registered. */
+export const DUMMY_PASSWORD_HASH = '$2b$12$lyBsPWU.S81FtafGOY3Or.lwCiOJSeIFoQAVRLMFCma6qvYPCK2Zy';
 
 export function createRawAuthToken(): string {
   return randomBytes(32).toString('base64url');

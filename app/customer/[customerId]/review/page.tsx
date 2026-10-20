@@ -1,25 +1,17 @@
-import { ReviewOrderClient } from '@/components/customer/ReviewOrderClient';
-import { getCustomerReviewData } from '@/features/customer-portal/queries';
+import { redirect } from 'next/navigation';
+import { ReviewOrderClient } from '@/features/customer-portal/components/ReviewOrderClient';
+import { getCustomerPortalData } from '@/features/customer-portal/queries';
 import { requireCustomerPage } from '@/lib/authorization';
-import { getEffectiveVatRate } from '@/features/orders/tax-rates';
+import { paths } from '@/lib/paths';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Review(props: { params: Promise<{ customerId: string }> }) {
-  const params = await props.params;
-  await requireCustomerPage(params.customerId);
-  const [data, vatRate] = await Promise.all([
-    getCustomerReviewData(params.customerId),
-    getEffectiveVatRate(new Date()),
-  ]);
+export default async function CustomerReviewPage(props: { params: Promise<{ customerId: string }> }) {
+  const { customerId } = await props.params;
+  await requireCustomerPage(customerId);
+  const data = await getCustomerPortalData(customerId);
 
-  return (
-    <ReviewOrderClient
-      customer={data.customer}
-      route={data.route}
-      products={data.products}
-      lastOrder={data.lastOrder}
-      vatRatePercent={vatRate.ratePercent}
-    />
-  );
+  if (data.activeOrder) redirect(paths.customer.order(customerId, data.activeOrder.orderNumber));
+
+  return <ReviewOrderClient data={data} />;
 }

@@ -1,63 +1,46 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
-import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
-import { assertAdminAction } from '@/lib/authorization';
+import { NotFoundError } from '@/lib/errors';
 import { prisma } from '@/lib/db';
-import { retryNotificationJob, sendNotificationJobNow } from './jobs';
+import { adminAction } from '@/lib/server-action';
+import { fields, z } from '@/lib/validation';
+import { resendNotificationJob } from './jobs';
 
-const retryNotificationJobSchema = z.object({
-  jobId: z.string().trim().min(1),
-});
-
-const updateReminderRuleSchema = z.object({
-  ruleId: z.string().trim().min(1),
-  name: z.string().trim().min(1).max(160),
-  hoursBeforeDelivery: z.coerce.number().int().min(1).max(720),
+const reminderRuleSchema = z.object({
+  name: fields.requiredText(160),
+  routeId: fields.optionalText(120),
+  channel: z.enum(['EMAIL', 'WHATSAPP']),
+  hoursBeforeDelivery: z.coerce.number().int().min(1, 'לפחות שעה אחת.').max(720, 'עד 30 יום.'),
   isActive: z.boolean(),
 });
 
-export async function retryNotificationJobAction(input: unknown): Promise<ActionResult<{ jobId: string }>> {
-  try {
-    const parsed = retryNotificationJobSchema.parse(input);
-    await assertAdminAction();
-    await retryNotificationJob(parsed.jobId);
-    revalidatePath('/admin/notifications');
-    return actionOk({ jobId: parsed.jobId });
-  } catch (error) {
-    return actionError(error);
-  }
-}
+export const sendNotificationJobNowAction = adminAction(z.object({ jobId: fields.id }), async ({ jobId }) => {
+  const result = await resendNotificationJob(jobId);
+  return { jobId, status: result.processed ? result.status : 'PENDING' };
+});
 
-export async function sendNotificationJobNowAction(input: unknown): Promise<ActionResult<{ jobId: string }>> {
-  try {
-    const parsed = retryNotificationJobSchema.parse(input);
-    await assertAdminAction();
-    await sendNotificationJobNow(parsed.jobId);
-    revalidatePath('/admin/notifications');
-    return actionOk({ jobId: parsed.jobId });
-  } catch (error) {
-    return actionError(error);
-  }
-}
+export const createReminderRuleAction = adminAction(reminderRuleSchema, async (input, ctx) => {
+  await assertRouteExists(input.routeId);
+  return prisma.$transaction(async (tx) => {
+    const rule = await tx.reminderRule.create({ data: input, select: { id: true } });
+    await ctx.audit(tx, { entityType: 'ReminderRule', entityId: rule.id, action: 'REMINDER_RULE_CREATED', after: input });
+    return { ruleId: rule.id };
+  });
+});
 
-export async function updateReminderRuleAction(input: unknown): Promise<ActionResult<{ ruleId: string }>> {
-  try {
-    const parsed = updateReminderRuleSchema.parse(input);
-    await assertAdminAction();
-    const rule = await prisma.reminderRule.update({
-      where: { id: parsed.ruleId },
-      data: {
-        name: parsed.name,
-        hoursBeforeDelivery: parsed.hoursBeforeDelivery,
-        isActive: parsed.isActive,
-      },
-      select: { id: true },
-    });
-    revalidatePath('/admin/notifications');
-    return actionOk({ ruleId: rule.id });
-  } catch (error) {
-    return actionError(error);
+export const updateReminderRuleAction = adminAction(reminderRuleSchema.extend({ ruleId: fields.id }), async ({ ruleId, ...data }, ctx) => {
+  await assertRouteExists(data.routeId);
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.reminderRule.findUnique({ where: { id: ruleId } });
+    if (!before) throw new NotFoundError('חוק התזכורת לא נמצא.');
+    await tx.reminderRule.update({ where: { id: ruleId }, data });
+    await ctx.audit(tx, { entityType: 'ReminderRule', entityId: ruleId, action: 'REMINDER_RULE_UPDATED', before, after: data });
+    return { ruleId };
+  });
+});
+
+async function assertRouteExists(routeId: string | null) {
+  if (routeId && !(await prisma.route.findUnique({ where: { id: routeId }, select: { id: true } }))) {
+    throw new NotFoundError('הקו לא נמצא.');
   }
 }

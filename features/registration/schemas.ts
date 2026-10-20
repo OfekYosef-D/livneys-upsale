@@ -1,55 +1,31 @@
-import { z } from 'zod';
-
-export const registrationStatuses = ['PENDING', 'CONTACTED', 'CONVERTED', 'ARCHIVED'] as const;
-
-const requiredText = (max: number) => z.string().trim().min(1).max(max);
-
-const nullableText = (max: number) =>
-  z.preprocess((value) => {
-    if (value === undefined || value === null) return null;
-    if (typeof value !== 'string') return value;
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : null;
-  }, z.string().max(max).nullable());
-
-const requiredEmail = z.string().trim().toLowerCase().email().max(254);
-
-const nullableEmail = z.preprocess((value) => {
-  if (value === undefined || value === null) return null;
-  if (typeof value !== 'string') return value;
-  const trimmed = value.trim().toLowerCase();
-  return trimmed.length > 0 ? trimmed : null;
-}, z.string().email().max(254).nullable());
+import { fields, z } from '@/lib/validation';
 
 export const companyRegistrationSchema = z.object({
-  businessName: requiredText(160),
-  invoiceName: nullableText(160),
-  contactName: requiredText(120),
-  phone: requiredText(40),
-  email: requiredEmail,
-  accountingContactName: nullableText(120),
-  accountingEmail: nullableEmail,
-  accountingPhone: nullableText(40),
-  businessType: requiredText(80),
-  address: requiredText(240),
-  deliveryNotes: nullableText(1000),
-  openingOrderNotes: nullableText(1000),
-  website: z.string().max(0).optional().default(''),
+  businessName: fields.requiredText(160),
+  invoiceName: fields.optionalText(160),
+  contactName: fields.requiredText(120),
+  phone: fields.phone,
+  email: fields.email,
+  accountingContactName: fields.optionalText(120),
+  accountingEmail: fields.optionalEmail,
+  accountingPhone: fields.optionalText(40),
+  businessType: fields.requiredText(80),
+  address: fields.requiredText(240),
+  deliveryNotes: fields.optionalText(1000),
+  openingOrderNotes: fields.optionalText(1000),
+  /** Honeypot: real users never see or fill this field. Checked after rate limiting, with a generic error. */
+  website: z.string().max(500).optional().default(''),
   challengeToken: z.string().max(2048).optional().default(''),
 });
 
 export const updateRegistrationStatusSchema = z.object({
-  id: requiredText(120),
-  status: z.enum(registrationStatuses),
-  internalNote: nullableText(1000).optional(),
+  id: fields.id,
+  status: z.enum(['CONTACTED', 'ARCHIVED', 'PENDING']),
+  internalNote: fields.optionalText(1000).optional(),
 });
 
 export const convertRegistrationSchema = z.object({
-  requestId: requiredText(120),
-  routeId: requiredText(120),
-  priceListId: requiredText(120),
+  requestId: fields.id,
+  routeId: fields.id,
+  priceListId: fields.id,
 });
-
-export type CompanyRegistrationInput = z.input<typeof companyRegistrationSchema>;
-export type UpdateRegistrationStatusInput = z.infer<typeof updateRegistrationStatusSchema>;
-export type ConvertRegistrationInput = z.infer<typeof convertRegistrationSchema>;

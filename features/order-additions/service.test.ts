@@ -1,95 +1,45 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { asMock } from '@/test/prisma-mock';
 
-vi.mock('../../lib/db', () => ({
-  prisma: {
-    order: { findFirst: vi.fn() },
-    $transaction: vi.fn(),
-  },
-}));
-
+vi.mock('@/lib/db', async () => (await import('@/test/prisma-mock')).prismaModule());
 vi.mock('../orders/service', () => ({
-  getOrderWriteContext: vi.fn(),
+  getOrderWriteContext: vi.fn(async () => ({
+    customerId: 'cust-1',
+    routeId: 'route-1',
+    vatRatePercent: 18,
+    schedule: { deliveryAt: new Date(), cutoffAt: new Date() },
+    pricing: {
+      target: { customerId: 'cust-1', routeId: 'route-1', priceListId: 'l' },
+      products: [{ id: 'p1', name: 'P', category: 'C', basePrice: 100, isActive: true, minQty: 1, orderMultiple: 1 }],
+      priceListItems: [],
+      promotions: [],
+    },
+  })),
 }));
 
-vi.mock('./persistence', async (importOriginal) => {
-  const original = await importOriginal<typeof import('./persistence')>();
-  return { ...original, persistPendingAdditionRequest: vi.fn() };
-});
-
-const { prisma } = await import('../../lib/db');
-const { getOrderWriteContext } = await import('../orders/service');
-const { persistPendingAdditionRequest } = await import('./persistence');
+const { prisma } = await import('@/lib/db');
 const { submitOrderAddition } = await import('./service');
-
-const context = {
-  vatRatePercent: 19,
-  customer: { id: 'cust-001', routeId: 'route-001', priceListId: 'price-list-001', isActive: true },
-  route: {
-    id: 'route-001', isActive: true,
-    nextDeliveryAt: new Date('2026-08-19T08:00:00.000Z'),
-    nextCutoffAt: new Date('2026-08-17T08:00:00.000Z'),
-  },
-  products: [{ id: 'product-001', name: 'טחינה', category: 'ממרחים', basePrice: 100, isActive: true, minQty: 1, orderMultiple: 1 }],
-  priceListItems: [{ productId: 'product-001', price: 100 }],
-  promotions: [],
-};
+const db = asMock(prisma);
+const audit = vi.fn();
 
 describe('order addition service', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => db.$reset());
 
-  it('snapshots additions with the original order payment term in a serializable transaction', async () => {
-    vi.mocked(prisma.order.findFirst).mockResolvedValue({
-      id: 'order-001', customerId: 'cust-001', status: 'APPROVED', revision: 7,
-      vatRatePercent: 17,
-      paymentTerm: 'IMMEDIATE_OR_CASH', deliveryWindowStart: context.route.nextDeliveryAt,
-      lines: [{ productId: 'product-001', quantity: 2 }],
-    } as never);
-    vi.mocked(getOrderWriteContext).mockResolvedValue(context);
-    vi.mocked(persistPendingAdditionRequest).mockResolvedValue({
-      request: { id: 'request-001', status: 'PENDING', revision: 1 }, replayed: false,
-    } as never);
-    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback({} as never));
+  it('prices the addition at the VAT rate the original order was placed with', async () => {
+    db.order.findFirst.mockResolvedValue({ id: 'order-1', status: 'SUBMITTED', paymentTerm: 'NET_30', vatRatePercent: 17, lines: [] });
+    db.orderAdditionRequest.findFirst.mockResolvedValue(null);
+    db.order.findUnique.mockResolvedValue({ customerId: 'cust-1', status: 'SUBMITTED', revision: 1 });
+    db.orderAdditionRequest.create.mockResolvedValue({ id: 'req-1' });
+    db.orderAdditionRequest.findUniqueOrThrow.mockResolvedValue({ id: 'req-1' });
 
-    const result = await submitOrderAddition({
-      customerId: 'cust-001', orderId: 'order-001',
-      idempotencyKey: '1f4106db-26c3-49ed-9cf6-c625dd18fc73',
-      items: [{ productId: 'product-001', quantity: 2 }],
-      now: new Date('2026-08-11T12:00:00.000Z'),
-    });
-
-    expect(result).toEqual({ requestId: 'request-001', status: 'PENDING', replayed: false });
-    expect(persistPendingAdditionRequest).toHaveBeenCalledWith({}, expect.objectContaining({
-      paymentTerm: 'IMMEDIATE_OR_CASH', orderRevision: 7,
-      snapshot: expect.objectContaining({ paymentDiscountTotal: 10, vatRatePercent: 17, vatTotal: 32.3, totalIncludingVat: 222.3 }),
-    }));
-    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'Serializable' });
+    await expect(submitOrderAddition({ customerId: 'cust-1', orderId: 'order-1', idempotencyKey: 'k', items: [{ productId: 'p1', quantity: 1 }], actor: { userId: 'u', audit } }))
+      .resolves.toEqual({ requestId: 'req-1', replayed: false });
+    expect(db.orderAdditionRequest.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ vatRatePercent: 17, vatTotal: 17, totalIncludingVat: 117 }) }));
   });
 
-  it('does not allow a customer to add to another company order', async () => {
-    vi.mocked(prisma.order.findFirst).mockResolvedValue(null);
-    await expect(submitOrderAddition({
-      customerId: 'cust-002', orderId: 'order-001',
-      idempotencyKey: '1f4106db-26c3-49ed-9cf6-c625dd18fc73',
-      items: [{ productId: 'product-001', quantity: 2 }], now: new Date(),
-    })).rejects.toMatchObject({ code: 'NOT_FOUND' });
-  });
-
-  it('retries a serializable race and returns the single open request', async () => {
-    vi.mocked(prisma.order.findFirst).mockResolvedValue({
-      id: 'order-001', customerId: 'cust-001', status: 'APPROVED', revision: 7,
-      paymentTerm: 'NET_30', deliveryWindowStart: context.route.nextDeliveryAt,
-      lines: [],
-    } as never);
-    vi.mocked(getOrderWriteContext).mockResolvedValue(context);
-    vi.mocked(prisma.$transaction)
-      .mockRejectedValueOnce({ code: 'P2034' })
-      .mockImplementationOnce(async (callback) => callback({} as never));
-    vi.mocked(persistPendingAdditionRequest).mockResolvedValue({ request: { id: 'request-001', status: 'PENDING' }, replayed: false } as never);
-
-    await expect(submitOrderAddition({
-      customerId: 'cust-001', orderId: 'order-001', idempotencyKey: '1f4106db-26c3-49ed-9cf6-c625dd18fc73',
-      items: [{ productId: 'product-001', quantity: 2 }], now: new Date(),
-    })).resolves.toMatchObject({ requestId: 'request-001' });
-    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+  it('refuses an order of another customer', async () => {
+    db.order.findFirst.mockResolvedValue(null);
+    await expect(submitOrderAddition({ customerId: 'cust-1', orderId: 'x', idempotencyKey: 'k', items: [{ productId: 'p1', quantity: 1 }], actor: { userId: 'u', audit } }))
+      .rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });

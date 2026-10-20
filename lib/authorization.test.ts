@@ -135,4 +135,39 @@ describe('authorization helpers', () => {
 
     await expect(assertCustomerAction('cust-001')).rejects.toThrow(AuthorizationError);
   });
+
+  it('rejects a customer session once the user or the company is deactivated', async () => {
+    mockedGetServerSession.mockResolvedValue({
+      user: { id: 'user-cust-001', role: 'CUSTOMER', customerId: 'cust-001', sessionVersion: 1, mfaEnabled: false },
+      expires: '2026-06-27T00:00:00.000Z',
+    });
+    const active = { id: 'user-cust-001', role: 'CUSTOMER', customerId: 'cust-001', isActive: true, sessionVersion: 1, mfaEnabled: false };
+
+    userFindUnique.mockResolvedValueOnce({ ...active, isActive: false, customer: { isActive: true } });
+    await expect(assertCustomerAction('cust-001')).rejects.toThrow(AuthorizationError);
+    userFindUnique.mockResolvedValueOnce({ ...active, customer: { isActive: false } });
+    await expect(assertCustomerAction('cust-001')).rejects.toThrow(AuthorizationError);
+  });
+
+  it('rejects a session whose role no longer matches the stored user, and missing sessions', async () => {
+    mockedGetServerSession.mockResolvedValue({
+      user: { id: 'user-cust-001', role: 'ADMIN', customerId: null, sessionVersion: 1, mfaEnabled: false },
+      expires: '2026-06-27T00:00:00.000Z',
+    });
+    await expect(assertAdminAction()).rejects.toThrow(AuthorizationError);
+
+    mockedGetServerSession.mockResolvedValue(null);
+    await expect(assertAdminAction()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await expect(assertCustomerAction('cust-001')).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
+  it('explains a cross-account attempt in Hebrew', async () => {
+    mockedGetServerSession.mockResolvedValue({
+      user: { id: 'user-cust-001', role: 'CUSTOMER', customerId: 'cust-001', sessionVersion: 1, mfaEnabled: false },
+      expires: '2026-06-27T00:00:00.000Z',
+    });
+    await expect(assertCustomerAction('cust-002')).rejects.toMatchObject({
+      code: 'UNAUTHORIZED', message: 'אין גישה לחשבון לקוח אחר.',
+    });
+  });
 });

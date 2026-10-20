@@ -12,12 +12,5 @@
     "tag": "מעדניות ובתי קפה",
     "description": "קרם ארטישוק באריזה בוטיקית שמתאימה למדף פרימיום.",
     "productId": "prod-artichoke"
-  },
-  {
-    "id": "promo-tasting",
-    "title": "מארז טעימות",
-    "tag": "כניסה ללא חיכוך",
-    "description": "מארז מגוון ללקוחות שרוצים לבדוק מכירה לפני התחייבות גדולה.",
-    "productId": "prod-tasting-kit"
   }
 ]

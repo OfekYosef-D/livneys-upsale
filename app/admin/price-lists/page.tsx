@@ -1,17 +1,18 @@
 import { AdminShell } from '@/components/admin/AdminShell';
-import { AdminPriceListsManager } from '@/features/admin-crm/components/AdminCrmManagers';
+import { PriceListsManager } from '@/features/admin-crm/components/PriceListsManager';
 import { getPriceListManagementData } from '@/features/admin-crm/queries';
-import { requireAdmin } from '@/lib/admin-guard';
+import { requireAdminPage } from '@/lib/authorization';
+import { paths } from '@/lib/paths';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminPriceListsPage() {
-  await requireAdmin('/admin/price-lists');
+export default async function Page() {
+  await requireAdminPage(paths.admin.priceLists);
   const data = await getPriceListManagementData();
 
   return (
-    <AdminShell title="מחירונים" subtitle="ניהול מלא של מחירי מוצרים לפי מחירון, שכפול מחירונים ושיוך ללקוחות." activeHref="/admin/price-lists">
-      <AdminPriceListsManager data={data} />
+    <AdminShell title="מחירונים" activeHref={paths.admin.priceLists}>
+      <PriceListsManager data={data} />
     </AdminShell>
   );
 }

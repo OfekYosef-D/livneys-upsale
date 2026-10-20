@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { legalDocuments, LEGAL_DOCUMENT_SET_VERSION } from './documents';
-import { assertLegalDocumentsApprovedForProduction, recordOrderLegalAcceptances } from './acceptance';
+import { assertLegalDocumentsApprovedForProduction, hashLegalDocument, recordOrderLegalAcceptances } from './acceptance';
+import { getLegalDocument } from './documents';
 
 describe('versioned legal acceptance', () => {
   it('stores the version and SHA-256 hash of every displayed document', async () => {
@@ -29,16 +30,45 @@ describe('versioned legal acceptance', () => {
     await expect(recordOrderLegalAcceptances({ legalAcceptance: { createMany } } as never, {
       orderId: 'order-1', customerId: 'cust-1', userId: 'user-1', acceptedAt: new Date(),
       expectedDocumentSetVersion: 'previous-version',
-    })).rejects.toMatchObject({ code: 'STALE_VERSION' });
+    })).rejects.toMatchObject({
+      code: 'STALE_VERSION',
+      message: 'התנאים עודכנו מאז שפתחתם את המסך. רעננו ועברו שוב על הנוסח העדכני.',
+    });
     expect(createMany).not.toHaveBeenCalled();
   });
 
   it('blocks only a real production deployment until counsel-approved copy is declared', () => {
     expect(() => assertLegalDocumentsApprovedForProduction({ VERCEL_ENV: 'preview' })).not.toThrow();
-    expect(() => assertLegalDocumentsApprovedForProduction({ VERCEL_ENV: 'production' })).toThrow();
+    expect(() => assertLegalDocumentsApprovedForProduction({ VERCEL_ENV: 'production' })).toThrow(expect.objectContaining({
+      code: 'LEGAL_DOCUMENTS_NOT_APPROVED',
+      message: 'לא ניתן לקבל הזמנות לפני אישור ופרסום הנוסח המשפטי העדכני.',
+    }));
+    expect(() => assertLegalDocumentsApprovedForProduction({
+      VERCEL_ENV: 'production', LEGAL_DOCUMENTS_APPROVED_VERSION: 'older-version',
+    })).toThrow(expect.objectContaining({ code: 'LEGAL_DOCUMENTS_NOT_APPROVED' }));
     expect(() => assertLegalDocumentsApprovedForProduction({
       VERCEL_ENV: 'production',
       LEGAL_DOCUMENTS_APPROVED_VERSION: LEGAL_DOCUMENT_SET_VERSION,
     })).not.toThrow();
+  });
+
+  it('hashes each document deterministically and changes the hash when the wording changes', () => {
+    const [document] = legalDocuments;
+    expect(hashLegalDocument(document)).toBe(hashLegalDocument({ ...document }));
+    expect(hashLegalDocument({ ...document, sections: [...document.sections, { heading: 'x', body: 'y' }] }))
+      .not.toBe(hashLegalDocument(document));
+    expect(new Set(legalDocuments.map(hashLegalDocument)).size).toBe(legalDocuments.length);
+  });
+
+  it('resolves documents by slug only', () => {
+    expect(getLegalDocument('privacy')).toMatchObject({ type: 'PRIVACY_POLICY' });
+    expect(getLegalDocument('PRIVACY_POLICY')).toBeNull();
+  });
+
+  it('serves readable Hebrew copy (no mojibake)', () => {
+    for (const document of legalDocuments) {
+      expect(document.title).toMatch(/[֐-׿]/);
+      expect(JSON.stringify(document)).not.toMatch(/×|�/);
+    }
   });
 });

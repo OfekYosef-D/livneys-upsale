@@ -1,5 +1,7 @@
 import { AuthTokenType, Prisma } from '@prisma/client';
-import { prisma } from '../../lib/db';
+import { prisma } from '@/lib/db';
+import { AppError } from '@/lib/errors';
+import type { TransactionClient } from '@/lib/transactions';
 import { createRawAuthToken, hashAuthToken } from './security';
 
 const tokenTtlMs: Record<AuthTokenType, number> = {
@@ -7,43 +9,27 @@ const tokenTtlMs: Record<AuthTokenType, number> = {
   PASSWORD_RESET: 30 * 60 * 1000,
 };
 
-export async function issueAuthToken({
-  userId,
-  type,
-  baseUrl,
-  now = new Date(),
-}: {
-  userId: string;
-  type: AuthTokenType;
-  baseUrl: string;
-  now?: Date;
-}) {
-  return prisma.$transaction((tx) => issueAuthTokenInTransaction(tx, { userId, type, baseUrl, now }));
+export class InvalidAuthTokenError extends AppError {
+  constructor() {
+    super('INVALID_TOKEN', 'הקישור אינו תקף או שפג תוקפו. בקשו קישור חדש.');
+  }
 }
 
+export function issueAuthToken(input: { userId: string; type: AuthTokenType; baseUrl: string; now?: Date }) {
+  return prisma.$transaction((tx) => issueAuthTokenInTransaction(tx, input));
+}
+
+/**
+ * Only a hash is stored. Tokens are bound to the user's sessionVersion, so any password change
+ * or deactivation silently invalidates every outstanding link.
+ */
 export async function issueAuthTokenInTransaction(
-  tx: Prisma.TransactionClient,
-  {
-    userId,
-    type,
-    baseUrl,
-    now = new Date(),
-  }: {
-    userId: string;
-    type: AuthTokenType;
-    baseUrl: string;
-    now?: Date;
-  },
+  tx: TransactionClient,
+  { userId, type, baseUrl, now = new Date() }: { userId: string; type: AuthTokenType; baseUrl: string; now?: Date },
 ) {
   const user = await tx.user.findUnique({
     where: { id: userId },
-    select: {
-      sessionVersion: true,
-      isActive: true,
-      role: true,
-      passwordHash: true,
-      customer: { select: { isActive: true } },
-    },
+    select: { sessionVersion: true, isActive: true, role: true, passwordHash: true, customer: { select: { isActive: true } } },
   });
   if (
     !user
@@ -55,81 +41,20 @@ export async function issueAuthTokenInTransaction(
   }
 
   const rawToken = createRawAuthToken();
-  const tokenHash = hashAuthToken(rawToken);
   const expiresAt = new Date(now.getTime() + tokenTtlMs[type]);
-  const tokenRecord = await tx.authToken.create({
-    data: { userId, type, tokenHash, expiresAt, sessionVersion: user.sessionVersion },
+  const record = await tx.authToken.create({
+    data: { userId, type, tokenHash: hashAuthToken(rawToken), expiresAt, sessionVersion: user.sessionVersion },
   });
 
-  const path = type === 'PASSWORD_SETUP' ? '/setup-password' : '/reset-password';
-  const url = new URL(path, baseUrl);
+  const url = new URL(type === 'PASSWORD_SETUP' ? '/setup-password' : '/reset-password', baseUrl);
   url.searchParams.set('token', rawToken);
-  return { tokenId: tokenRecord.id, rawToken, url: url.toString(), expiresAt };
+  return { tokenId: record.id, rawToken, url: url.toString(), expiresAt };
 }
 
-export async function consumePasswordToken({
-  token,
-  type,
-  passwordHash,
-  now = new Date(),
-}: {
-  token: string;
-  type: AuthTokenType;
-  passwordHash: string;
-  now?: Date;
-}) {
-  return prisma.$transaction(async (tx) => {
-    const record = await tx.authToken.findUnique({
-      where: { tokenHash: hashAuthToken(token) },
-      include: { user: { include: { customer: true } } },
-    });
-    if (
-      !record
-      || record.type !== type
-      || record.usedAt
-      || record.expiresAt <= now
-      || !record.user.isActive
-      || record.sessionVersion !== record.user.sessionVersion
-      || (record.user.role === 'CUSTOMER' && !record.user.customer?.isActive)
-    ) {
-      throw new InvalidAuthTokenError();
-    }
+const tokenRecordInclude = { user: { include: { customer: { select: { isActive: true } } } } } as const;
+type TokenRecord = Prisma.AuthTokenGetPayload<{ include: typeof tokenRecordInclude }>;
 
-    const claimed = await tx.authToken.updateMany({
-      where: { id: record.id, usedAt: null, expiresAt: { gt: now } },
-      data: { usedAt: now },
-    });
-    if (claimed.count !== 1) throw new InvalidAuthTokenError();
-
-    await tx.user.update({
-      where: { id: record.userId },
-      data: {
-        passwordHash,
-        passwordChangedAt: now,
-        sessionVersion: { increment: 1 },
-      },
-    });
-    await tx.authToken.updateMany({
-      where: { userId: record.userId, usedAt: null },
-      data: { usedAt: now },
-    });
-    return { userId: record.userId, role: record.user.role, customerId: record.user.customerId };
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-}
-
-export async function assertPasswordTokenUsable({
-  token,
-  type,
-  now = new Date(),
-}: {
-  token: string;
-  type: AuthTokenType;
-  now?: Date;
-}) {
-  const record = await prisma.authToken.findUnique({
-    where: { tokenHash: hashAuthToken(token) },
-    include: { user: { include: { customer: true } } },
-  });
+function assertUsable(record: TokenRecord | null, type: AuthTokenType, now: Date): asserts record is TokenRecord {
   if (
     !record
     || record.type !== type
@@ -143,11 +68,39 @@ export async function assertPasswordTokenUsable({
   }
 }
 
-export class InvalidAuthTokenError extends Error {
-  readonly code = 'INVALID_TOKEN';
+/** Cheap pre-check before hashing the new password. */
+export async function assertPasswordTokenUsable({ token, type, now = new Date() }: { token: string; type: AuthTokenType; now?: Date }) {
+  const record = await prisma.authToken.findUnique({ where: { tokenHash: hashAuthToken(token) }, include: tokenRecordInclude });
+  assertUsable(record, type, now);
+}
 
-  constructor() {
-    super('הקישור אינו תקף או שפג תוקפו. בקשו קישור חדש.');
-    this.name = 'InvalidAuthTokenError';
-  }
+/** Single-use: sets the password, revokes every other open link and signs out all sessions. */
+export function consumePasswordToken({
+  token,
+  type,
+  passwordHash,
+  now = new Date(),
+}: {
+  token: string;
+  type: AuthTokenType;
+  passwordHash: string;
+  now?: Date;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const record = await tx.authToken.findUnique({ where: { tokenHash: hashAuthToken(token) }, include: tokenRecordInclude });
+    assertUsable(record, type, now);
+
+    const claimed = await tx.authToken.updateMany({
+      where: { id: record.id, usedAt: null, expiresAt: { gt: now } },
+      data: { usedAt: now },
+    });
+    if (claimed.count !== 1) throw new InvalidAuthTokenError();
+
+    await tx.user.update({
+      where: { id: record.userId },
+      data: { passwordHash, passwordChangedAt: now, sessionVersion: { increment: 1 } },
+    });
+    await tx.authToken.updateMany({ where: { userId: record.userId, usedAt: null }, data: { usedAt: now } });
+    return { userId: record.userId, role: record.user.role, customerId: record.user.customerId };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

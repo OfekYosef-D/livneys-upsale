@@ -1,18 +1,19 @@
-export const whatsappTemplateKeys = [
+import { readEnvText } from './delivery';
+
+/** Customer-facing message types. Each one needs a matching approved template in Meta before WhatsApp can go live. */
+export const notificationTemplateKeys = [
   'ORDER_REMINDER',
   'ORDER_RECEIVED',
+  'ORDER_SPECIAL_REQUEST',
   'ORDER_APPROVED',
   'ORDER_PACKED',
   'ORDER_DELIVERED',
   'ORDER_CANCELLED',
-  'ORDER_SPECIAL_REQUEST',
   'ORDER_ADDITION_APPROVED',
   'ORDER_ADDITION_REJECTED',
-  'PASSWORD_SETUP',
-  'PASSWORD_RESET',
 ] as const;
 
-export type WhatsAppTemplateKey = (typeof whatsappTemplateKeys)[number];
+export type NotificationTemplateKey = (typeof notificationTemplateKeys)[number];
 
 type EnvLike = Record<string, string | undefined>;
 
@@ -24,61 +25,29 @@ export type WhatsAppConfig = {
   templateLanguage: string;
   webhookVerifyToken: string | null;
   appSecret: string | null;
-  cronSecret: string | null;
-  baseUrl: string | null;
-  templates: Record<WhatsAppTemplateKey, string | null>;
-};
-
-const templateEnvNames: Record<WhatsAppTemplateKey, string> = {
-  ORDER_REMINDER: 'WHATSAPP_TEMPLATE_ORDER_REMINDER',
-  ORDER_RECEIVED: 'WHATSAPP_TEMPLATE_ORDER_RECEIVED',
-  ORDER_APPROVED: 'WHATSAPP_TEMPLATE_ORDER_APPROVED',
-  ORDER_PACKED: 'WHATSAPP_TEMPLATE_ORDER_PACKED',
-  ORDER_DELIVERED: 'WHATSAPP_TEMPLATE_ORDER_DELIVERED',
-  ORDER_CANCELLED: 'WHATSAPP_TEMPLATE_ORDER_CANCELLED',
-  ORDER_SPECIAL_REQUEST: 'WHATSAPP_TEMPLATE_ORDER_SPECIAL_REQUEST',
-  ORDER_ADDITION_APPROVED: 'WHATSAPP_TEMPLATE_ORDER_ADDITION_APPROVED',
-  ORDER_ADDITION_REJECTED: 'WHATSAPP_TEMPLATE_ORDER_ADDITION_REJECTED',
-  PASSWORD_SETUP: 'WHATSAPP_TEMPLATE_PASSWORD_SETUP',
-  PASSWORD_RESET: 'WHATSAPP_TEMPLATE_PASSWORD_RESET',
+  templates: Record<NotificationTemplateKey, string | null>;
 };
 
 export function getWhatsAppConfig(env: EnvLike = process.env): WhatsAppConfig {
   return {
-    sendEnabled: parseBoolean(env.WHATSAPP_SEND_ENABLED),
-    accessToken: normalizeEnvText(env.WHATSAPP_ACCESS_TOKEN),
-    phoneNumberId: normalizeEnvText(env.WHATSAPP_PHONE_NUMBER_ID),
-    graphApiVersion: normalizeEnvText(env.WHATSAPP_GRAPH_API_VERSION) ?? 'v25.0',
-    templateLanguage: normalizeEnvText(env.WHATSAPP_TEMPLATE_LANGUAGE) ?? 'he',
-    webhookVerifyToken: normalizeEnvText(env.WHATSAPP_WEBHOOK_VERIFY_TOKEN),
-    appSecret: normalizeEnvText(env.WHATSAPP_APP_SECRET),
-    cronSecret: normalizeEnvText(env.CRON_SECRET),
-    baseUrl: normalizeEnvText(env.NEXTAUTH_URL),
-    templates: whatsappTemplateKeys.reduce(
-      (accumulator, key) => ({
-        ...accumulator,
-        [key]: normalizeEnvText(env[templateEnvNames[key]]),
-      }),
-      {} as Record<WhatsAppTemplateKey, string | null>,
-    ),
+    sendEnabled: env.WHATSAPP_SEND_ENABLED === 'true' || env.WHATSAPP_SEND_ENABLED === '1',
+    accessToken: readEnvText(env.WHATSAPP_ACCESS_TOKEN),
+    phoneNumberId: readEnvText(env.WHATSAPP_PHONE_NUMBER_ID),
+    graphApiVersion: readEnvText(env.WHATSAPP_GRAPH_API_VERSION) ?? 'v25.0',
+    templateLanguage: readEnvText(env.WHATSAPP_TEMPLATE_LANGUAGE) ?? 'he',
+    webhookVerifyToken: readEnvText(env.WHATSAPP_WEBHOOK_VERIFY_TOKEN),
+    appSecret: readEnvText(env.WHATSAPP_APP_SECRET),
+    templates: Object.fromEntries(
+      notificationTemplateKeys.map((key) => [key, readEnvText(env[`WHATSAPP_TEMPLATE_${key}`])]),
+    ) as Record<NotificationTemplateKey, string | null>,
   };
 }
 
-export function resolveWhatsAppTemplateName(key: WhatsAppTemplateKey, config = getWhatsAppConfig()): string | null {
-  return config.templates[key] ?? null;
-}
-
-export function hasWhatsAppProviderCredentials(config = getWhatsAppConfig()): boolean {
+export function hasWhatsAppProviderCredentials(config: WhatsAppConfig): boolean {
   return Boolean(config.accessToken && config.phoneNumberId);
 }
 
-function parseBoolean(value: string | undefined): boolean {
-  return value === 'true' || value === '1';
-}
-
-function normalizeEnvText(value: string | undefined): string | null {
-  if (!value) return null;
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
+/** Public base URL used in links inside messages. */
+export function getAppBaseUrl(env: EnvLike = process.env): string {
+  return (readEnvText(env.NEXTAUTH_URL) ?? 'http://localhost:3000').replace(/\/+$/, '');
 }

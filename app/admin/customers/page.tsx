@@ -1,17 +1,18 @@
 import { AdminShell } from '@/components/admin/AdminShell';
-import { AdminCustomersManager } from '@/features/admin-crm/components/AdminCrmManagers';
+import { CustomersManager } from '@/features/admin-crm/components/CustomersManager';
 import { getCustomerManagementData } from '@/features/admin-crm/queries';
-import { requireAdmin } from '@/lib/admin-guard';
+import { requireAdminPage } from '@/lib/authorization';
+import { paths } from '@/lib/paths';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminCustomersPage() {
-  await requireAdmin('/admin/customers');
+export default async function Page() {
+  await requireAdminPage(paths.admin.customers);
   const data = await getCustomerManagementData();
 
   return (
-    <AdminShell title="ניהול לקוחות" subtitle="יצירה, עריכה והפעלה של לקוחות, קווים, מחירונים והעדפות הודעה." activeHref="/admin/customers">
-      <AdminCustomersManager data={data} />
+    <AdminShell title="לקוחות" activeHref={paths.admin.customers}>
+      <CustomersManager data={data} />
     </AdminShell>
   );
 }

@@ -1,3 +1,3 @@
-Seed data for the current Livneys ordering and CRM prototype.
+Demo data for local development, loaded by `npm run db:seed:demo` (`prisma/seed.ts`).
 
-These JSON files intentionally stand in for the future database layer. Keep IDs stable while the UI still reads from local data, because customer links, product images, routes, and order state are joined by these IDs.
+Never used in production. Product image file names map to the bundled photos in `assets/` via `lib/product-assets.ts`.
