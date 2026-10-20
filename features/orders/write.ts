@@ -1,167 +1,141 @@
-import type { OrderSource } from '@prisma/client';
-import { SafeActionError } from '../../lib/safe-action-error';
-import { calculateOrderPricing, type PricingPriceListItem, type PricingProduct, type PricingPromotion } from '../pricing/engine';
-import { validateInstitutionalOrderRules } from './business-rules';
+import type { OrderSource, OrderStatus } from '@prisma/client';
+import { ValidationError } from '@/lib/errors';
+import type { CatalogPricingInput } from '../catalog/customer-catalog';
+import { calculateOrderPricing, type PricedLine } from '../pricing/engine';
+import type { RouteSchedule } from '../routes/schedule';
+import { assertMinimumOrderTotal } from './business-rules';
 import { COMMERCIAL_TERMS_VERSION } from './commercial-terms';
-import { calculatePaymentTermsSummary, type PaymentTermValue } from './payment-terms';
-import { calculateVatSummary } from './vat';
-import {
-  getSubmissionStatus,
-  normalizeCustomerOrderItems,
-  type OrderSnapshotLine,
-  type OrderStatus,
-  type SnapshotItem,
-} from './utils';
+import { normalizeOrderItems, type OrderItem } from './quantity';
+import { getSubmissionStatus } from './status';
+import { calculateOrderTotals, type OrderTotals, type PaymentTermValue } from './totals';
 
+/** Everything a write needs to know about the customer, loaded once per request. */
 export type OrderWriteContext = {
-  vatRatePercent?: number;
-  customer: {
-    id: string;
-    routeId: string;
-    priceListId: string;
-    isActive: boolean;
-  };
-  route: {
-    id: string;
-    isActive: boolean;
-    nextDeliveryAt: Date;
-    nextCutoffAt: Date;
-  };
-  products: PricingProduct[];
-  priceListItems: PricingPriceListItem[];
-  promotions: PricingPromotion[];
+  customerId: string;
+  routeId: string;
+  schedule: RouteSchedule;
+  vatRatePercent: number;
+  pricing: CatalogPricingInput;
 };
 
-export type SubmittedOrderPayload = {
-  order: {
-    customerId: string;
-    routeId: string;
-    status: OrderStatus;
-    source: OrderSource;
-    deliveryWindowStart: Date;
-    deadlineAt: Date;
-    submittedAt: Date;
-    notes: string | null;
-    internalNote: string | null;
-    subtotal: number;
-    discountTotal: number;
-    paymentTerm: PaymentTermValue;
-    paymentDiscountPercent: number;
-    paymentDiscountTotal: number;
-    total: number;
-    vatRatePercent: number;
-    vatTotal: number;
-    totalIncludingVat: number;
-    commercialTermsVersion: string | null;
-    commercialTermsAcceptedAt: Date | null;
-  };
-  lines: OrderSnapshotLine[];
+export type OrderRecordData = OrderTotals & {
+  customerId: string;
+  routeId: string;
+  status: OrderStatus;
+  source: OrderSource;
+  deliveryWindowStart: Date;
+  deadlineAt: Date;
+  submittedAt: Date | null;
+  notes: string | null;
+  internalNote: string | null;
+  paymentTerm: PaymentTermValue;
+  commercialTermsVersion: string | null;
+  commercialTermsAcceptedAt: Date | null;
+};
+
+/** An immutable price snapshot: later catalog changes never alter a saved order. */
+export type OrderSnapshot = {
+  order: OrderRecordData;
+  lines: PricedLine[];
 };
 
 export type ManualOrderIntakeChannel = 'PHONE' | 'WHATSAPP' | 'ADMIN_MANUAL';
 
-export function buildSubmittedOrderPayload({
+export function priceOrderItems(context: OrderWriteContext, items: readonly OrderItem[], now: Date) {
+  return calculateOrderPricing({ ...context.pricing, items: normalizeOrderItems(items, context.pricing.products), now });
+}
+
+export function buildSubmittedOrder({
   context,
   items,
   source,
   paymentTerm,
   commercialTermsAccepted = false,
-  now,
   notes,
   internalNote,
+  now,
 }: {
   context: OrderWriteContext;
-  items: SnapshotItem[];
+  items: readonly OrderItem[];
   source: OrderSource;
   paymentTerm: PaymentTermValue;
   commercialTermsAccepted?: boolean;
-  now: Date;
   notes?: string | null;
   internalNote?: string | null;
-}): SubmittedOrderPayload {
+  now: Date;
+}): OrderSnapshot {
   if (source === 'CUSTOMER' && !commercialTermsAccepted) {
-    throw new SafeActionError('VALIDATION_ERROR', 'יש לאשר שההזמנה היא עסקית ואת פרטי ההזמנה לפני השליחה.');
+    throw new ValidationError('יש לאשר שההזמנה היא עסקית ואת פרטי ההזמנה לפני השליחה.');
   }
 
-  if (!context.customer.isActive) {
-    throw new SafeActionError('ORDER_LOCKED', 'הלקוח אינו פעיל.');
-  }
+  const pricing = priceOrderItems(context, items, now);
+  if (pricing.lines.length === 0) throw new ValidationError('ההזמנה חייבת לכלול לפחות מוצר אחד.');
+  assertMinimumOrderTotal(source, pricing.total);
 
-  if (!context.route.isActive) {
-    throw new SafeActionError('ORDER_LOCKED', 'קו החלוקה של הלקוח אינו פעיל.');
-  }
-
-  const pricing = calculateOrderPricing({
-    customer: context.customer,
-    route: context.route,
-    items: normalizeCustomerOrderItems(
-      items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
-      context.products,
-    ),
-    products: context.products,
-    priceListItems: context.priceListItems,
-    promotions: context.promotions,
-    now,
-  });
-  const lines = pricing.lines;
-
-  if (lines.length === 0) {
-    throw new SafeActionError('VALIDATION_ERROR', 'ההזמנה חייבת לכלול לפחות מוצר אחד.');
-  }
-
-  validateInstitutionalOrderRules({
-    source,
-    total: pricing.total,
-    items: lines.map((line) => ({ productId: line.productId, quantity: line.quantity })),
-    products: context.products,
-  });
-  const payment = calculatePaymentTermsSummary(pricing.total, paymentTerm);
-  const vat = calculateVatSummary(payment.total, context.vatRatePercent);
-
+  const isCustomer = source === 'CUSTOMER';
   return {
     order: {
-      customerId: context.customer.id,
-      routeId: context.route.id,
-      status: getSubmissionStatus({
-        now,
-        cutoff: context.route.nextCutoffAt,
-      }),
+      ...baseRecord(context),
+      ...calculateOrderTotals({ ...pricing, paymentTerm, vatRatePercent: context.vatRatePercent }),
+      status: getSubmissionStatus({ now, cutoff: context.schedule.cutoffAt }),
       source,
-      deliveryWindowStart: context.route.nextDeliveryAt,
-      deadlineAt: context.route.nextCutoffAt,
       submittedAt: now,
-      notes: normalizeNullableText(notes),
-      internalNote: normalizeNullableText(internalNote),
-      subtotal: pricing.subtotal,
-      discountTotal: pricing.discountTotal,
+      notes: normalizeText(notes),
+      internalNote: normalizeText(internalNote),
       paymentTerm,
-      paymentDiscountPercent: payment.paymentDiscountPercent,
-      paymentDiscountTotal: payment.paymentDiscountTotal,
-      total: payment.total,
-      vatRatePercent: vat.vatRatePercent,
-      vatTotal: vat.vatTotal,
-      totalIncludingVat: vat.totalIncludingVat,
-      commercialTermsVersion: source === 'CUSTOMER' ? COMMERCIAL_TERMS_VERSION : null,
-      commercialTermsAcceptedAt: source === 'CUSTOMER' ? now : null,
+      commercialTermsVersion: isCustomer ? COMMERCIAL_TERMS_VERSION : null,
+      commercialTermsAcceptedAt: isCustomer ? now : null,
     },
-    lines,
+    lines: pricing.lines,
   };
 }
 
-export function formatManualOrderInternalNote({
-  intakeChannel,
-  note,
+/** A customer's work-in-progress cart for the current delivery; returns null when the cart is empty. */
+export function buildDraftOrder({
+  context,
+  items,
+  now,
 }: {
-  intakeChannel: ManualOrderIntakeChannel;
-  note?: string | null;
-}): string {
-  const normalizedNote = normalizeNullableText(note);
-  return normalizedNote ? `[manual-order:intake=${intakeChannel}] ${normalizedNote}` : `[manual-order:intake=${intakeChannel}]`;
+  context: OrderWriteContext;
+  items: readonly OrderItem[];
+  now: Date;
+}): OrderSnapshot | null {
+  const pricing = priceOrderItems(context, items, now);
+  if (pricing.lines.length === 0) return null;
+
+  return {
+    order: {
+      ...baseRecord(context),
+      ...calculateOrderTotals({ ...pricing, paymentTerm: 'NET_30', vatRatePercent: context.vatRatePercent }),
+      status: 'DRAFT',
+      source: 'CUSTOMER',
+      submittedAt: null,
+      notes: null,
+      internalNote: null,
+      paymentTerm: 'NET_30',
+      commercialTermsVersion: null,
+      commercialTermsAcceptedAt: null,
+    },
+    lines: pricing.lines,
+  };
 }
 
-function normalizeNullableText(value: string | null | undefined): string | null {
-  if (!value) return null;
+export function formatManualOrderInternalNote({ intakeChannel, note }: { intakeChannel: ManualOrderIntakeChannel; note?: string | null }): string {
+  const tag = `[manual-order:intake=${intakeChannel}]`;
+  const normalized = normalizeText(note);
+  return normalized ? `${tag} ${normalized}` : tag;
+}
 
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
+function baseRecord(context: OrderWriteContext) {
+  return {
+    customerId: context.customerId,
+    routeId: context.routeId,
+    deliveryWindowStart: context.schedule.deliveryAt,
+    deadlineAt: context.schedule.cutoffAt,
+  };
+}
+
+function normalizeText(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }

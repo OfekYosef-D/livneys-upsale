@@ -74,3 +74,8 @@ export const legalDocuments: LegalDocumentDefinition[] = [
 export function getLegalDocument(slug: string) {
   return legalDocuments.find((document) => document.slug === slug) ?? null;
 }
+
+/** Set LEGAL_DOCUMENTS_APPROVED_VERSION to the current set version once a lawyer approves the wording. */
+export function isLegalVersionApproved(env: Record<string, string | undefined> = process.env): boolean {
+  return env.LEGAL_DOCUMENTS_APPROVED_VERSION === LEGAL_DOCUMENT_SET_VERSION;
+}

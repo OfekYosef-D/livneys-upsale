@@ -1,31 +1,19 @@
-import { z } from 'zod';
-
-const additionItemSchema = z.object({
-  productId: z.string().trim().min(1).max(120),
-  quantity: z.coerce.number().int().positive(),
-});
+import { fields, z } from '@/lib/validation';
 
 export const submitOrderAdditionSchema = z.object({
-  customerId: z.string().trim().min(1).max(120),
-  orderId: z.string().trim().min(1).max(120),
-  idempotencyKey: z.string().uuid(),
-  items: z.array(additionItemSchema).min(1),
+  customerId: fields.id,
+  orderId: fields.id,
+  idempotencyKey: fields.idempotencyKey,
+  items: z.array(z.object({ productId: fields.id, quantity: z.coerce.number().int().positive() })).min(1, 'יש לבחור לפחות מוצר אחד.'),
 });
 
 export const reviewOrderAdditionSchema = z
   .object({
-    requestId: z.string().trim().min(1).max(120),
+    requestId: fields.id,
     decision: z.enum(['APPROVED', 'REJECTED']),
-    reason: z.preprocess((value) => {
-      if (typeof value !== 'string') return null;
-      const trimmed = value.trim();
-      return trimmed.length > 0 ? trimmed : null;
-    }, z.string().max(1000).nullable()),
+    reason: fields.optionalText(1000),
   })
   .refine((value) => value.decision !== 'REJECTED' || Boolean(value.reason), {
     path: ['reason'],
     message: 'יש להזין סיבת דחייה.',
   });
-
-export type SubmitOrderAdditionInput = z.infer<typeof submitOrderAdditionSchema>;
-export type ReviewOrderAdditionInput = z.infer<typeof reviewOrderAdditionSchema>;

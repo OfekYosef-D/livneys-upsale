@@ -12,7 +12,8 @@
     "db:audit:critical": "tsx scripts/audit-critical-data.ts",
     "db:audit:order-integrity": "tsx scripts/audit-critical-data.ts --orders --assert-order-integrity",
     "db:seed:demo": "prisma db seed",
-    "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts"
+    "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
+    "db:test-users": "tsx scripts/create-test-users.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

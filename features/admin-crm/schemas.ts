@@ -1,252 +1,156 @@
-import { z } from 'zod';
-import type { ManualOrderIntakeChannel } from '@/features/orders/write';
+import { fields, z } from '@/lib/validation';
+import type { ManualOrderIntakeChannel } from '../orders/write';
 
-const intakeChannels = ['PHONE', 'WHATSAPP', 'ADMIN_MANUAL'] as const satisfies ManualOrderIntakeChannel[];
+const intakeChannels = ['PHONE', 'WHATSAPP', 'ADMIN_MANUAL'] as const satisfies readonly ManualOrderIntakeChannel[];
 const promotionEffectTypes = ['DISPLAY_ONLY', 'PERCENT_OFF', 'FIXED_AMOUNT_OFF', 'FIXED_UNIT_PRICE', 'BUY_X_GET_Y'] as const;
 
-const requiredText = (max: number) => z.string().trim().min(1).max(max);
+export const activeToggleSchema = z.object({ id: fields.id, isActive: z.boolean() });
 
-const nullableText = (max: number) =>
-  z.preprocess((value) => {
-    if (value === undefined || value === null) return null;
-    if (typeof value !== 'string') return value;
-
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : null;
-  }, z.string().max(max).nullable());
-
-const nullableEmail = z.preprocess((value) => {
-  if (value === undefined || value === null) return null;
-  if (typeof value !== 'string') return value;
-
-  const trimmed = value.trim().toLowerCase();
-  return trimmed.length > 0 ? trimmed : null;
-}, z.string().email().max(254).nullable());
-
-const nullableDate = z.preprocess((value) => {
-  if (value === undefined || value === null || value === '') return null;
-  return value;
-}, z.coerce.date().nullable());
-
-const nullableNumber = z.preprocess((value) => {
-  if (value === undefined || value === null || value === '') return null;
-  return value;
-}, z.coerce.number().nullable());
-
-const stringArray = z.preprocess((value) => {
-  if (Array.isArray(value)) {
-    return value.map((item) => (typeof item === 'string' ? item.trim() : item)).filter(Boolean);
-  }
-
-  if (typeof value === 'string') {
-    return value
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-
-  return [];
-}, z.array(requiredText(160)).default([]));
-
-export const priceListPriceSchema = z.object({
-  productId: requiredText(120),
-  price: z.coerce.number().positive(),
-});
-
-export const productPriceSchema = z.object({
-  priceListId: requiredText(120),
-  price: z.coerce.number().positive(),
-});
-
-export const customerMutationSchema = z.object({
-  name: requiredText(160),
-  invoiceName: nullableText(160),
-  contact: requiredText(120),
-  email: nullableEmail,
-  phone: requiredText(40),
-  accountingContactName: nullableText(120),
-  accountingEmail: nullableEmail,
-  accountingPhone: nullableText(40),
-  businessType: nullableText(80),
-  region: requiredText(120),
-  address: requiredText(240),
-  deliveryConstraints: nullableText(1000),
-  routeId: requiredText(120),
-  priceListId: requiredText(120),
-  notes: nullableText(1000),
-  statusLabel: nullableText(120),
+export const customerSchema = z.object({
+  id: fields.id.optional(),
+  name: fields.requiredText(160),
+  invoiceName: fields.optionalText(160),
+  contact: fields.requiredText(120),
+  email: fields.optionalEmail,
+  phone: fields.phone,
+  accountingContactName: fields.optionalText(120),
+  accountingEmail: fields.optionalEmail,
+  accountingPhone: fields.optionalText(40),
+  businessType: fields.optionalText(80),
+  region: fields.requiredText(120),
+  address: fields.requiredText(240),
+  deliveryConstraints: fields.optionalText(1000),
+  routeId: fields.id,
+  priceListId: fields.id,
+  notes: fields.optionalText(1000),
+  statusLabel: fields.optionalText(120),
   isActive: z.boolean(),
   emailEnabled: z.boolean(),
   whatsappEnabled: z.boolean(),
 });
 
-export const createCustomerSchema = customerMutationSchema.extend({
-  id: nullableText(80).optional(),
-});
-
-export const updateCustomerSchema = customerMutationSchema.extend({
-  id: requiredText(120),
-});
-
-export const productMutationSchema = z.object({
-  sku: requiredText(80).transform((value) => value.toUpperCase()),
-  name: requiredText(160),
-  category: requiredText(120),
-  description: nullableText(1000),
-  basePrice: z.coerce.number().positive(),
-  unit: requiredText(40),
-  caseSize: requiredText(80),
-  minQty: z.coerce.number().int().min(1),
-  orderMultiple: z.coerce.number().int().min(1).default(1),
-  imageUrl: z.preprocess((value) => {
-    if (value === undefined || value === null || value === '') return null;
-    return value;
-  }, z.string().trim().url().max(500).nullable()),
-  assetImage: nullableText(240),
-  stockLabel: nullableText(120),
-  isActive: z.boolean(),
-  prices: z.array(productPriceSchema).default([]),
-});
-
-export const createProductSchema = productMutationSchema.extend({
-  id: nullableText(120).optional(),
-});
-
-export const updateProductSchema = productMutationSchema.extend({
-  id: requiredText(120),
-});
-
-export const routeMutationSchema = z
+export const productSchema = z
   .object({
-    name: requiredText(120),
-    region: requiredText(120),
-    driver: nullableText(120),
-    opsContactName: nullableText(120),
-    opsContactPhone: nullableText(40),
-    deliveryWeekday: z.coerce.number().int().min(0).max(6),
-    cutoffWeekday: z.coerce.number().int().min(0).max(6),
-    cutoffTime: z.string().trim().regex(/^\d{2}:\d{2}$/),
-    nextDeliveryAt: z.coerce.date(),
-    nextCutoffAt: z.coerce.date(),
+    id: fields.id.optional(),
+    sku: fields.requiredText(80).transform((value) => value.toUpperCase()),
+    name: fields.requiredText(160),
+    category: fields.requiredText(120),
+    description: fields.optionalText(1000),
+    basePrice: fields.positivePrice,
+    unit: fields.requiredText(40),
+    caseSize: fields.requiredText(80),
+    minQty: z.coerce.number().int().min(1),
+    orderMultiple: z.coerce.number().int().min(1).default(1),
+    imageUrl: z.preprocess((value) => (value === '' || value === undefined ? null : value), z.string().trim().url().max(500).nullable()),
+    assetImage: fields.optionalText(240),
+    stockLabel: fields.optionalText(120),
     isActive: z.boolean(),
+    prices: z.array(z.object({ priceListId: fields.id, price: fields.positivePrice })).default([]),
   })
-  .refine((value) => value.nextCutoffAt.getTime() <= value.nextDeliveryAt.getTime(), {
-    path: ['nextCutoffAt'],
-    message: 'Cutoff must be before delivery',
+  .refine((value) => value.minQty % value.orderMultiple === 0 || value.minQty < value.orderMultiple, {
+    path: ['minQty'],
+    message: 'כמות המינימום צריכה להתאים לכפולת ההזמנה (למשל מינימום 6 עם כפולה 6).',
   });
 
-export const createRouteSchema = routeMutationSchema.extend({
-  id: nullableText(120).optional(),
-});
-
-export const updateRouteSchema = routeMutationSchema.extend({
-  id: requiredText(120),
-});
-
-export const promotionMutationSchema = z
+export const quickProductUpdateSchema = z
   .object({
-    title: requiredText(160),
-    tag: requiredText(60),
-    description: requiredText(1000),
-    productId: nullableText(120).optional(),
+    id: fields.id,
+    basePrice: fields.positivePrice.optional(),
+    minQty: z.coerce.number().int().min(1).optional(),
+  })
+  .refine((value) => value.basePrice !== undefined || value.minQty !== undefined, { message: 'יש לעדכן מחיר או כמות מינימום.' });
+
+export const bulkCategoryPriceSchema = z.object({
+  category: fields.requiredText(120),
+  price: fields.positivePrice,
+});
+
+export const routeSchema = z.object({
+  id: fields.id.optional(),
+  name: fields.requiredText(120),
+  region: fields.requiredText(120),
+  driver: fields.optionalText(120),
+  opsContactName: fields.optionalText(120),
+  opsContactPhone: fields.optionalText(40),
+  deliveryWeekday: z.coerce.number().int().min(0).max(6),
+  cutoffWeekday: z.coerce.number().int().min(0).max(6),
+  cutoffTime: z.string().trim().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'שעה לא תקינה.'),
+  /** Optional one-off override of the next delivery date (YYYY-MM-DD), e.g. around holidays. */
+  nextDeliveryDate: z.preprocess(
+    (value) => (value === '' || value === undefined ? null : value),
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'תאריך לא תקין.').nullable(),
+  ),
+  isActive: z.boolean(),
+});
+
+export const promotionSchema = z
+  .object({
+    id: fields.id.optional(),
+    title: fields.requiredText(160),
+    tag: fields.requiredText(60),
+    description: fields.requiredText(1000),
     effectType: z.enum(promotionEffectTypes).default('DISPLAY_ONLY'),
-    discountValue: nullableNumber,
-    buyQuantity: nullableNumber,
-    freeQuantity: nullableNumber,
+    discountValue: fields.optionalNumber,
+    buyQuantity: fields.optionalNumber,
+    freeQuantity: fields.optionalNumber,
     priority: z.coerce.number().int().min(0).default(0),
-    productIds: stringArray,
-    categories: stringArray,
-    customerIds: stringArray,
-    routeIds: stringArray,
-    priceListIds: stringArray,
-    startsAt: nullableDate,
-    endsAt: nullableDate,
+    productIds: fields.stringList,
+    categories: fields.stringList,
+    customerIds: fields.stringList,
+    routeIds: fields.stringList,
+    priceListIds: fields.stringList,
+    startsAt: fields.optionalIsraelDateTime,
+    endsAt: fields.optionalIsraelDateTime,
     isActive: z.boolean(),
   })
-  .refine((value) => !value.startsAt || !value.endsAt || value.startsAt.getTime() < value.endsAt.getTime(), {
+  .refine((value) => !value.startsAt || !value.endsAt || value.startsAt < value.endsAt, {
     path: ['endsAt'],
-    message: 'Promotion end must be after start',
+    message: 'תאריך הסיום חייב להיות אחרי תאריך ההתחלה.',
   })
-  .refine((value) => value.effectType === 'DISPLAY_ONLY' || value.effectType === 'BUY_X_GET_Y' || ((value.discountValue ?? 0) > 0), {
+  .refine((value) => ['DISPLAY_ONLY', 'BUY_X_GET_Y'].includes(value.effectType) || (value.discountValue ?? 0) > 0, {
     path: ['discountValue'],
-    message: 'Discount value is required for this promotion type',
+    message: 'יש להזין ערך הנחה או מחיר לסוג מבצע זה.',
   })
-  .refine((value) => value.effectType !== 'PERCENT_OFF' || ((value.discountValue ?? 0) > 0 && (value.discountValue ?? 0) <= 100), {
+  .refine((value) => value.effectType !== 'PERCENT_OFF' || (value.discountValue ?? 0) <= 100, {
     path: ['discountValue'],
-    message: 'Percent discount must be between 0 and 100',
+    message: 'אחוז הנחה חייב להיות בין 0 ל-100.',
   })
   .refine((value) => value.effectType !== 'BUY_X_GET_Y' || ((value.buyQuantity ?? 0) >= 1 && (value.freeQuantity ?? 0) >= 1), {
     path: ['buyQuantity'],
-    message: 'Buy/free quantities are required for bundle promotions',
+    message: 'במבצע "קנה X קבל Y" יש להזין את שתי הכמויות.',
   });
 
-export const createPromotionSchema = promotionMutationSchema.extend({
-  id: nullableText(120).optional(),
-});
-
-export const updatePromotionSchema = promotionMutationSchema.extend({
-  id: requiredText(120),
-});
-
-export const priceListMutationSchema = z.object({
-  name: requiredText(160),
-  description: nullableText(500),
+export const priceListSchema = z.object({
+  id: fields.id.optional(),
+  name: fields.requiredText(160),
+  description: fields.optionalText(500),
   isDefault: z.boolean(),
-  prices: z.array(priceListPriceSchema).min(1),
+  prices: z.array(z.object({ productId: fields.id, price: fields.positivePrice })).min(1),
 });
 
-export const createPriceListSchema = priceListMutationSchema.extend({
-  id: nullableText(120).optional(),
-});
+export const clonePriceListSchema = z.object({ id: fields.id, name: fields.requiredText(160) });
 
-export const updatePriceListSchema = priceListMutationSchema.extend({
-  id: requiredText(120),
-});
-
-export const recommendationMutationSchema = z.object({
-  customerId: requiredText(120),
-  productId: requiredText(120),
-  reason: nullableText(500),
+export const recommendationSchema = z.object({
+  id: fields.id.optional(),
+  customerId: fields.id,
+  productId: fields.id,
+  reason: fields.optionalText(500),
   isActive: z.boolean(),
 });
 
-export const createRecommendationSchema = recommendationMutationSchema;
-
-export const updateRecommendationSchema = recommendationMutationSchema.extend({
-  id: requiredText(120),
-});
-
-export const manualOrderItemSchema = z.object({
-  productId: requiredText(120),
-  quantity: z.coerce.number().int().positive(),
-});
-
-export const manualOrderMutationSchema = z.object({
-  customerId: requiredText(120),
-  idempotencyKey: z.string().uuid(),
+export const manualOrderSchema = z.object({
+  customerId: fields.id,
+  idempotencyKey: fields.idempotencyKey,
   vatRatePercent: z.coerce.number().positive().max(100),
-  items: z.array(manualOrderItemSchema).min(1),
-  notes: nullableText(1000).default(null),
-  internalNote: nullableText(1000).default(null),
+  items: z.array(z.object({ productId: fields.id, quantity: z.coerce.number().int().positive() })).min(1, 'בחרו לפחות מוצר אחד.'),
+  notes: fields.optionalText(1000),
+  internalNote: fields.optionalText(1000),
   intakeChannel: z.enum(intakeChannels),
 });
 
-export type CustomerMutationInput = z.infer<typeof customerMutationSchema>;
-export type CreateCustomerInput = z.infer<typeof createCustomerSchema>;
-export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>;
-export type ProductMutationInput = z.infer<typeof productMutationSchema>;
-export type CreateProductInput = z.infer<typeof createProductSchema>;
-export type UpdateProductInput = z.infer<typeof updateProductSchema>;
-export type RouteMutationInput = z.infer<typeof routeMutationSchema>;
-export type CreateRouteInput = z.infer<typeof createRouteSchema>;
-export type UpdateRouteInput = z.infer<typeof updateRouteSchema>;
-export type PromotionMutationInput = z.infer<typeof promotionMutationSchema>;
-export type CreatePromotionInput = z.infer<typeof createPromotionSchema>;
-export type UpdatePromotionInput = z.infer<typeof updatePromotionSchema>;
-export type PriceListMutationInput = z.infer<typeof priceListMutationSchema>;
-export type CreatePriceListInput = z.infer<typeof createPriceListSchema>;
-export type UpdatePriceListInput = z.infer<typeof updatePriceListSchema>;
-export type RecommendationMutationInput = z.infer<typeof recommendationMutationSchema>;
-export type CreateRecommendationInput = z.infer<typeof createRecommendationSchema>;
-export type UpdateRecommendationInput = z.infer<typeof updateRecommendationSchema>;
-export type ManualOrderMutationInput = z.infer<typeof manualOrderMutationSchema>;
+export type CustomerInput = z.output<typeof customerSchema>;
+export type ProductInput = z.output<typeof productSchema>;
+export type RouteInput = z.output<typeof routeSchema>;
+export type PromotionInput = z.output<typeof promotionSchema>;
+export type PriceListInput = z.output<typeof priceListSchema>;
+export type RecommendationInput = z.output<typeof recommendationSchema>;

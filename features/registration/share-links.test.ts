@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  buildLoginInviteMessage,
-  buildRegistrationInviteMessage,
-  buildWhatsAppUrl,
-  getLoginUrl,
-  getRegistrationUrl,
-  toWhatsAppPhone,
-} from './share-links';
+import { buildWhatsAppUrl, toWhatsAppPhone } from '@/lib/whatsapp-link';
+import { buildLoginInviteMessage, buildRegistrationInviteMessage, getLoginUrl, getRegistrationUrl } from './share-links';
 
 describe('registration share links', () => {
   it('builds absolute registration and login urls', () => {

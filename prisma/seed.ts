@@ -1,53 +1,41 @@
-import { PrismaClient, type NotificationChannel, type OrderStatus, type PromotionEffectType } from '@prisma/client';
+import { PrismaClient, type OrderStatus, type PromotionEffectType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import customers from '../data/customers.json';
 import orders from '../data/orders.json';
 import products from '../data/products.json';
 import promotions from '../data/promotions.json';
 import routes from '../data/routes.json';
-import { createOrderSnapshotLines } from '../features/orders/utils';
-import { calculateVatSummary } from '../features/orders/vat';
+import { calculateOrderTotals } from '../features/orders/totals';
+import { priceLine, summarizeLines } from '../features/pricing/engine';
+import { buildRouteAnchor } from '../features/routes/schedule';
 import { defaultInstitutionalRouteNames, productPricePresets } from '../features/owner-rules/constants';
 import { assertDemoSeedAllowed } from '../features/deployment/database-safety';
 
 const prisma = new PrismaClient();
 
-const adminEmail = 'admin@livneys.local';
+const adminEmail = 'admin@example.com';
 const adminPassword = 'livneys-admin';
 const customerPassword = 'livneys-demo';
 
 const customerEmails: Record<string, string> = {
-  'cust-001': 'south@livneys.local',
-  'cust-002': 'center@livneys.local',
-  'cust-003': 'north@livneys.local',
-  'cust-004': 'cafe-south@livneys.local',
+  'cust-001': 'south@example.com',
+  'cust-002': 'center@example.com',
+  'cust-003': 'north@example.com',
+  'cust-004': 'cafe-south@example.com',
 };
 
-function futureDate(daysFromToday: number, hourUtc: number): Date {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysFromToday, hourUtc, 0, 0));
+/** Demo routes follow the same weekday rules as real ones (Sunday = 0); dates are computed from them. */
+const routeRules: Record<string, { deliveryWeekday: number; cutoffWeekday: number }> = {
+  'route-south': { deliveryWeekday: 2, cutoffWeekday: 0 },
+  'route-center': { deliveryWeekday: 4, cutoffWeekday: 2 },
+  'route-north': { deliveryWeekday: 3, cutoffWeekday: 1 },
+};
+
+function routeWindow(routeId: string) {
+  const rules = routeRules[routeId] ?? routeRules['route-south'];
+  const anchor = buildRouteAnchor({ ...rules, cutoffTime: '18:00' });
+  return { ...rules, delivery: anchor.nextDeliveryAt, cutoff: anchor.nextCutoffAt };
 }
-
-const routeWindows: Record<string, { delivery: Date; cutoff: Date; deliveryWeekday: number; cutoffWeekday: number }> = {
-  'route-south': {
-    delivery: futureDate(3, 8),
-    cutoff: futureDate(2, 15),
-    deliveryWeekday: 2,
-    cutoffWeekday: 1,
-  },
-  'route-center': {
-    delivery: futureDate(4, 8),
-    cutoff: futureDate(3, 15),
-    deliveryWeekday: 4,
-    cutoffWeekday: 3,
-  },
-  'route-north': {
-    delivery: futureDate(5, 8),
-    cutoff: futureDate(4, 15),
-    deliveryWeekday: 3,
-    cutoffWeekday: 2,
-  },
-};
 
 const ownerRoutes = defaultInstitutionalRouteNames.map((name, index) => ({
   id: `route-owner-${index + 1}`,
@@ -143,8 +131,8 @@ async function seedProductsAndPricing() {
     data: [
       {
         id: 'price-list-standard',
-        name: 'מחירון מוסדי סטנדרטי',
-        description: 'מחירי בסיס ללקוחות מוסדיים',
+        name: 'מחירון סטנדרטי',
+        description: 'מחירי בסיס',
         isDefault: true,
       },
       {
@@ -201,7 +189,7 @@ async function seedRoutesCustomersAndUsers() {
   const hashedCustomerPassword = await bcrypt.hash(customerPassword, 12);
 
   for (const route of [...routes, ...ownerRoutes]) {
-    const window = routeWindows[route.id] ?? routeWindows['route-south'];
+    const window = routeWindow(route.id);
 
     await prisma.route.create({
       data: {
@@ -231,7 +219,7 @@ async function seedRoutesCustomersAndUsers() {
   });
 
   for (const customer of customers) {
-    const email = customerEmails[customer.id] ?? `${customer.id}@livneys.local`;
+    const email = customerEmails[customer.id] ?? `${customer.id}@example.com`;
 
     await prisma.customer.create({
       data: {
@@ -311,18 +299,14 @@ async function seedPromotionsRecommendationsAndOrders() {
     const customer = customers.find((item) => item.id === order.customerId);
     if (!customer) continue;
 
-    const routeWindow = routeWindows[customer.routeId] ?? routeWindows['route-south'];
-    const snapshotLines = createOrderSnapshotLines({
-      items: order.items.map((item) => ({ productId: item.productId, quantity: item.qty })),
-      products: products.map((product) => ({
-        id: product.id,
-        name: product.name,
-        price: getSeedProductPrice(product),
-        minQty: product.minQty ?? 1,
-      })),
+    const window = routeWindow(customer.routeId);
+    const lines = order.items.flatMap((item) => {
+      const product = products.find((candidate) => candidate.id === item.productId);
+      return product
+        ? [priceLine({ productId: product.id, productName: product.name, listUnitPrice: getSeedProductPrice(product), quantity: item.qty, promotion: null })]
+        : [];
     });
-    const total = snapshotLines.reduce((sum, line) => sum + line.lineTotal, 0);
-    const vat = calculateVatSummary(total);
+    const totals = calculateOrderTotals({ ...summarizeLines(lines), paymentTerm: 'NET_30', vatRatePercent: 18 });
     const status = normalizeOrderStatus(order.status, order.id);
     const orderDate = new Date(`${order.date}T09:00:00.000Z`);
 
@@ -333,17 +317,12 @@ async function seedPromotionsRecommendationsAndOrders() {
         routeId: customer.routeId,
         status,
         source: 'CUSTOMER',
-        deliveryWindowStart: status === 'DRAFT' ? routeWindow.delivery : orderDate,
-        deadlineAt: routeWindow.cutoff,
+        deliveryWindowStart: status === 'DRAFT' ? window.delivery : orderDate,
+        deadlineAt: window.cutoff,
         submittedAt: status === 'DRAFT' ? null : orderDate,
-        subtotal: total,
-        discountTotal: 0,
-        total,
-        vatRatePercent: vat.vatRatePercent,
-        vatTotal: vat.vatTotal,
-        totalIncludingVat: vat.totalIncludingVat,
+        ...totals,
         lines: {
-          create: snapshotLines.map((line) => ({
+          create: lines.map((line) => ({
             productId: line.productId,
             productName: line.productName,
             quantity: line.quantity,
@@ -361,121 +340,10 @@ async function seedPromotionsRecommendationsAndOrders() {
   }
 }
 
-async function seedReminderExamples() {
-  const southWindow = routeWindows['route-south'];
-  const emailRule = await prisma.reminderRule.create({
-    data: {
-      routeId: 'route-south',
-      name: 'תזכורת 48 שעות לפני חלוקת דרום',
-      hoursBeforeDelivery: 48,
-      channel: 'EMAIL',
-      isActive: true,
-    },
-  });
-
-  const whatsappRule = await prisma.reminderRule.create({
-    data: {
-      routeId: 'route-south',
-      name: 'WhatsApp ידני ללקוחות שלא הזמינו',
-      hoursBeforeDelivery: 48,
-      channel: 'WHATSAPP',
-      isActive: true,
-    },
-  });
-
-  await createReminderExample({
-    ruleId: emailRule.id,
-    customerId: 'cust-001',
-    routeId: 'route-south',
-    deliveryWindowStart: southWindow.delivery,
-    channel: 'EMAIL',
-    status: 'PENDING',
-    scheduledAt: futureDate(1, 8),
-    message: 'תזכורת דמו להזמנה חוזרת עם מוצרים מומלצים.',
-  });
-
-  await createReminderExample({
-    ruleId: whatsappRule.id,
-    customerId: 'cust-004',
-    routeId: 'route-south',
-    deliveryWindowStart: southWindow.delivery,
-    channel: 'WHATSAPP',
-    status: 'WHATSAPP_QUEUED',
-    scheduledAt: futureDate(1, 8),
-    message: 'שלום, קו דרום מתקרב. אפשר להשלים הזמנה חוזרת בקישור.',
-    whatsappUrl: 'https://wa.me/972500000000?text=שלום',
-  });
-}
-
-async function createReminderExample({
-  ruleId,
-  customerId,
-  routeId,
-  deliveryWindowStart,
-  channel,
-  status,
-  scheduledAt,
-  message,
-  whatsappUrl,
-}: {
-  ruleId: string;
-  customerId: string;
-  routeId: string;
-  deliveryWindowStart: Date;
-  channel: NotificationChannel;
-  status: 'PENDING' | 'WHATSAPP_QUEUED';
-  scheduledAt: Date;
-  message: string;
-  whatsappUrl?: string;
-}) {
-  const reminderJob = await prisma.reminderJob.create({
-    data: {
-      reminderRuleId: ruleId,
-      customerId,
-      routeId,
-      deliveryWindowStart,
-      channel,
-      status,
-      scheduledAt,
-      whatsappUrl,
-    },
-  });
-  const notificationJob =
-    channel === 'WHATSAPP'
-      ? await prisma.notificationJob.create({
-          data: {
-            customerId,
-            reminderJobId: reminderJob.id,
-            channel,
-            templateKey: 'ORDER_REMINDER',
-            templateName: null,
-            status: 'DRY_RUN',
-            dryRun: true,
-            payload: {
-              to: '972500000000',
-              languageCode: 'he',
-              bodyParameters: ['לקוח לדוגמה', 'Livney', 'דרום', '01/07/2026', '30/06/2026, 18:00', 'http://localhost:3000/customer/cust-004'],
-            },
-            message,
-            scheduledAt,
-            processedAt: scheduledAt,
-            attempts: 1,
-            dedupeKey: `seed:reminder:${reminderJob.id}`,
-          },
-        })
-      : null;
-
-  await prisma.notificationEvent.create({
-    data: {
-      customerId,
-      reminderJobId: reminderJob.id,
-      notificationJobId: notificationJob?.id,
-      channel,
-      type: 'REMINDER_EXAMPLE',
-      status: status === 'PENDING' ? 'PENDING' : 'SENT',
-      subject: channel === 'EMAIL' ? 'תזכורת להזמנה חוזרת' : null,
-      message,
-    },
+/** One weekly email reminder for every route, two days before delivery (processed by the daily cron). */
+async function seedReminderRule() {
+  await prisma.reminderRule.create({
+    data: { routeId: null, name: 'תזכורת שבועית – יומיים לפני החלוקה', hoursBeforeDelivery: 48, channel: 'EMAIL', isActive: true },
   });
 }
 
@@ -489,7 +357,7 @@ async function main() {
   await seedProductsAndPricing();
   await seedRoutesCustomersAndUsers();
   await seedPromotionsRecommendationsAndOrders();
-  await seedReminderExamples();
+  await seedReminderRule();
 
   console.log('Seed complete.');
   console.log(`Admin: ${adminEmail} / ${adminPassword}`);

@@ -87,5 +87,3 @@ export const productImages: Record<string, StaticImageData> = {
   'pomelli_catalog_image_0622 (39).jpg': image39,
   'pomelli_catalog_image_0622 (40).jpg': image40,
 };
-
-export const fallbackProductImage = image00;

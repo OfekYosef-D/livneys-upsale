@@ -1,9 +1,9 @@
+/** Business rules agreed with the owner. Changing a value here changes behaviour everywhere. */
+
+/** Minimum customer order, in ₪ after promotions and before VAT. Manual (admin) orders are exempt. */
 export const MINIMUM_INSTITUTIONAL_ORDER_TOTAL = 700;
 
-export const PRICES_BEFORE_VAT_LABEL = 'מחירי המחירון לפני מע״מ';
-
-export const INSTITUTIONAL_PRICING_NOTICE =
-  'המחירון מיועד ללקוחות עסקיים ומוסדיים. הסכום כולל מע״מ מוצג בסל ובסיכום ההזמנה.';
+export const INSTITUTIONAL_PRICING_NOTICE = 'המחירים ליחידה לפני מע״מ. הסכום כולל מע״מ מוצג בסל ובסיכום ההזמנה.';
 
 export const institutionalBusinessTypes = [
   'מעדניות',
@@ -48,7 +48,7 @@ export const productPricePresets = [
   },
   {
     id: 'institutional-500',
-    label: 'מוסדי 500 גרם',
+    label: 'ממרחים וריבות 500 גרם',
     unit: 'צנצנת 500 גרם',
     caseSize: '4 יחידות בארגז',
     minQty: 4,
@@ -57,7 +57,7 @@ export const productPricePresets = [
   },
   {
     id: 'herb-institutional-500',
-    label: 'זעתר וטימין מוסדי 500 גרם',
+    label: 'זעתר וטימין 500 גרם',
     unit: 'צנצנת 500 גרם',
     caseSize: '4 יחידות בארגז',
     minQty: 4,

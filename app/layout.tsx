@@ -1,7 +1,9 @@
 import type React from 'react';
+import { Suspense } from 'react';
 import './globals.css';
 import type { Metadata } from 'next';
 import { Heebo } from 'next/font/google';
+import { NavigationProgress } from '@/components/ui/NavigationProgress';
 
 const heebo = Heebo({
   subsets: ['hebrew', 'latin'],
@@ -22,7 +24,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="he" dir="rtl" className={heebo.variable}>
-      <body>{children}</body>
+      <body>
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
+        {children}
+      </body>
     </html>
   );
 }

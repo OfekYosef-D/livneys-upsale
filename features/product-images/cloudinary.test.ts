@@ -42,8 +42,35 @@ describe('Cloudinary product image upload helpers', () => {
 
   it('returns a safe configuration error when image upload is unavailable', () => {
     expect(() => getCloudinaryConfig({} as NodeJS.ProcessEnv)).toThrow(
-      expect.objectContaining({ code: 'NOT_CONFIGURED' }),
+      expect.objectContaining({ code: 'DELIVERY_UNAVAILABLE', message: 'העלאת תמונות אינה מוגדרת כרגע.' }),
     );
+  });
+
+  it('trims credentials and defaults the product folder', () => {
+    expect(getCloudinaryConfig({
+      CLOUDINARY_CLOUD_NAME: ' demo ', CLOUDINARY_API_KEY: 'key', CLOUDINARY_API_SECRET: 'secret',
+    } as unknown as NodeJS.ProcessEnv)).toEqual({ cloudName: 'demo', apiKey: 'key', apiSecret: 'secret', folder: 'livneys/products' });
+  });
+
+  it('surfaces a provider rejection and a missing image URL as errors', async () => {
+    const config = { cloudName: 'demo', apiKey: 'key', apiSecret: 'secret' };
+    const file = new File(['image'], 'product.png', { type: 'image/png' });
+    await expect(uploadProductImageToCloudinary({
+      file, config, fetchImpl: vi.fn(async () => new Response(JSON.stringify({ error: { message: 'Invalid signature' } }), { status: 401 })),
+    })).rejects.toThrow('Invalid signature');
+    await expect(uploadProductImageToCloudinary({
+      file, config, fetchImpl: vi.fn(async () => new Response(JSON.stringify({}), { status: 200 })),
+    })).rejects.toThrow('Cloudinary did not return an image URL.');
+  });
+
+  it('never uploads a rejected file type', async () => {
+    const fetchMock = vi.fn();
+    await expect(uploadProductImageToCloudinary({
+      file: new File(['x'], 'doc.pdf', { type: 'application/pdf' }),
+      config: { cloudName: 'demo', apiKey: 'key', apiSecret: 'secret' },
+      fetchImpl: fetchMock,
+    })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('uploads image files to Cloudinary using a signed request', async () => {
@@ -68,5 +95,11 @@ describe('Cloudinary product image upload helpers', () => {
 
     expect(result.secureUrl).toBe('https://res.cloudinary.com/demo/image/upload/v1/product.jpg');
     expect(fetchMock).toHaveBeenCalledWith('https://api.cloudinary.com/v1_1/demo/image/upload', expect.any(Object));
+    const form = (fetchMock.mock.calls[0] as unknown as [string, { body: FormData }])[1].body;
+    expect(form.get('api_key')).toBe('key');
+    expect(form.get('timestamp')).toBe('1234');
+    expect(form.get('folder')).toBe('livneys/products');
+    expect(form.get('signature')).toBe(buildCloudinarySignature({ timestamp: '1234', folder: 'livneys/products' }, 'secret'));
+    expect(form.get('api_secret')).toBeNull();
   });
 });

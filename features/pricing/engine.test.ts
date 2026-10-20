@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { calculateOrderPricing, resolveCatalogPricing, type PricingPromotion } from './engine';
+import { applyPromotion, calculateOrderPricing, priceLine, resolveCatalogPricing, type PricingPromotion } from './engine';
 
 const now = new Date('2026-06-27T10:00:00.000Z');
 
-const customer = {
-  id: 'cust-south',
+const target = {
+  customerId: 'cust-south',
   routeId: 'route-south',
   priceListId: 'price-list-south',
-};
-
-const route = {
-  id: 'route-south',
 };
 
 const products = [
@@ -51,8 +47,7 @@ function promo(overrides: Partial<PricingPromotion> = {}): PricingPromotion {
 describe('pricing engine', () => {
   it('returns safe domain errors for unavailable products and invalid quantities', () => {
     expect(() => calculateOrderPricing({
-      customer,
-      route,
+      target,
       products,
       priceListItems,
       items: [{ productId: 'prod-hidden', quantity: 1 }],
@@ -61,8 +56,7 @@ describe('pricing engine', () => {
     })).toThrow(expect.objectContaining({ code: 'NOT_FOUND' }));
 
     expect(() => calculateOrderPricing({
-      customer,
-      route,
+      target,
       products: [{ ...products[0], minQty: 6 }],
       priceListItems,
       items: [{ productId: 'prod-herb', quantity: 2 }],
@@ -73,8 +67,7 @@ describe('pricing engine', () => {
 
   it('resolves catalog prices from the customer price list and active eligible promotions', () => {
     const result = resolveCatalogPricing({
-      customer,
-      route,
+      target,
       products,
       priceListItems,
       promotions: [
@@ -85,16 +78,16 @@ describe('pricing engine', () => {
       now,
     });
 
-    expect(result.products).toEqual([
+    expect(result).toEqual([
       expect.objectContaining({
-        id: 'prod-herb',
+        productId: 'prod-herb',
         listPrice: 30,
         price: 27,
         promoLabel: '10% הנחה',
         promotion: expect.objectContaining({ id: 'promo-week' }),
       }),
       expect.objectContaining({
-        id: 'prod-spread',
+        productId: 'prod-spread',
         listPrice: 28,
         price: 28,
         promoLabel: undefined,
@@ -105,8 +98,7 @@ describe('pricing engine', () => {
 
   it('chooses one promotion by priority, then savings, then earliest end date', () => {
     const result = calculateOrderPricing({
-      customer,
-      route,
+      target,
       products,
       priceListItems,
       items: [{ productId: 'prod-herb', quantity: 10 }],
@@ -135,8 +127,7 @@ describe('pricing engine', () => {
 
   it('calculates fixed price and buy-x-get-y discounts with line snapshots', () => {
     const fixedPrice = calculateOrderPricing({
-      customer,
-      route,
+      target,
       products,
       priceListItems,
       items: [{ productId: 'prod-spread', quantity: 3 }],
@@ -155,8 +146,7 @@ describe('pricing engine', () => {
     );
 
     const buyXGetY = calculateOrderPricing({
-      customer,
-      route,
+      target,
       products,
       priceListItems,
       items: [{ productId: 'prod-herb', quantity: 14 }],
@@ -172,5 +162,25 @@ describe('pricing engine', () => {
         lineTotal: 360,
       }),
     );
+  });
+
+  it('rejects quantities that break the case multiple', () => {
+    expect(() => calculateOrderPricing({
+      target,
+      products: [{ ...products[0], minQty: 6, orderMultiple: 6 }],
+      priceListItems,
+      items: [{ productId: 'prod-herb', quantity: 8 }],
+      promotions: [],
+      now,
+    })).toThrow(expect.objectContaining({ code: 'VALIDATION_ERROR' }));
+  });
+
+  it('exposes the same per-line math the browser cart uses', () => {
+    expect(applyPromotion({ effectType: 'PERCENT_OFF', discountValue: 150, buyQuantity: null, freeQuantity: null }, 10, 2))
+      .toEqual({ unitPrice: 0, discountTotal: 20 });
+    expect(applyPromotion({ effectType: 'FIXED_AMOUNT_OFF', discountValue: 50, buyQuantity: null, freeQuantity: null }, 10, 3))
+      .toEqual({ unitPrice: 0, discountTotal: 30 });
+    const display = priceLine({ productId: 'p', productName: 'P', listUnitPrice: 10, quantity: 3, promotion: { ...promo(), effectType: 'DISPLAY_ONLY' } });
+    expect(display).toMatchObject({ lineTotal: 30, discountTotal: 0, promotionId: null, promotionSnapshot: null });
   });
 });

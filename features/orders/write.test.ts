@@ -1,282 +1,98 @@
 import { describe, expect, it } from 'vitest';
 import type { PricingPromotion } from '../pricing/engine';
-import { buildSubmittedOrderPayload, formatManualOrderInternalNote } from './write';
+import { buildDraftOrder, buildSubmittedOrder, formatManualOrderInternalNote, type OrderWriteContext } from './write';
 
-const route = {
-  id: 'route-south',
-  isActive: true,
-  nextDeliveryAt: new Date('2026-06-30T08:00:00.000Z'),
-  nextCutoffAt: new Date('2026-06-29T15:00:00.000Z'),
-};
+const now = new Date('2026-10-17T10:00:00.000Z');
 
-const customer = {
-  id: 'cust-001',
-  routeId: 'route-south',
-  priceListId: 'price-list-south',
-  isActive: true,
-};
-
-const products = [
-  {
-    id: 'prod-a',
-    name: 'Product A',
-    category: 'Category A',
-    basePrice: 12,
-    isActive: true,
-    minQty: 2,
-  },
-  {
-    id: 'prod-b',
-    name: 'Product B',
-    category: 'Category B',
-    basePrice: 7,
-    isActive: true,
-    minQty: 1,
-  },
-];
-
-const priceListItems = [
-  { productId: 'prod-a', price: 12 },
-  { productId: 'prod-b', price: 7 },
-];
-
-const promotion: PricingPromotion = {
-  id: 'promo-a',
-  title: 'Promo A',
-  tag: '25%',
-  description: 'Discounted Product A',
-  effectType: 'PERCENT_OFF',
-  discountValue: 25,
-  buyQuantity: null,
-  freeQuantity: null,
-  priority: 10,
-  startsAt: null,
-  endsAt: null,
-  isActive: true,
-  productIds: ['prod-a'],
-  categories: [],
-  customerIds: [],
-  routeIds: [],
-  priceListIds: ['price-list-south'],
-};
-
-describe('shared order write utilities', () => {
-  it('builds submitted admin order payloads with price snapshots and cutoff status', () => {
-    const result = buildSubmittedOrderPayload({
-      context: {
-        customer,
-        route,
-        products,
-        priceListItems,
-        promotions: [],
-      },
-      items: [
-        { productId: 'prod-a', quantity: 3 },
-        { productId: 'prod-b', quantity: 4 },
+function context(overrides: Partial<OrderWriteContext> = {}): OrderWriteContext {
+  return {
+    customerId: 'cust-1',
+    routeId: 'route-1',
+    vatRatePercent: 18,
+    schedule: { deliveryAt: new Date('2026-10-20T05:00:00.000Z'), cutoffAt: new Date('2026-10-18T15:00:00.000Z') },
+    pricing: {
+      target: { customerId: 'cust-1', routeId: 'route-1', priceListId: 'list-1' },
+      products: [
+        { id: 'jar', name: 'ממרח', category: 'ממרחים', basePrice: 20, isActive: true, minQty: 6, orderMultiple: 6 },
+        { id: 'sauce', name: 'רוטב', category: 'רטבים', basePrice: 40, isActive: true, minQty: 1, orderMultiple: 1 },
       ],
-      source: 'ADMIN',
-      paymentTerm: 'NET_30',
-      now: new Date('2026-06-29T14:00:00.000Z'),
-      notes: 'Customer asked for delivery confirmation.',
-      internalNote: formatManualOrderInternalNote({
-        intakeChannel: 'WHATSAPP',
-        note: 'Sent by Shai.',
-      }),
-    });
+      priceListItems: [{ productId: 'jar', price: 18 }],
+      promotions: [],
+    },
+    ...overrides,
+  };
+}
 
-    expect(result.order).toMatchObject({
-      customerId: 'cust-001',
-      routeId: 'route-south',
-      status: 'SUBMITTED',
-      source: 'ADMIN',
-      paymentTerm: 'NET_30',
-      subtotal: 64,
-      discountTotal: 0,
-      total: 64,
-      vatRatePercent: 18,
-      vatTotal: 11.52,
-      totalIncludingVat: 75.52,
-      commercialTermsVersion: null,
-      commercialTermsAcceptedAt: null,
-      notes: 'Customer asked for delivery confirmation.',
-      internalNote: '[manual-order:intake=WHATSAPP] Sent by Shai.',
-    });
-    expect(result.lines).toEqual([
-      {
-        productId: 'prod-a',
-        productName: 'Product A',
-        quantity: 3,
-        listUnitPrice: 12,
-        unitPrice: 12,
-        lineSubtotal: 36,
-        discountTotal: 0,
-        lineTotal: 36,
-        promotionId: null,
-        promotionSnapshot: null,
-      },
-      {
-        productId: 'prod-b',
-        productName: 'Product B',
-        quantity: 4,
-        listUnitPrice: 7,
-        unitPrice: 7,
-        lineSubtotal: 28,
-        discountTotal: 0,
-        lineTotal: 28,
-        promotionId: null,
-        promotionSnapshot: null,
-      },
-    ]);
-  });
+const tenPercentOnSauce: PricingPromotion = {
+  id: 'promo', title: 'מבצע', tag: '10%', description: 'הנחה', effectType: 'PERCENT_OFF', discountValue: 10,
+  buyQuantity: null, freeQuantity: null, priority: 1, startsAt: null, endsAt: null, isActive: true,
+  productIds: ['sauce'], categories: [], customerIds: [], routeIds: [], priceListIds: [],
+};
 
-  it('applies eligible promotions and stores discount snapshots server-side', () => {
-    const result = buildSubmittedOrderPayload({
-      context: {
-        customer,
-        route,
-        products,
-        priceListItems,
-        promotions: [promotion],
-      },
-      items: [{ productId: 'prod-a', quantity: 4 }],
-      source: 'ADMIN',
-      paymentTerm: 'IMMEDIATE_OR_CASH',
-      now: new Date('2026-06-29T14:00:00.000Z'),
-    });
-
-    expect(result.order).toMatchObject({
-      subtotal: 48,
-      discountTotal: 12,
-      paymentTerm: 'IMMEDIATE_OR_CASH',
-      paymentDiscountPercent: 5,
-      paymentDiscountTotal: 1.8,
-      total: 34.2,
-      vatRatePercent: 18,
-      vatTotal: 6.16,
-      totalIncludingVat: 40.36,
-    });
-    expect(result.lines[0]).toEqual(
-      expect.objectContaining({
-        listUnitPrice: 12,
-        unitPrice: 9,
-        lineSubtotal: 48,
-        discountTotal: 12,
-        lineTotal: 36,
-        promotionId: 'promo-a',
-        promotionSnapshot: expect.objectContaining({ id: 'promo-a', effectType: 'PERCENT_OFF' }),
-      }),
-    );
-  });
-
-  it('checks the customer minimum before the immediate payment discount', () => {
-    const result = buildSubmittedOrderPayload({
-      context: {
-        customer,
-        route,
-        products: [
-          {
-            id: 'prod-minimum',
-            name: 'Minimum order product',
-            category: 'Category A',
-            basePrice: 700,
-            isActive: true,
-            minQty: 1,
-          },
-        ],
-        priceListItems: [{ productId: 'prod-minimum', price: 700 }],
-        promotions: [],
-      },
-      items: [{ productId: 'prod-minimum', quantity: 1 }],
+describe('order snapshots', () => {
+  it('snapshots price-list prices, totals, delivery window and the B2B declaration for customer orders', () => {
+    const snapshot = buildSubmittedOrder({
+      context: context(),
+      items: [{ productId: 'jar', quantity: 24 }, { productId: 'sauce', quantity: 10 }],
       source: 'CUSTOMER',
-      paymentTerm: 'IMMEDIATE_OR_CASH',
+      paymentTerm: 'NET_30',
       commercialTermsAccepted: true,
-      now: new Date('2026-06-29T14:00:00.000Z'),
+      notes: '  לפני 10  ',
+      now,
     });
 
-    expect(result.order).toMatchObject({
-      subtotal: 700,
-      paymentDiscountTotal: 35,
-      total: 665,
-      vatRatePercent: 18,
-      vatTotal: 119.7,
-      totalIncludingVat: 784.7,
-      commercialTermsVersion: '2026-08-12-review',
-      commercialTermsAcceptedAt: new Date('2026-06-29T14:00:00.000Z'),
+    expect(snapshot.lines.map((line) => [line.productId, line.unitPrice, line.lineTotal])).toEqual([['jar', 18, 432], ['sauce', 40, 400]]);
+    expect(snapshot.order).toMatchObject({
+      status: 'SUBMITTED',
+      source: 'CUSTOMER',
+      subtotal: 832,
+      total: 832,
+      vatTotal: 149.76,
+      totalIncludingVat: 981.76,
+      deliveryWindowStart: new Date('2026-10-20T05:00:00.000Z'),
+      notes: 'לפני 10',
+      commercialTermsAcceptedAt: now,
     });
   });
 
-  it('rejects customer submission without the B2B commercial declaration', () => {
-    expect(() =>
-      buildSubmittedOrderPayload({
-        context: { customer, route, products, priceListItems, promotions: [] },
-        items: [{ productId: 'prod-a', quantity: 2 }],
-        source: 'CUSTOMER',
-        paymentTerm: 'NET_30',
-        commercialTermsAccepted: false,
-        now: new Date('2026-06-29T14:00:00.000Z'),
-      }),
-    ).toThrow(expect.objectContaining({ code: 'VALIDATION_ERROR' }));
-  });
-
-  it('marks submitted orders after cutoff as special requests', () => {
-    const result = buildSubmittedOrderPayload({
-      context: { customer, route, products, priceListItems, promotions: [] },
-      items: [{ productId: 'prod-a', quantity: 2 }],
+  it('applies promotions server-side and marks orders after the cut-off as special requests', () => {
+    const snapshot = buildSubmittedOrder({
+      context: context({ pricing: { ...context().pricing, promotions: [tenPercentOnSauce] } }),
+      items: [{ productId: 'sauce', quantity: 20 }],
       source: 'ADMIN',
       paymentTerm: 'NET_30',
-      now: new Date('2026-06-29T16:00:00.000Z'),
+      now: new Date('2026-10-19T08:00:00.000Z'),
     });
-
-    expect(result.order.status).toBe('SPECIAL_REQUEST');
+    expect(snapshot.order).toMatchObject({ status: 'SPECIAL_REQUEST', discountTotal: 80, total: 720, commercialTermsVersion: null });
+    expect(snapshot.lines[0].promotionSnapshot).toMatchObject({ id: 'promo' });
   });
 
-  it('rejects inactive customers and routes before building order data', () => {
-    expect(() =>
-      buildSubmittedOrderPayload({
-        context: {
-          customer: { id: 'cust-inactive', routeId: 'route-south', priceListId: 'price-list-south', isActive: false },
-          route,
-          products,
-          priceListItems,
-          promotions: [],
-        },
-        items: [{ productId: 'prod-a', quantity: 2 }],
-        source: 'ADMIN',
-        paymentTerm: 'NET_30',
-        now: new Date('2026-06-29T14:00:00.000Z'),
-      }),
-    ).toThrow(expect.objectContaining({ code: 'ORDER_LOCKED' }));
-
-    expect(() =>
-      buildSubmittedOrderPayload({
-        context: {
-          customer,
-          route: { ...route, isActive: false },
-          products,
-          priceListItems,
-          promotions: [],
-        },
-        items: [{ productId: 'prod-a', quantity: 2 }],
-        source: 'ADMIN',
-        paymentTerm: 'NET_30',
-        now: new Date('2026-06-29T14:00:00.000Z'),
-      }),
-    ).toThrow(expect.objectContaining({ code: 'ORDER_LOCKED' }));
+  it('enforces the B2B declaration and the customer minimum (before the payment discount)', () => {
+    const base = { context: context(), source: 'CUSTOMER' as const, paymentTerm: 'IMMEDIATE_OR_CASH' as const, now };
+    expect(() => buildSubmittedOrder({ ...base, items: [{ productId: 'sauce', quantity: 20 }] })).toThrow(expect.objectContaining({ code: 'VALIDATION_ERROR' }));
+    expect(() => buildSubmittedOrder({ ...base, commercialTermsAccepted: true, items: [{ productId: 'sauce', quantity: 5 }] }))
+      .toThrow(expect.objectContaining({ message: expect.stringContaining('מינימום') }));
+    // 700 before the 5% immediate-payment discount is enough.
+    expect(buildSubmittedOrder({ ...base, commercialTermsAccepted: true, items: [{ productId: 'sauce', quantity: 18 }, { productId: 'jar', quantity: 0 }] }).order.total).toBe(684);
   });
 
-  it('drops unavailable products instead of failing when building submitted order payloads', () => {
-    const result = buildSubmittedOrderPayload({
-      context: { customer, route, products, priceListItems, promotions: [] },
-      items: [
-        { productId: 'prod-a', quantity: 2 },
-        { productId: 'prod-disabled', quantity: 4 },
-      ],
+  it('ignores products that are no longer sold and rejects an order that ends up empty', () => {
+    expect(() => buildSubmittedOrder({
+      context: context(),
+      items: [{ productId: 'discontinued', quantity: 6 }],
       source: 'ADMIN',
       paymentTerm: 'NET_30',
-      now: new Date('2026-06-29T14:00:00.000Z'),
-    });
+      now,
+    })).toThrow(expect.objectContaining({ message: expect.stringContaining('לפחות מוצר אחד') }));
+  });
 
-    expect(result.lines).toHaveLength(1);
-    expect(result.lines[0]?.productId).toBe('prod-a');
+  it('builds drafts without a minimum and returns null for an empty cart', () => {
+    expect(buildDraftOrder({ context: context(), items: [{ productId: 'sauce', quantity: 1 }], now })?.order).toMatchObject({ status: 'DRAFT', submittedAt: null, total: 40 });
+    expect(buildDraftOrder({ context: context(), items: [], now })).toBeNull();
+  });
+
+  it('tags manual orders with the intake channel', () => {
+    expect(formatManualOrderInternalNote({ intakeChannel: 'PHONE', note: ' התקשר בבוקר ' })).toBe('[manual-order:intake=PHONE] התקשר בבוקר');
+    expect(formatManualOrderInternalNote({ intakeChannel: 'WHATSAPP' })).toBe('[manual-order:intake=WHATSAPP]');
   });
 });

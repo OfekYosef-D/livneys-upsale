@@ -1,362 +1,139 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import * as actions from './actions';
+import { AppError, AuthorizationError } from '@/lib/errors';
 
-vi.mock('next/cache', () => ({
-  revalidatePath: vi.fn(),
-}));
-
-vi.mock('@/lib/db', () => ({
-  prisma: {
-    $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({})),
-    order: {
-      findFirst: vi.fn(),
-      upsert: vi.fn(),
-    },
-  },
-}));
-
-vi.mock('@/features/orders/service', () => ({
-  createSubmittedOrder: vi.fn(),
-  getOrderWriteContext: vi.fn(),
-}));
-
-vi.mock('@/features/orders/persistence', () => ({
-  cancelDraftOrder: vi.fn(),
-  isRetryableOrderWriteError: vi.fn(() => false),
-  persistDraftOrder: vi.fn(),
-  StaleOrderWriteError: class StaleOrderWriteError extends Error {},
-}));
-
-vi.mock('@/features/pricing/engine', () => ({
-  calculateOrderPricing: vi.fn(),
-}));
-
-vi.mock('../notifications/jobs', () => ({
-  enqueueOrderLifecycleWhatsApp: vi.fn(),
-}));
-
-vi.mock('@/lib/action-result', () => ({
-  actionOk: (data: unknown) => ({ ok: true, data }),
-  actionError: (error: unknown) => ({
-    ok: false,
-    error: error instanceof Error ? error.message : 'Unexpected error',
-  }),
-}));
-
+vi.mock('@/lib/db', async () => (await import('@/test/prisma-mock')).prismaModule());
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/authorization', () => ({
+  assertAdminAction: vi.fn(),
   assertCustomerAction: vi.fn(),
+}));
+vi.mock('@/features/notifications/order-notifications', () => ({
+  notifyOrderStatusInBackground: vi.fn(),
+  notifyAdditionDecisionInBackground: vi.fn(),
+}));
+vi.mock('@/features/orders/service', () => ({
+  submitOrder: vi.fn(),
+  saveDraftOrder: vi.fn(),
+  changeOrderStatus: vi.fn(),
 }));
 
 const { assertCustomerAction } = await import('@/lib/authorization');
-const { createSubmittedOrder, getOrderWriteContext } = await import('@/features/orders/service');
-const { enqueueOrderLifecycleWhatsApp } = await import('../notifications/jobs');
-const { cancelDraftOrder, persistDraftOrder } = await import('@/features/orders/persistence');
-const { calculateOrderPricing } = await import('@/features/pricing/engine');
+const { revalidatePath } = await import('next/cache');
+const { notifyOrderStatusInBackground } = await import('@/features/notifications/order-notifications');
+const { saveDraftOrder, submitOrder } = await import('@/features/orders/service');
+const { saveDraftOrderAction, submitCustomerOrderAction } = await import('./actions');
 
-const mockedAssertCustomerAction = vi.mocked(assertCustomerAction);
-const mockedCreateSubmittedOrder = vi.mocked(createSubmittedOrder);
-const mockedGetOrderWriteContext = vi.mocked(getOrderWriteContext);
-const mockedEnqueueOrderLifecycleWhatsApp = vi.mocked(enqueueOrderLifecycleWhatsApp);
-const mockedPersistDraftOrder = vi.mocked(persistDraftOrder);
-const mockedCancelDraftOrder = vi.mocked(cancelDraftOrder);
-const mockedCalculateOrderPricing = vi.mocked(calculateOrderPricing);
 const idempotencyKey = '9d31ee3f-3eb9-4cbc-b0ff-d48ed1daed71';
+const submission = {
+  customerId: 'cust-001',
+  idempotencyKey,
+  items: [{ productId: 'prod-a', quantity: 2 }],
+  notes: 'Call before arrival',
+  paymentTerm: 'IMMEDIATE_OR_CASH',
+  vatRatePercent: 18,
+  legalDocumentSetVersion: '2026-08-12-review',
+  commercialTermsAccepted: true,
+};
 
-describe('customer portal actions', () => {
-  beforeEach(() => {
-    mockedAssertCustomerAction.mockReset();
-    mockedCreateSubmittedOrder.mockReset();
-    mockedGetOrderWriteContext.mockReset();
-    mockedEnqueueOrderLifecycleWhatsApp.mockReset();
-    mockedPersistDraftOrder.mockReset();
-    mockedCancelDraftOrder.mockReset();
-    mockedCalculateOrderPricing.mockReset();
-  });
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(assertCustomerAction).mockResolvedValue({ user: { id: 'u1', role: 'CUSTOMER', customerId: 'cust-001' } } as never);
+});
 
-  it('cancels the current draft when the customer empties the cart', async () => {
-    mockedAssertCustomerAction.mockResolvedValue({
-      user: { id: 'user-1', role: 'CUSTOMER', customerId: 'cust-001' },
-      expires: '2026-08-12T00:00:00.000Z',
-    });
-    mockedGetOrderWriteContext.mockResolvedValue({
-      customer: { id: 'cust-001', routeId: 'route-south', priceListId: 'price-list-standard', isActive: true },
-      route: {
-        id: 'route-south', isActive: true,
-        nextDeliveryAt: new Date('2026-08-12T08:00:00.000Z'),
-        nextCutoffAt: new Date('2026-08-11T15:00:00.000Z'),
-      },
-      products: [],
-      priceListItems: [],
-      promotions: [],
-    });
-    mockedCancelDraftOrder.mockResolvedValue({ orderId: 'draft-empty', cancelled: true });
+describe('saveDraftOrderAction', () => {
+  it('authorizes against the payload customer and delegates to saveDraftOrder', async () => {
+    vi.mocked(saveDraftOrder).mockResolvedValue({ orderId: 'draft-1' });
 
-    const result = await actions.saveDraftOrderAction({ customerId: 'cust-001', items: [] });
-
-    expect(result).toEqual({ ok: true, data: { orderId: null } });
-    expect(mockedCancelDraftOrder).toHaveBeenCalledWith(expect.anything(), {
-      customerId: 'cust-001',
-      deliveryWindowStart: new Date('2026-08-12T08:00:00.000Z'),
-    });
-    expect(mockedCalculateOrderPricing).not.toHaveBeenCalled();
-  });
-
-  it('persists a draft through the transactional order integrity layer', async () => {
-    mockedAssertCustomerAction.mockResolvedValue({
-      user: { id: 'user-1', role: 'CUSTOMER', customerId: 'cust-001' },
-      expires: '2026-08-12T00:00:00.000Z',
-    });
-    mockedGetOrderWriteContext.mockResolvedValue({
-      customer: { id: 'cust-001', routeId: 'route-south', priceListId: 'price-list-standard', isActive: true },
-      route: {
-        id: 'route-south',
-        isActive: true,
-        nextDeliveryAt: new Date('2026-08-12T08:00:00.000Z'),
-        nextCutoffAt: new Date('2026-08-11T15:00:00.000Z'),
-      },
-      products: [{
-        id: 'prod-a', name: 'Product A', category: 'Spreads', basePrice: 100,
-        isActive: true, minQty: 1, orderMultiple: 1,
-      }],
-      priceListItems: [{ productId: 'prod-a', price: 100 }],
-      promotions: [],
-    });
-    mockedCalculateOrderPricing.mockReturnValue({
-      subtotal: 200,
-      discountTotal: 0,
-      total: 200,
-      lines: [{
-        productId: 'prod-a', productName: 'Product A', quantity: 2,
-        listUnitPrice: 100, unitPrice: 100, lineSubtotal: 200,
-        discountTotal: 0, lineTotal: 200, promotionId: null, promotionSnapshot: null,
-      }],
-    });
-    mockedPersistDraftOrder.mockResolvedValue({
-      order: {
-        id: 'draft-1', orderNumber: 1001, status: 'DRAFT', routeId: 'route-south',
-        customerId: 'cust-001', deliveryWindowStart: new Date('2026-08-12T08:00:00.000Z'),
-        idempotencyKey: null, revision: 1,
-      },
-    });
-
-    const result = await actions.saveDraftOrderAction({
-      customerId: 'cust-001',
-      items: [{ productId: 'prod-a', qty: 2 }],
-    });
+    const result = await saveDraftOrderAction({ customerId: 'cust-001', items: [{ productId: 'prod-a', quantity: 2 }] });
 
     expect(result).toEqual({ ok: true, data: { orderId: 'draft-1' } });
-    expect(mockedPersistDraftOrder).toHaveBeenCalledWith(expect.anything(), {
-      payload: expect.objectContaining({
-        order: expect.objectContaining({
-          customerId: 'cust-001',
-          status: 'DRAFT',
-          submittedAt: null,
-        }),
-      }),
-    });
+    expect(assertCustomerAction).toHaveBeenCalledWith('cust-001');
+    expect(saveDraftOrder).toHaveBeenCalledWith('cust-001', [{ productId: 'prod-a', quantity: 2 }]);
+    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
   });
 
-  it('queues lifecycle WhatsApp notifications after customer order submission', async () => {
-    mockedAssertCustomerAction.mockResolvedValue({
-      user: { id: 'user-1', role: 'CUSTOMER', customerId: 'cust-001' },
-      expires: '2026-07-01T00:00:00.000Z',
-    });
-    mockedCreateSubmittedOrder.mockResolvedValue({
-      orderId: 'ord-customer',
-      orderNumber: 1001,
-      status: 'SUBMITTED',
-      routeId: 'route-south',
-      replayed: false,
-    });
-    mockedGetOrderWriteContext.mockResolvedValue({
-      customer: {
-        id: 'cust-001',
-        routeId: 'route-south',
-        priceListId: 'price-list-standard',
-        isActive: true,
-      },
-      route: {
-        id: 'route-south',
-        isActive: true,
-        nextDeliveryAt: new Date('2026-07-10T08:00:00.000Z'),
-        nextCutoffAt: new Date('2026-07-09T15:00:00.000Z'),
-      },
-      products: [
-        {
-          id: 'prod-a',
-          name: 'Product A',
-          category: 'Spreads',
-          basePrice: 100,
-          isActive: true,
-          minQty: 1,
-          orderMultiple: 1,
-        },
-      ],
-      priceListItems: [{ productId: 'prod-a', price: 100 }],
-      promotions: [],
-    });
+  it('passes an empty cart through so the draft can be cancelled', async () => {
+    vi.mocked(saveDraftOrder).mockResolvedValue({ orderId: null });
 
-    const result = await actions.submitCustomerOrderAction({
+    const result = await saveDraftOrderAction({ customerId: 'cust-001', items: [] });
+
+    expect(result).toEqual({ ok: true, data: { orderId: null } });
+    expect(saveDraftOrder).toHaveBeenCalledWith('cust-001', []);
+  });
+
+  it('returns UNAUTHORIZED when the signed-in user does not own the customer', async () => {
+    vi.mocked(assertCustomerAction).mockRejectedValue(new AuthorizationError());
+
+    const result = await saveDraftOrderAction({ customerId: 'cust-other', items: [] });
+
+    expect(result).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+    expect(saveDraftOrder).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe('submitCustomerOrderAction', () => {
+  it('submits a CUSTOMER order with the confirmed totals and notifies', async () => {
+    vi.mocked(submitOrder).mockResolvedValue({ orderId: 'ord-customer', orderNumber: 1001, status: 'SUBMITTED', replayed: false });
+
+    const result = await submitCustomerOrderAction(submission);
+
+    expect(result).toEqual({ ok: true, data: { orderId: 'ord-customer', status: 'SUBMITTED' } });
+    expect(submitOrder).toHaveBeenCalledWith({
       customerId: 'cust-001',
+      items: [{ productId: 'prod-a', quantity: 2 }],
+      source: 'CUSTOMER',
       idempotencyKey,
-      items: [{ productId: 'prod-a', qty: 2 }],
-      notes: 'Call before arrival',
       paymentTerm: 'IMMEDIATE_OR_CASH',
-      vatRatePercent: 18,
-      legalDocumentSetVersion: '2026-08-12-review',
       commercialTermsAccepted: true,
+      notes: 'Call before arrival',
+      expectedVatRatePercent: 18,
+      expectedLegalDocumentSetVersion: '2026-08-12-review',
+      actor: { userId: 'u1', audit: expect.any(Function) },
     });
-
-    expect(result).toEqual({
-      ok: true,
-      data: { orderId: 'ord-customer', status: 'SUBMITTED' },
-    });
-    expect(mockedCreateSubmittedOrder).toHaveBeenCalledWith(
-      expect.objectContaining({
-        idempotencyKey,
-        paymentTerm: 'IMMEDIATE_OR_CASH',
-        commercialTermsAccepted: true,
-        expectedVatRatePercent: 18,
-        expectedLegalDocumentSetVersion: '2026-08-12-review',
-      }),
-    );
-    expect(mockedEnqueueOrderLifecycleWhatsApp).toHaveBeenCalledWith({ orderId: 'ord-customer' });
+    expect(notifyOrderStatusInBackground).toHaveBeenCalledWith('ord-customer');
   });
 
-  it('does not enqueue a duplicate lifecycle notification when a submission is replayed', async () => {
-    mockedAssertCustomerAction.mockResolvedValue({
-      user: { id: 'user-1', role: 'CUSTOMER', customerId: 'cust-001' },
-      expires: '2026-07-01T00:00:00.000Z',
-    });
-    mockedGetOrderWriteContext.mockResolvedValue({
-      customer: { id: 'cust-001', routeId: 'route-south', priceListId: 'price-list-standard', isActive: true },
-      route: {
-        id: 'route-south', isActive: true,
-        nextDeliveryAt: new Date('2026-07-10T08:00:00.000Z'),
-        nextCutoffAt: new Date('2026-07-09T15:00:00.000Z'),
-      },
-      products: [{
-        id: 'prod-a', name: 'Product A', category: 'Spreads', basePrice: 400,
-        isActive: true, minQty: 1, orderMultiple: 1,
-      }],
-      priceListItems: [{ productId: 'prod-a', price: 400 }],
-      promotions: [],
-    });
-    mockedCreateSubmittedOrder.mockResolvedValue({
-      orderId: 'ord-customer', orderNumber: 1001, status: 'SUBMITTED',
-      routeId: 'route-south', replayed: true,
-    });
+  it('does not notify again when the submission is replayed', async () => {
+    vi.mocked(submitOrder).mockResolvedValue({ orderId: 'ord-customer', orderNumber: 1001, status: 'SUBMITTED', replayed: true });
 
-    const result = await actions.submitCustomerOrderAction({
-      customerId: 'cust-001',
-      idempotencyKey,
-      items: [{ productId: 'prod-a', qty: 2 }],
-      paymentTerm: 'NET_30',
-      vatRatePercent: 18,
-      legalDocumentSetVersion: '2026-08-12-review',
-      commercialTermsAccepted: true,
-    });
+    const result = await submitCustomerOrderAction(submission);
 
     expect(result.ok).toBe(true);
-    expect(mockedEnqueueOrderLifecycleWhatsApp).not.toHaveBeenCalled();
+    expect(notifyOrderStatusInBackground).not.toHaveBeenCalled();
   });
 
-  it('rejects a customer order when the B2B declaration was not accepted', async () => {
-    mockedAssertCustomerAction.mockResolvedValue({
-      user: { id: 'user-1', role: 'CUSTOMER', customerId: 'cust-001' },
-      expires: '2026-07-01T00:00:00.000Z',
-    });
-    mockedGetOrderWriteContext.mockResolvedValue({
-      customer: {
-        id: 'cust-001',
-        routeId: 'route-south',
-        priceListId: 'price-list-standard',
-        isActive: true,
-      },
-      route: {
-        id: 'route-south',
-        isActive: true,
-        nextDeliveryAt: new Date('2026-07-10T08:00:00.000Z'),
-        nextCutoffAt: new Date('2026-07-09T15:00:00.000Z'),
-      },
-      products: [{
-        id: 'prod-a',
-        name: 'Product A',
-        category: 'Spreads',
-        basePrice: 100,
-        isActive: true,
-        minQty: 1,
-        orderMultiple: 1,
-      }],
-      priceListItems: [{ productId: 'prod-a', price: 100 }],
-      promotions: [],
-    });
+  it('rejects an order without the B2B declaration before authorization or submission', async () => {
+    const result = await submitCustomerOrderAction({ ...submission, commercialTermsAccepted: false });
 
-    const result = await actions.submitCustomerOrderAction({
-      customerId: 'cust-001',
-      idempotencyKey,
-      items: [{ productId: 'prod-a', qty: 2 }],
-      paymentTerm: 'NET_30',
-      vatRatePercent: 18,
-      legalDocumentSetVersion: '2026-08-12-review',
-      commercialTermsAccepted: false,
-    });
-
-    expect(result.ok).toBe(false);
-    expect(mockedCreateSubmittedOrder).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: false, code: 'VALIDATION_ERROR' });
+    expect(assertCustomerAction).not.toHaveBeenCalled();
+    expect(submitOrder).not.toHaveBeenCalled();
   });
 
-  it('rejects an unsupported payment term before creating an order', async () => {
-    mockedAssertCustomerAction.mockResolvedValue({
-      user: { id: 'user-1', role: 'CUSTOMER', customerId: 'cust-001' },
-      expires: '2026-07-01T00:00:00.000Z',
-    });
-    mockedCreateSubmittedOrder.mockResolvedValue({
-      orderId: 'ord-customer',
-      orderNumber: 1001,
-      status: 'SUBMITTED',
-      routeId: 'route-south',
-      replayed: false,
-    });
-    mockedGetOrderWriteContext.mockResolvedValue({
-      customer: {
-        id: 'cust-001',
-        routeId: 'route-south',
-        priceListId: 'price-list-standard',
-        isActive: true,
-      },
-      route: {
-        id: 'route-south',
-        isActive: true,
-        nextDeliveryAt: new Date('2026-07-10T08:00:00.000Z'),
-        nextCutoffAt: new Date('2026-07-09T15:00:00.000Z'),
-      },
-      products: [
-        {
-          id: 'prod-a',
-          name: 'Product A',
-          category: 'Spreads',
-          basePrice: 100,
-          isActive: true,
-          minQty: 1,
-          orderMultiple: 1,
-        },
-      ],
-      priceListItems: [{ productId: 'prod-a', price: 100 }],
-      promotions: [],
-    });
+  it('rejects an unsupported payment term', async () => {
+    const result = await submitCustomerOrderAction({ ...submission, paymentTerm: 'INVALID' });
 
-    const result = await actions.submitCustomerOrderAction({
-      customerId: 'cust-001',
-      idempotencyKey,
-      items: [{ productId: 'prod-a', qty: 2 }],
-      paymentTerm: 'INVALID' as 'NET_30',
-      vatRatePercent: 18,
-      legalDocumentSetVersion: '2026-08-12-review',
-      commercialTermsAccepted: true,
-    });
+    expect(result).toMatchObject({ ok: false, code: 'VALIDATION_ERROR' });
+    expect(submitOrder).not.toHaveBeenCalled();
+  });
 
-    expect(result.ok).toBe(false);
-    expect(mockedCreateSubmittedOrder).not.toHaveBeenCalled();
+  it('returns UNAUTHORIZED for another customer', async () => {
+    vi.mocked(assertCustomerAction).mockRejectedValue(new AuthorizationError());
+
+    const result = await submitCustomerOrderAction({ ...submission, customerId: 'cust-other' });
+
+    expect(result).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+    expect(assertCustomerAction).toHaveBeenCalledWith('cust-other');
+    expect(submitOrder).not.toHaveBeenCalled();
+  });
+
+  it('surfaces business errors from the order service', async () => {
+    vi.mocked(submitOrder).mockRejectedValue(new AppError('STALE_VERSION', 'המחירים השתנו.'));
+
+    const result = await submitCustomerOrderAction(submission);
+
+    expect(result).toEqual({ ok: false, code: 'STALE_VERSION', error: 'המחירים השתנו.' });
+    expect(notifyOrderStatusInBackground).not.toHaveBeenCalled();
   });
 });

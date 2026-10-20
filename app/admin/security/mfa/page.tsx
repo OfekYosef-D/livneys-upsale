@@ -1,14 +1,15 @@
 import { AdminShell } from '@/components/admin/AdminShell';
 import { MfaEnrollmentClient } from '@/features/auth/components/MfaEnrollmentClient';
 import { requireAdminPage } from '@/lib/authorization';
+import { paths } from '@/lib/paths';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminMfaPage() {
-  const session = await requireAdminPage('/admin/security/mfa');
+export default async function AdminSecurityPage() {
+  const session = await requireAdminPage(paths.admin.security);
   return (
-    <AdminShell title="אבטחת חשבון" subtitle="אימות דו-שלבי הוא אפשרות רשות. אפשר להפעיל אותו כאן בכל שלב." activeHref="/admin">
-      <section className="mx-auto max-w-xl rounded-2xl border border-black/10 bg-white p-5 shadow-[0_18px_54px_rgba(0,0,0,0.05)]">
+    <AdminShell title="אבטחת החשבון" activeHref={paths.admin.security}>
+      <section className="ui-panel mx-auto max-w-xl p-5">
         <MfaEnrollmentClient alreadyEnabled={Boolean(session.user.mfaEnabled)} />
       </section>
     </AdminShell>

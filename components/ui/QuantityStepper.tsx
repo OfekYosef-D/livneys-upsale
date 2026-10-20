@@ -16,10 +16,6 @@ export function parseOrderQuantity(draft: string, min: number, step: number): nu
   return quantity;
 }
 
-export function finalizeOrderQuantity(draft: string, min: number, step: number, fallbackValue: number): number {
-  return parseOrderQuantity(draft, min, step) ?? fallbackValue;
-}
-
 export function QuantityStepper({
   value,
   onChange,
@@ -84,7 +80,7 @@ export function QuantityStepper({
   }
 
   return (
-    <div className="grid h-10 grid-cols-[2.5rem_1fr_2.5rem] items-center overflow-hidden rounded-full border border-black/10 bg-[#e6e1d8]">
+    <div className="grid h-10 grid-cols-[2.5rem_1fr_2.5rem] items-center overflow-hidden rounded-md border border-[var(--pantry-line)] bg-[var(--pantry)]">
       <button
         type="button"
         aria-label="הפחת כמות"
@@ -110,8 +106,8 @@ export function QuantityStepper({
         onFocus={handleFocus}
         onBlur={(event) => commitDraft(event.currentTarget.value)}
         onKeyDown={handleKeyDown}
-        className={`h-full min-w-0 w-full appearance-none border-0 px-1 text-center text-base font-black tabular-nums outline-none transition focus:ring-2 focus:ring-inset focus:ring-black/25 ${
-          isEditing && !draftIsValid ? 'bg-red-50 text-red-700' : 'bg-[#e6e1d8] text-black'
+        className={`h-full min-w-0 w-full appearance-none border-0 px-1 text-center text-base font-semibold tabular-nums outline-none transition focus:ring-2 focus:ring-inset focus:ring-black/25 ${
+          isEditing && !draftIsValid ? 'bg-red-50 text-red-700' : 'bg-[var(--pantry)] text-black'
         }`}
       />
       <button

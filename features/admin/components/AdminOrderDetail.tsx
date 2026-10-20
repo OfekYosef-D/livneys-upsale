@@ -1,154 +1,77 @@
 import Link from 'next/link';
-import type { getAdminOrderDetail } from '@/features/admin/queries';
-import { OrderFinancialSummary } from '@/features/orders/components/OrderFinancialSummary';
-import { formatOrderNumber } from '@/features/orders/order-number';
-import { paymentTermLabels } from '@/features/orders/payment-terms';
-import { money } from '@/lib/format';
+import { Button } from '@/components/ui/Button';
+import { Panel, PanelHeader } from '@/components/ui/Panel';
+import { DefinitionItem, DefinitionList } from '@/components/ui/Toolbar';
+import { formatDateTime, formatLongDate } from '@/lib/datetime';
+import { paths } from '@/lib/paths';
+import { legalDocuments } from '../../legal/documents';
+import { AdminAdditionRequests } from '../../order-additions/components/AdminAdditionRequests';
+import { OrderFinancialSummary } from '../../orders/components/OrderFinancialSummary';
+import { OrderLinesTable } from '../../orders/components/OrderLinesTable';
+import { OrderStatusBadge } from '../../orders/components/OrderStatusBadge';
+import { canAddItems } from '../../orders/status';
+import { paymentTermLabels } from '../../orders/totals';
+import { AdminPaymentReceipts } from '../../payments/components/AdminPaymentReceipts';
+import type { AdminOrderDetailData } from '../queries';
 import { AdminOrderStatusActions } from './AdminOrderStatusActions';
-import { OrderStatusPill } from './OrderStatusPill';
-import { AdminAdditionRequests } from '@/features/order-additions/components/AdminAdditionRequests';
-import { AdminPaymentReceipts } from '@/features/payments/components/AdminPaymentReceipts';
 
-type OrderData = NonNullable<Awaited<ReturnType<typeof getAdminOrderDetail>>>;
+const documentTitles = Object.fromEntries(legalDocuments.map((document) => [document.type, document.title]));
 
-export function AdminOrderDetail({ order }: { order: OrderData }) {
+export function AdminOrderDetail({ order }: { order: AdminOrderDetailData }) {
+  const hasPendingAddition = order.additionRequests.some((request) => request.status === 'PENDING');
+
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-      <section className="overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_18px_54px_rgba(0,0,0,0.05)]">
-        <div className="hidden gap-2 border-b border-black/10 bg-[#e6e1d8] px-4 py-2 text-xs font-black text-black/55 md:grid md:grid-cols-[minmax(0,1fr)_5rem_7rem_6rem_7rem]">
-          <span>מוצר</span>
-          <span>כמות</span>
-          <span>מחיר</span>
-          <span>הנחה</span>
-          <span>סה״כ</span>
-        </div>
-        <div className="divide-y divide-black/10">
-          {order.lines.map((line) => (
-            <div key={line.id} className="grid gap-2 px-4 py-4 text-sm md:grid-cols-[minmax(0,1fr)_5rem_7rem_6rem_7rem] md:items-center">
-              <div className="min-w-0">
-                <p className="truncate font-black">{line.productName}</p>
-                {line.promotionLabel && <p className="mt-1 w-fit rounded-full bg-black px-2 py-0.5 text-[11px] font-black text-white">{line.promotionLabel}</p>}
-              </div>
-              <p className="font-bold tabular-nums"><span className="md:hidden">כמות: </span>{line.quantity}</p>
-              <div className="font-bold tabular-nums">
-                <span className="md:hidden">מחיר: </span>
-                {line.listUnitPrice > line.unitPrice && <p className="text-xs text-black/40 line-through">{money(line.listUnitPrice)}</p>}
-                <p>{money(line.unitPrice)}</p>
-              </div>
-              <p className={`font-black tabular-nums ${line.discountTotal > 0 ? 'text-emerald-700' : 'text-black/35'}`}>
-                <span className="md:hidden">הנחה: </span>{line.discountTotal > 0 ? `-${money(line.discountTotal)}` : money(0)}
-              </p>
-              <p className="font-black tabular-nums"><span className="md:hidden">סה״כ: </span>{money(line.lineTotal)}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <aside className="space-y-4">
-        <section className="rounded-2xl border border-black/10 bg-white p-4 shadow-[0_18px_54px_rgba(0,0,0,0.05)]">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-black text-black/45">הזמנה</p>
-              <h2 className="text-xl font-black">{formatOrderNumber(order.orderNumber)}</h2>
-            </div>
-            <OrderStatusPill status={order.status} />
-          </div>
-          <Info label="לקוח" value={order.customerName} href={`/admin/customers/${order.customerId}`} />
-          <Info label="קו" value={order.routeName} href={order.routeId ? `/admin/routes/${order.routeId}` : undefined} />
-          <Info label="מקור" value={order.source === 'ADMIN' ? 'הזמנה ידנית' : 'פורטל לקוח'} />
-          <Info label="תנאי תשלום" value={paymentTermLabels[order.paymentTerm]} />
-          <Info label="איש קשר" value={`${order.customerContact} · ${order.customerPhone}`} />
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <MiniMetric label="שורות" value={String(order.lineCount)} />
-            <MiniMetric label="חלוקה" value={new Intl.DateTimeFormat('he-IL').format(new Date(order.deliveryWindowStart))} />
-          </div>
-          <div className="mt-4 rounded-xl bg-[#e6e1d8] px-3 pb-3 pt-0.5">
-            <OrderFinancialSummary
-              subtotal={order.subtotal}
-              productDiscountTotal={order.discountTotal}
-              paymentDiscountPercent={order.paymentDiscountPercent}
-              paymentDiscountTotal={order.paymentDiscountTotal}
-              totalBeforeVat={order.total}
-              vatRatePercent={order.vatRatePercent}
-              vatTotal={order.vatTotal}
-              totalIncludingVat={order.totalIncludingVat}
-            />
-          </div>
-          <div className="mt-3 rounded-xl border border-black/10 p-3 text-xs font-bold leading-5">
-            <p className="font-black">תיעוד אישור מסחרי</p>
-            {order.commercialTermsAcceptedAt ? (
-              <p className="mt-1 text-black/60">
-                הלקוח אישר הצהרת B2B ב־{new Intl.DateTimeFormat('he-IL', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Jerusalem' }).format(new Date(order.commercialTermsAcceptedAt))}
-                {order.commercialTermsVersion ? ` · גרסה ${order.commercialTermsVersion}` : ''}.
-              </p>
-            ) : (
-              <p className="mt-1 text-black/60">
-                {order.source === 'ADMIN' ? 'הזמנה ידנית שהוזנה על ידי הצוות; לא נדרש אישור פורטל לקוח.' : 'לא נשמר אישור הצהרה להזמנה היסטורית זו.'}
-              </p>
-            )}
-          </div>
-          {order.legalAcceptances.length > 0 && (
-            <div className="mt-3 rounded-xl border border-black/10 p-3 text-xs font-bold leading-5">
-              <p className="font-black">תיעוד מסמכים שאושרו</p>
-              <ul className="mt-2 space-y-1 text-black/60">
-                {order.legalAcceptances.map((acceptance) => (
-                  <li key={acceptance.id}>
-                    {legalDocumentLabel(acceptance.documentType)} · גרסה {acceptance.documentVersion} · {new Intl.DateTimeFormat('he-IL', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Jerusalem' }).format(new Date(acceptance.acceptedAt))}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 break-all text-[10px] text-black/40">Hash: {order.legalAcceptances[0]?.contentHash}</p>
-            </div>
-          )}
-          {order.notes && <p className="mt-3 rounded-xl border border-black/10 p-3 text-sm font-bold">{order.notes}</p>}
-          {order.internalNote && <p className="mt-3 rounded-xl bg-[#e6e1d8] p-3 text-xs font-black text-black/65">{order.internalNote}</p>}
-          {['SUBMITTED', 'SPECIAL_REQUEST', 'APPROVED'].includes(order.status) && !order.additionRequests.some((request) => request.status === 'PENDING') && (
-            <Link href={`/admin/orders/${order.id}/addition`} className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-[#e6e1d8] px-4 text-sm font-black text-black ring-1 ring-black/10 hover:bg-black hover:text-white">
-              רישום תוספת מאושרת
-            </Link>
-          )}
-          <AdminOrderStatusActions key={`${order.id}:${order.revision}`} orderId={order.id} status={order.status} />
-        </section>
-      </aside>
-      <div className="lg:col-span-2">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_19rem]">
+      <div className="space-y-4">
+        <Panel>
+          <PanelHeader title="פריטים" description={`${order.lines.length} שורות`} />
+          <OrderLinesTable lines={order.lines} />
+        </Panel>
         <AdminAdditionRequests requests={order.additionRequests} />
+        <AdminPaymentReceipts orderId={order.id} total={order.totalIncludingVat} summary={order.paymentSummary} receipts={order.paymentReceipts} />
       </div>
-      <div className="lg:col-span-2">
-        <AdminPaymentReceipts
-          orderId={order.id}
-          total={order.totalIncludingVat}
-          paidTotal={order.paymentSummary.paidTotal}
-          outstanding={order.paymentSummary.outstanding}
-          status={order.paymentSummary.status}
-          receipts={order.paymentReceipts}
-        />
-      </div>
-    </div>
-  );
-}
 
-function legalDocumentLabel(type: 'COMMERCIAL_TERMS' | 'PRIVACY_POLICY' | 'CANCELLATION_RETURNS') {
-  if (type === 'COMMERCIAL_TERMS') return 'תנאים מסחריים';
-  if (type === 'PRIVACY_POLICY') return 'מדיניות פרטיות';
-  return 'ביטולים והחזרות';
-}
+      {/* On phones the status actions come first: approving is the most common task. */}
+      <aside className="order-first space-y-4 lg:order-none">
+        <Panel className="space-y-4 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <OrderStatusBadge status={order.status} />
+            <span className="text-xs text-black/55">{order.source === 'ADMIN' ? 'הזמנה ידנית' : 'הוזמן בפורטל'}</span>
+          </div>
+          <DefinitionList>
+            <DefinitionItem label="לקוח"><Link href={paths.admin.customer(order.customerId)} className="underline-offset-2 hover:underline">{order.customerName}</Link></DefinitionItem>
+            <DefinitionItem label="איש קשר">
+              {order.customerContact} · <a href={`tel:${order.customerPhone}`} className="hover:underline" dir="ltr">{order.customerPhone}</a>
+            </DefinitionItem>
+            <DefinitionItem label="קו">{order.routeId ? <Link href={paths.admin.route(order.routeId)} className="hover:underline">{order.routeName}</Link> : order.routeName}</DefinitionItem>
+            <DefinitionItem label="חלוקה">{formatLongDate(order.deliveryWindowStart)}</DefinitionItem>
+            <DefinitionItem label="תנאי תשלום">{paymentTermLabels[order.paymentTerm]}</DefinitionItem>
+            {order.submittedAt && <DefinitionItem label="נשלחה">{formatDateTime(order.submittedAt)}</DefinitionItem>}
+          </DefinitionList>
+          {order.notes && <p className="rounded-md bg-[var(--pantry-soft)] p-2.5 text-sm"><span className="font-semibold">הערת לקוח: </span>{order.notes}</p>}
+          {order.internalNote && <p className="rounded-md bg-amber-50 p-2.5 text-xs text-amber-950">{order.internalNote}</p>}
+          <OrderFinancialSummary totals={order} />
+          <AdminOrderStatusActions orderId={order.id} status={order.status} />
+          {canAddItems(order.status) && !hasPendingAddition && (
+            <Button href={paths.admin.orderAddition(order.id)} variant="secondary" fullWidth>הוספת פריטים (לבקשת הלקוח)</Button>
+          )}
+        </Panel>
 
-function MiniMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-black/10 p-3">
-      <p className="text-xs font-black text-black/45">{label}</p>
-      <p className="mt-1 text-sm font-black tabular-nums">{value}</p>
-    </div>
-  );
-}
-
-function Info({ label, value, href }: { label: string; value: string; href?: string }) {
-  const content = <p className="text-sm font-bold">{value}</p>;
-
-  return (
-    <div className="mt-3">
-      <p className="text-xs font-black text-black/45">{label}</p>
-      {href ? <Link href={href} className="hover:underline">{content}</Link> : content}
+        <Panel className="p-4 text-xs leading-5 text-black/60">
+          <p className="font-semibold text-black">תיעוד אישור תנאים</p>
+          {order.legalAcceptances.length > 0 ? (
+            <ul className="mt-2 space-y-1">
+              {order.legalAcceptances.map((acceptance) => (
+                <li key={acceptance.id}>
+                  {documentTitles[acceptance.documentType] ?? acceptance.documentType} · גרסה {acceptance.documentVersion} · {formatDateTime(acceptance.acceptedAt)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1">{order.source === 'ADMIN' ? 'הזמנה ידנית – לא נדרש אישור לקוח בפורטל.' : 'לא נשמר אישור להזמנה זו.'}</p>
+          )}
+        </Panel>
+      </aside>
     </div>
   );
 }

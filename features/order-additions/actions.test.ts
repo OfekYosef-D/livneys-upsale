@@ -1,93 +1,138 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppError, AuthorizationError } from '@/lib/errors';
 
+vi.mock('@/lib/db', async () => (await import('@/test/prisma-mock')).prismaModule());
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
-vi.mock('../../lib/authorization', () => ({
-  assertCustomerAction: vi.fn(),
+vi.mock('@/lib/authorization', () => ({
   assertAdminAction: vi.fn(),
-  AuthorizationError: class AuthorizationError extends Error {},
+  assertCustomerAction: vi.fn(),
 }));
-vi.mock('../../lib/db', () => ({ prisma: { $transaction: vi.fn() } }));
-vi.mock('./service', () => ({ submitOrderAddition: vi.fn() }));
-vi.mock('./persistence', () => ({ approveAdditionRequest: vi.fn(), rejectAdditionRequest: vi.fn() }));
-vi.mock('./notifications', () => ({ enqueueOrderAdditionDecisionNotifications: vi.fn() }));
+vi.mock('@/features/notifications/order-notifications', () => ({
+  notifyOrderStatusInBackground: vi.fn(),
+  notifyAdditionDecisionInBackground: vi.fn(),
+}));
+vi.mock('./service', () => ({
+  submitOrderAddition: vi.fn(),
+  reviewOrderAddition: vi.fn(),
+}));
 
-const { assertAdminAction, assertCustomerAction } = await import('../../lib/authorization');
-const { prisma } = await import('../../lib/db');
-const { submitOrderAddition } = await import('./service');
-const { approveAdditionRequest, rejectAdditionRequest } = await import('./persistence');
-const { enqueueOrderAdditionDecisionNotifications } = await import('./notifications');
+const { assertAdminAction, assertCustomerAction } = await import('@/lib/authorization');
+const { notifyAdditionDecisionInBackground } = await import('@/features/notifications/order-notifications');
+const { submitOrderAddition, reviewOrderAddition } = await import('./service');
 const { createApprovedOrderAdditionAction, reviewOrderAdditionAction, submitOrderAdditionAction } = await import('./actions');
 
-describe('order addition actions', () => {
-  beforeEach(() => vi.clearAllMocks());
+const addition = {
+  customerId: 'cust-001',
+  orderId: 'order-001',
+  idempotencyKey: '1f4106db-26c3-49ed-9cf6-c625dd18fc73',
+  items: [{ productId: 'product-001', quantity: 2 }],
+};
+const actor = { userId: 'u1', audit: expect.any(Function) };
 
-  it('authorizes the customer and submits an additions-only request', async () => {
-    vi.mocked(assertCustomerAction).mockResolvedValue({ user: { id: 'customer-user-001' } } as never);
-    vi.mocked(submitOrderAddition).mockResolvedValue({ requestId: 'request-001', status: 'PENDING', replayed: false });
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(assertAdminAction).mockResolvedValue({ user: { id: 'u1', role: 'ADMIN' } } as never);
+  vi.mocked(assertCustomerAction).mockResolvedValue({ user: { id: 'u1', role: 'CUSTOMER', customerId: 'cust-001' } } as never);
+});
 
-    const result = await submitOrderAdditionAction({
-      customerId: 'cust-001', orderId: 'order-001',
-      idempotencyKey: '1f4106db-26c3-49ed-9cf6-c625dd18fc73',
-      items: [{ productId: 'product-001', quantity: 2 }],
-    });
+describe('submitOrderAdditionAction', () => {
+  it('authorizes the customer and submits a pending addition request', async () => {
+    vi.mocked(submitOrderAddition).mockResolvedValue({ requestId: 'request-001', replayed: false });
 
-    expect(result).toEqual({ ok: true, data: { requestId: 'request-001', status: 'PENDING' } });
-    expect(submitOrderAddition).toHaveBeenCalledWith(expect.objectContaining({ actorUserId: 'customer-user-001' }));
+    const result = await submitOrderAdditionAction(addition);
+
+    expect(result).toEqual({ ok: true, data: { requestId: 'request-001' } });
+    expect(assertCustomerAction).toHaveBeenCalledWith('cust-001');
+    expect(submitOrderAddition).toHaveBeenCalledWith({ ...addition, actor });
+    expect(reviewOrderAddition).not.toHaveBeenCalled();
+    expect(notifyAdditionDecisionInBackground).not.toHaveBeenCalled();
   });
 
-  it('approves in a serializable transaction and queues customer notifications', async () => {
-    vi.mocked(assertAdminAction).mockResolvedValue({ user: { id: 'admin-001' } } as never);
-    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback({} as never));
-    vi.mocked(approveAdditionRequest).mockResolvedValue({ orderId: 'order-001', customerId: 'cust-001', replayed: false });
+  it('returns UNAUTHORIZED for another customer', async () => {
+    vi.mocked(assertCustomerAction).mockRejectedValue(new AuthorizationError());
+
+    const result = await submitOrderAdditionAction({ ...addition, customerId: 'cust-other' });
+
+    expect(result).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+    expect(submitOrderAddition).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a locked order as a business error', async () => {
+    vi.mocked(submitOrderAddition).mockRejectedValue(new AppError('ORDER_LOCKED', 'ההזמנה כבר נארזה.'));
+
+    const result = await submitOrderAdditionAction(addition);
+
+    expect(result).toEqual({ ok: false, code: 'ORDER_LOCKED', error: 'ההזמנה כבר נארזה.' });
+  });
+});
+
+describe('createApprovedOrderAdditionAction', () => {
+  it('lets an admin register an addition that is approved immediately and notifies the customer', async () => {
+    vi.mocked(submitOrderAddition).mockResolvedValue({ requestId: 'request-002', replayed: false });
+    vi.mocked(reviewOrderAddition).mockResolvedValue({ orderId: 'order-001', customerId: 'cust-001', replayed: false } as never);
+
+    const result = await createApprovedOrderAdditionAction(addition);
+
+    expect(result).toEqual({ ok: true, data: { orderId: 'order-001', requestId: 'request-002' } });
+    expect(assertCustomerAction).not.toHaveBeenCalled();
+    expect(submitOrderAddition).toHaveBeenCalledWith({ ...addition, actor });
+    expect(reviewOrderAddition).toHaveBeenCalledWith({ requestId: 'request-002', decision: 'APPROVED', reason: null, actor });
+    expect(notifyAdditionDecisionInBackground).toHaveBeenCalledWith('request-002', 'APPROVED');
+  });
+
+  it('requires an admin session', async () => {
+    vi.mocked(assertAdminAction).mockRejectedValue(new AuthorizationError());
+
+    const result = await createApprovedOrderAdditionAction(addition);
+
+    expect(result).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+    expect(submitOrderAddition).not.toHaveBeenCalled();
+  });
+});
+
+describe('reviewOrderAdditionAction', () => {
+  it('approves the request and notifies the customer', async () => {
+    vi.mocked(reviewOrderAddition).mockResolvedValue({ orderId: 'order-001', customerId: 'cust-001', replayed: false } as never);
 
     const result = await reviewOrderAdditionAction({ requestId: 'request-001', decision: 'APPROVED' });
 
     expect(result).toEqual({ ok: true, data: { orderId: 'order-001', status: 'APPROVED' } });
-    expect(enqueueOrderAdditionDecisionNotifications).toHaveBeenCalledWith({ requestId: 'request-001', decision: 'APPROVED' });
+    expect(reviewOrderAddition).toHaveBeenCalledWith({ requestId: 'request-001', decision: 'APPROVED', reason: null, actor });
+    expect(notifyAdditionDecisionInBackground).toHaveBeenCalledWith('request-001', 'APPROVED');
   });
 
-  it('requires a reason and rejects without calling approval', async () => {
+  it('rejects with a reason and notifies the customer', async () => {
+    vi.mocked(reviewOrderAddition).mockResolvedValue({ orderId: 'order-001', customerId: 'cust-001', replayed: false } as never);
+
+    const result = await reviewOrderAdditionAction({ requestId: 'request-001', decision: 'REJECTED', reason: ' אזל מהמלאי ' });
+
+    expect(result).toEqual({ ok: true, data: { orderId: 'order-001', status: 'REJECTED' } });
+    expect(reviewOrderAddition).toHaveBeenCalledWith(expect.objectContaining({ decision: 'REJECTED', reason: 'אזל מהמלאי' }));
+    expect(notifyAdditionDecisionInBackground).toHaveBeenCalledWith('request-001', 'REJECTED');
+  });
+
+  it('does not notify again when the review is replayed', async () => {
+    vi.mocked(reviewOrderAddition).mockResolvedValue({ orderId: 'order-001', customerId: 'cust-001', replayed: true } as never);
+
+    const result = await reviewOrderAdditionAction({ requestId: 'request-001', decision: 'APPROVED' });
+
+    expect(result.ok).toBe(true);
+    expect(notifyAdditionDecisionInBackground).not.toHaveBeenCalled();
+  });
+
+  it('requires a rejection reason before reviewing', async () => {
     const result = await reviewOrderAdditionAction({ requestId: 'request-001', decision: 'REJECTED' });
-    expect(result.ok).toBe(false);
-    expect(approveAdditionRequest).not.toHaveBeenCalled();
-    expect(rejectAdditionRequest).not.toHaveBeenCalled();
+
+    expect(result).toMatchObject({ ok: false, code: 'VALIDATION_ERROR', error: 'יש להזין סיבת דחייה.' });
+    expect(reviewOrderAddition).not.toHaveBeenCalled();
   });
 
-  it('lets an admin register an immediately approved addition on an existing order', async () => {
-    vi.mocked(assertAdminAction).mockResolvedValue({ user: { id: 'admin-001' } } as never);
-    vi.mocked(submitOrderAddition).mockResolvedValue({ requestId: 'request-002', status: 'PENDING', replayed: false });
-    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback({} as never));
-    vi.mocked(approveAdditionRequest).mockResolvedValue({ orderId: 'order-001', customerId: 'cust-001', replayed: false });
+  it('requires an admin session', async () => {
+    vi.mocked(assertAdminAction).mockRejectedValue(new AuthorizationError());
 
-    const result = await createApprovedOrderAdditionAction({
-      customerId: 'cust-001', orderId: 'order-001',
-      idempotencyKey: '1f4106db-26c3-49ed-9cf6-c625dd18fc73',
-      items: [{ productId: 'product-001', quantity: 2 }],
-    });
+    const result = await reviewOrderAdditionAction({ requestId: 'request-001', decision: 'APPROVED' });
 
-    expect(result).toEqual({ ok: true, data: { orderId: 'order-001', requestId: 'request-002', status: 'APPROVED' } });
-    expect(approveAdditionRequest).toHaveBeenCalledWith({}, expect.objectContaining({ requestId: 'request-002', reviewerUserId: 'admin-001' }));
-    expect(enqueueOrderAdditionDecisionNotifications).toHaveBeenCalledWith({ requestId: 'request-002', decision: 'APPROVED' });
-  });
-
-  it('retries a serializable review race', async () => {
-    vi.mocked(assertAdminAction).mockResolvedValue({ user: { id: 'admin-001' } } as never);
-    vi.mocked(prisma.$transaction)
-      .mockRejectedValueOnce({ code: 'P2034' })
-      .mockImplementationOnce(async (callback) => callback({} as never));
-    vi.mocked(approveAdditionRequest).mockResolvedValue({ orderId: 'order-001', customerId: 'cust-001', replayed: false });
-
-    await expect(reviewOrderAdditionAction({ requestId: 'request-001', decision: 'APPROVED' })).resolves.toMatchObject({ ok: true });
-    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
-  });
-
-  it('retries deduplicated notification enqueueing when a decision is replayed', async () => {
-    vi.mocked(assertAdminAction).mockResolvedValue({ user: { id: 'admin-001' } } as never);
-    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback({} as never));
-    vi.mocked(approveAdditionRequest).mockResolvedValue({ orderId: 'order-001', customerId: 'cust-001', replayed: true });
-
-    await reviewOrderAdditionAction({ requestId: 'request-001', decision: 'APPROVED' });
-
-    expect(enqueueOrderAdditionDecisionNotifications).toHaveBeenCalledWith({ requestId: 'request-001', decision: 'APPROVED' });
+    expect(result).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+    expect(reviewOrderAddition).not.toHaveBeenCalled();
   });
 });

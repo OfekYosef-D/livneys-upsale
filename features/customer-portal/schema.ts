@@ -1,28 +1,23 @@
-import { z } from 'zod';
-import { paymentTermValues } from '../orders/payment-terms';
+import { fields, z } from '@/lib/validation';
+import { paymentTermValues } from '../orders/totals';
 
-export const orderItemInputSchema = z.object({
-  productId: z.string().min(1),
-  qty: z.number().int().nonnegative(),
+export const orderItemSchema = z.object({
+  productId: fields.id,
+  quantity: z.coerce.number().int().nonnegative(),
 });
 
 export const saveDraftOrderSchema = z.object({
-  customerId: z.string().min(1),
-  items: z.array(orderItemInputSchema),
+  customerId: fields.id,
+  items: z.array(orderItemSchema).max(500),
 });
 
 export const submitCustomerOrderSchema = z.object({
-  customerId: z.string().min(1),
-  idempotencyKey: z.string().uuid(),
+  customerId: fields.id,
+  idempotencyKey: fields.idempotencyKey,
   vatRatePercent: z.coerce.number().min(0).max(100),
   legalDocumentSetVersion: z.string().trim().min(1).max(80),
-  items: z.array(orderItemInputSchema).min(1),
-  notes: z.string().max(1000).optional(),
+  items: z.array(orderItemSchema).min(1, 'לא ניתן לשלוח הזמנה ריקה.').max(500),
+  notes: fields.optionalText(1000),
   paymentTerm: z.enum(paymentTermValues),
-  commercialTermsAccepted: z.boolean().refine((accepted) => accepted, {
-    message: 'יש לאשר שההזמנה היא עסקית ואת פרטי ההזמנה לפני השליחה.',
-  }),
+  commercialTermsAccepted: z.literal(true, 'יש לאשר שההזמנה היא עסקית ואת פרטי ההזמנה לפני השליחה.'),
 });
-
-export type SaveDraftOrderInput = z.infer<typeof saveDraftOrderSchema>;
-export type SubmitCustomerOrderInput = z.infer<typeof submitCustomerOrderSchema>;

@@ -1,11 +1,9 @@
 import bcrypt from 'bcryptjs';
-import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { credentialsSchema } from './schema';
 import { clearRateLimit, consumeRateLimit } from './rate-limit';
 import { decryptMfaSecret, hashRecoveryCode, verifyTotpCode } from './mfa';
-
-const dummyPasswordHash = '$2b$12$lyBsPWU.S81FtafGOY3Or.lwCiOJSeIFoQAVRLMFCma6qvYPCK2Zy';
+import { DUMMY_PASSWORD_HASH } from './security';
 
 export type AuthenticatedIdentity = {
   id: string;
@@ -25,28 +23,14 @@ export async function authenticateCredentials(
   if (!parsed.success) return null;
 
   const email = parsed.data.email.toLowerCase();
-  await consumeRateLimit({
-    scope: 'login-ip',
-    identifier: ip,
-    limit: 40,
-    windowMs: 15 * 60 * 1000,
-    blockMs: 30 * 60 * 1000,
-    now,
-  });
-  await consumeRateLimit({
-    scope: 'login-account',
-    identifier: email,
-    limit: 8,
-    windowMs: 15 * 60 * 1000,
-    blockMs: 30 * 60 * 1000,
-    now,
-  });
+  await consumeRateLimit('login-ip', ip, now);
+  await consumeRateLimit('login-account', email, now);
 
   const user = await prisma.user.findUnique({
     where: { email },
     include: { customer: true },
   });
-  const passwordMatches = await bcrypt.compare(parsed.data.password, user?.passwordHash ?? dummyPasswordHash);
+  const passwordMatches = await bcrypt.compare(parsed.data.password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
   const eligible = Boolean(
     user
     && user.isActive

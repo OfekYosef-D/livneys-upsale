@@ -1,162 +1,93 @@
-import { resolveCatalogPricing } from '@/features/pricing/engine';
-import { getEffectiveVatRate } from '@/features/orders/tax-rates';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
+import { customerCatalogInclude, priceCustomerCatalog } from '../catalog/customer-catalog';
+import { getEffectiveVatRate } from '../orders/tax-rates';
+import { getPromotionProductIds, loadActivePromotions } from '../pricing/promotions';
+import { resolveRouteSchedule } from '../routes/schedule';
+
+/** Demo/QA accounts (@livneys.local) are hidden from operational lists. */
+const realCustomers: Prisma.CustomerWhereInput = {
+  OR: [{ email: null }, { NOT: { email: { endsWith: '@livneys.local', mode: 'insensitive' } } }],
+};
+
+const listPriceLists = () =>
+  prisma.priceList.findMany({ select: { id: true, name: true, isDefault: true }, orderBy: [{ isDefault: 'desc' }, { name: 'asc' }] });
 
 export async function getCustomerManagementData() {
   const [customers, routes, priceLists] = await Promise.all([
     prisma.customer.findMany({
-      where: {
-        OR: [
-          { email: null },
-          { NOT: { email: { endsWith: '@livneys.local', mode: 'insensitive' } } },
-        ],
-      },
+      where: realCustomers,
       include: {
-        route: true,
-        priceList: true,
+        route: { select: { name: true } },
+        priceList: { select: { name: true } },
         notificationPreference: true,
-        _count: {
-          select: { orders: true, recommendations: true },
-        },
+        _count: { select: { orders: { where: { status: { not: 'DRAFT' } } } } },
         orders: {
-          include: { lines: true },
+          where: { status: { not: 'DRAFT' } },
+          select: { status: true, submittedAt: true, totalIncludingVat: true },
           orderBy: [{ submittedAt: 'desc' }, { createdAt: 'desc' }],
           take: 1,
         },
       },
       orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
     }),
-    prisma.route.findMany({
-      orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
-    }),
-    prisma.priceList.findMany({
-      orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
-    }),
+    prisma.route.findMany({ select: { id: true, name: true, isActive: true }, orderBy: [{ isActive: 'desc' }, { name: 'asc' }] }),
+    listPriceLists(),
   ]);
 
   return {
-    customers: customers.map((customer) => ({
-      id: customer.id,
-      name: customer.name,
-      invoiceName: customer.invoiceName,
-      contact: customer.contact,
-      email: customer.email,
-      phone: customer.phone,
-      accountingContactName: customer.accountingContactName,
-      accountingEmail: customer.accountingEmail,
-      accountingPhone: customer.accountingPhone,
-      businessType: customer.businessType,
-      region: customer.region,
-      address: customer.address,
-      deliveryConstraints: customer.deliveryConstraints,
-      notes: customer.notes,
-      statusLabel: customer.statusLabel,
-      isActive: customer.isActive,
-      routeId: customer.routeId,
-      routeName: customer.route.name,
-      priceListId: customer.priceListId,
-      priceListName: customer.priceList.name,
-      emailEnabled: customer.notificationPreference?.emailEnabled ?? true,
-      whatsappEnabled: customer.notificationPreference?.whatsappEnabled ?? false,
-      orderCount: customer._count.orders,
-      recommendationCount: customer._count.recommendations,
-      latestOrder: customer.orders[0]
-        ? {
-            id: customer.orders[0].id,
-            status: customer.orders[0].status,
-            submittedAt: customer.orders[0].submittedAt?.toISOString() ?? null,
-            total: Number(customer.orders[0].total),
-          }
+    customers: customers.map(({ route, priceList, notificationPreference, _count, orders, ...customer }) => ({
+      ...customer,
+      routeName: route.name,
+      priceListName: priceList.name,
+      emailEnabled: notificationPreference?.emailEnabled ?? true,
+      whatsappEnabled: notificationPreference?.whatsappEnabled ?? false,
+      orderCount: _count.orders,
+      latestOrder: orders[0]
+        ? { status: orders[0].status, submittedAt: orders[0].submittedAt?.toISOString() ?? null, totalIncludingVat: Number(orders[0].totalIncludingVat) }
         : null,
+      createdAt: customer.createdAt.toISOString(),
+      updatedAt: customer.updatedAt.toISOString(),
     })),
-    routes: routes.map((route) => ({
-      id: route.id,
-      name: route.name,
-      isActive: route.isActive,
-    })),
-    priceLists: priceLists.map((priceList) => ({
-      id: priceList.id,
-      name: priceList.name,
-      isDefault: priceList.isDefault,
-    })),
+    routes,
+    priceLists,
   };
 }
 
 export async function getProductManagementData() {
   const [products, priceLists] = await Promise.all([
     prisma.product.findMany({
-      include: {
-        priceListItems: {
-          include: {
-            priceList: true,
-          },
-        },
-        _count: {
-          select: { orderLines: true, promotions: true, recommendations: true },
-        },
-      },
+      include: { priceListItems: { select: { priceListId: true, price: true } }, _count: { select: { orderLines: true } } },
       orderBy: [{ isActive: 'desc' }, { category: 'asc' }, { name: 'asc' }],
     }),
-    prisma.priceList.findMany({
-      orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
-    }),
+    listPriceLists(),
   ]);
+  const defaultListId = priceLists.find((list) => list.isDefault)?.id;
 
   return {
-    products: products.map((product) => {
-      const defaultPrice = product.priceListItems.find((item) => item.priceList.isDefault);
-
+    products: products.map(({ priceListItems, _count, basePrice, createdAt, updatedAt, ...product }) => {
+      const defaultPrice = priceListItems.find((item) => item.priceListId === defaultListId);
       return {
-        id: product.id,
-        sku: product.sku,
-        name: product.name,
-        category: product.category,
-        description: product.description,
-        basePrice: Number(product.basePrice),
-        unit: product.unit,
-        caseSize: product.caseSize,
-        minQty: product.minQty,
-        orderMultiple: product.orderMultiple,
-        imageUrl: product.imageUrl,
-        assetImage: product.assetImage,
-        stockLabel: product.stockLabel,
-        isActive: product.isActive,
-        defaultPrice: defaultPrice ? Number(defaultPrice.price) : null,
-        prices: product.priceListItems.map((item) => ({
-          priceListId: item.priceListId,
-          priceListName: item.priceList.name,
-          isDefault: item.priceList.isDefault,
-          price: Number(item.price),
-        })),
-        orderLineCount: product._count.orderLines,
-        promotionCount: product._count.promotions,
-        recommendationCount: product._count.recommendations,
+        ...product,
+        basePrice: Number(basePrice),
+        price: Number(defaultPrice?.price ?? basePrice),
+        prices: priceListItems.map((item) => ({ priceListId: item.priceListId, price: Number(item.price) })),
+        orderLineCount: _count.orderLines,
       };
     }),
-    priceLists: priceLists.map((priceList) => ({
-      id: priceList.id,
-      name: priceList.name,
-      isDefault: priceList.isDefault,
-    })),
+    priceLists,
   };
 }
 
 export async function getPriceListManagementData() {
   const [priceLists, products] = await Promise.all([
     prisma.priceList.findMany({
-      include: {
-        items: {
-          include: { product: true },
-          orderBy: { product: { name: 'asc' } },
-        },
-        _count: {
-          select: { customers: true },
-        },
-      },
+      include: { items: { select: { productId: true, price: true } }, _count: { select: { customers: true } } },
       orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
     }),
     prisma.product.findMany({
       where: { isActive: true },
+      select: { id: true, name: true, sku: true, category: true, basePrice: true },
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
     }),
   ]);
@@ -168,51 +99,28 @@ export async function getPriceListManagementData() {
       description: priceList.description,
       isDefault: priceList.isDefault,
       customerCount: priceList._count.customers,
-      items: priceList.items.map((item) => ({
-        productId: item.productId,
-        productName: item.product.name,
-        sku: item.product.sku,
-        category: item.product.category,
-        price: Number(item.price),
-      })),
+      items: priceList.items.map((item) => ({ productId: item.productId, price: Number(item.price) })),
     })),
-    products: products.map((product) => ({
-      id: product.id,
-      name: product.name,
-      sku: product.sku,
-      category: product.category,
-      basePrice: Number(product.basePrice),
-    })),
+    products: products.map((product) => ({ ...product, basePrice: Number(product.basePrice) })),
   };
 }
 
-export async function getRouteManagementData() {
+export async function getRouteManagementData(now: Date = new Date()) {
   const routes = await prisma.route.findMany({
-    include: {
-      _count: {
-        select: { customers: true, orders: true },
-      },
-    },
+    include: { _count: { select: { customers: { where: { isActive: true } } } } },
     orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
   });
 
   return {
-    routes: routes.map((route) => ({
-      id: route.id,
-      name: route.name,
-      region: route.region,
-      driver: route.driver,
-      opsContactName: route.opsContactName,
-      opsContactPhone: route.opsContactPhone,
-      deliveryWeekday: route.deliveryWeekday,
-      cutoffWeekday: route.cutoffWeekday,
-      cutoffTime: route.cutoffTime,
-      nextDeliveryAt: route.nextDeliveryAt.toISOString(),
-      nextCutoffAt: route.nextCutoffAt.toISOString(),
-      isActive: route.isActive,
-      customerCount: route._count.customers,
-      orderCount: route._count.orders,
-    })),
+    routes: routes.map(({ _count, nextDeliveryAt, nextCutoffAt, createdAt, updatedAt, ...route }) => {
+      const schedule = resolveRouteSchedule({ ...route, nextDeliveryAt, nextCutoffAt }, now);
+      return {
+        ...route,
+        deliveryAt: schedule.deliveryAt.toISOString(),
+        cutoffAt: schedule.cutoffAt.toISOString(),
+        customerCount: _count.customers,
+      };
+    }),
   };
 }
 
@@ -220,80 +128,57 @@ export async function getPromotionManagementData() {
   const [promotions, products, customers, routes, priceLists] = await Promise.all([
     prisma.promotion.findMany({
       include: {
-        product: true,
-        productTargets: { include: { product: true } },
+        productTargets: { include: { product: { select: { name: true } } } },
+        product: { select: { name: true } },
         categoryTargets: true,
-        customerTargets: { include: { customer: true } },
-        routeTargets: { include: { route: true } },
-        priceListTargets: { include: { priceList: true } },
+        customerTargets: true,
+        routeTargets: true,
+        priceListTargets: true,
       },
-      orderBy: [{ isActive: 'desc' }, { title: 'asc' }],
+      orderBy: [{ isActive: 'desc' }, { priority: 'desc' }, { title: 'asc' }],
     }),
-    prisma.product.findMany({
-      orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
-    }),
-    prisma.customer.findMany({
-      where: { isActive: true },
-      orderBy: { name: 'asc' },
-    }),
-    prisma.route.findMany({
-      where: { isActive: true },
-      orderBy: { name: 'asc' },
-    }),
-    prisma.priceList.findMany({
-      orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
-    }),
+    prisma.product.findMany({ select: { id: true, name: true, sku: true, category: true, isActive: true }, orderBy: [{ isActive: 'desc' }, { name: 'asc' }] }),
+    prisma.customer.findMany({ where: { isActive: true, ...realCustomers }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    prisma.route.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    listPriceLists(),
   ]);
 
   return {
-    promotions: promotions.map((promotion) => ({
-      id: promotion.id,
-      title: promotion.title,
-      tag: promotion.tag,
-      description: promotion.description,
-      productId: promotion.productId,
-      productName: promotion.product?.name ?? promotion.productTargets[0]?.product.name ?? 'כל המוצרים',
-      effectType: promotion.effectType,
-      discountValue: promotion.discountValue === null ? null : Number(promotion.discountValue),
-      buyQuantity: promotion.buyQuantity,
-      freeQuantity: promotion.freeQuantity,
-      priority: promotion.priority,
-      productIds: [...new Set([promotion.productId, ...promotion.productTargets.map((target) => target.productId)].filter(Boolean) as string[])],
-      categories: promotion.categoryTargets.map((target) => target.category),
-      customerIds: promotion.customerTargets.map((target) => target.customerId),
-      routeIds: promotion.routeTargets.map((target) => target.routeId),
-      priceListIds: promotion.priceListTargets.map((target) => target.priceListId),
-      targetSummary: summarizePromotionTargets({
-        products: promotion.productTargets.map((target) => target.product.name),
+    promotions: promotions.map((promotion) => {
+      const productIds = getPromotionProductIds(promotion);
+      const targetCounts = [
+        [productIds.length, 'מוצרים'],
+        [promotion.categoryTargets.length, 'קטגוריות'],
+        [promotion.customerTargets.length, 'לקוחות'],
+        [promotion.routeTargets.length, 'קווים'],
+        [promotion.priceListTargets.length, 'מחירונים'],
+      ] as const;
+      return {
+        id: promotion.id,
+        title: promotion.title,
+        tag: promotion.tag,
+        description: promotion.description,
+        effectType: promotion.effectType,
+        discountValue: promotion.discountValue === null ? null : Number(promotion.discountValue),
+        buyQuantity: promotion.buyQuantity,
+        freeQuantity: promotion.freeQuantity,
+        priority: promotion.priority,
+        isActive: promotion.isActive,
+        startsAt: promotion.startsAt?.toISOString() ?? null,
+        endsAt: promotion.endsAt?.toISOString() ?? null,
+        productIds,
+        productName: promotion.product?.name ?? promotion.productTargets[0]?.product.name ?? 'כל המוצרים',
         categories: promotion.categoryTargets.map((target) => target.category),
-        customers: promotion.customerTargets.map((target) => target.customer.name),
-        routes: promotion.routeTargets.map((target) => target.route.name),
-        priceLists: promotion.priceListTargets.map((target) => target.priceList.name),
-      }),
-      startsAt: promotion.startsAt?.toISOString() ?? null,
-      endsAt: promotion.endsAt?.toISOString() ?? null,
-      isActive: promotion.isActive,
-    })),
-    products: products.map((product) => ({
-      id: product.id,
-      name: product.name,
-      sku: product.sku,
-      category: product.category,
-      isActive: product.isActive,
-    })),
-    customers: customers.map((customer) => ({
-      id: customer.id,
-      name: customer.name,
-    })),
-    routes: routes.map((route) => ({
-      id: route.id,
-      name: route.name,
-    })),
-    priceLists: priceLists.map((priceList) => ({
-      id: priceList.id,
-      name: priceList.name,
-      isDefault: priceList.isDefault,
-    })),
+        customerIds: promotion.customerTargets.map((target) => target.customerId),
+        routeIds: promotion.routeTargets.map((target) => target.routeId),
+        priceListIds: promotion.priceListTargets.map((target) => target.priceListId),
+        targetSummary: targetCounts.filter(([count]) => count > 0).map(([count, label]) => `${count} ${label}`).join(' · ') || 'כל הלקוחות',
+      };
+    }),
+    products,
+    customers,
+    routes,
+    priceLists,
     categories: [...new Set(products.map((product) => product.category))].sort((a, b) => a.localeCompare(b, 'he')),
   };
 }
@@ -301,20 +186,11 @@ export async function getPromotionManagementData() {
 export async function getRecommendationManagementData() {
   const [recommendations, customers, products] = await Promise.all([
     prisma.customerProductRecommendation.findMany({
-      include: {
-        customer: true,
-        product: true,
-      },
+      include: { customer: { select: { name: true } }, product: { select: { name: true } } },
       orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
     }),
-    prisma.customer.findMany({
-      where: { isActive: true },
-      orderBy: { name: 'asc' },
-    }),
-    prisma.product.findMany({
-      where: { isActive: true },
-      orderBy: { name: 'asc' },
-    }),
+    prisma.customer.findMany({ where: { isActive: true, ...realCustomers }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    prisma.product.findMany({ where: { isActive: true }, select: { id: true, name: true, sku: true }, orderBy: { name: 'asc' } }),
   ]);
 
   return {
@@ -328,159 +204,41 @@ export async function getRecommendationManagementData() {
       isActive: recommendation.isActive,
       updatedAt: recommendation.updatedAt.toISOString(),
     })),
-    customers: customers.map((customer) => ({
-      id: customer.id,
-      name: customer.name,
-    })),
-    products: products.map((product) => ({
-      id: product.id,
-      name: product.name,
-      sku: product.sku,
-    })),
+    customers,
+    products,
   };
 }
 
-export async function getManualOrderData(at = new Date()) {
-  const [customers, activePromotions, vatRate] = await Promise.all([
+export async function getManualOrderData(now: Date = new Date()) {
+  const [customers, promotions, vatRate] = await Promise.all([
     prisma.customer.findMany({
-      where: { isActive: true },
-      include: {
-        route: true,
-        priceList: {
-          include: {
-            items: {
-              include: { product: true },
-              orderBy: {
-                product: {
-                  name: 'asc',
-                },
-              },
-            },
-          },
-        },
-      },
+      where: { isActive: true, route: { isActive: true }, ...realCustomers },
+      include: customerCatalogInclude,
       orderBy: { name: 'asc' },
     }),
-    prisma.promotion.findMany({
-      where: { isActive: true },
-      include: {
-        productTargets: true,
-        categoryTargets: true,
-        customerTargets: true,
-        routeTargets: true,
-        priceListTargets: true,
-      },
-    }),
-    getEffectiveVatRate(at),
+    loadActivePromotions(prisma),
+    getEffectiveVatRate(now),
   ]);
-  const promotions = activePromotions.map((promotion) => ({
-    id: promotion.id,
-    title: promotion.title,
-    tag: promotion.tag,
-    description: promotion.description,
-    effectType: promotion.effectType,
-    discountValue: promotion.discountValue === null ? null : Number(promotion.discountValue),
-    buyQuantity: promotion.buyQuantity,
-    freeQuantity: promotion.freeQuantity,
-    priority: promotion.priority,
-    startsAt: promotion.startsAt,
-    endsAt: promotion.endsAt,
-    isActive: promotion.isActive,
-    productIds: [...new Set([promotion.productId, ...promotion.productTargets.map((target) => target.productId)].filter(Boolean) as string[])],
-    categories: promotion.categoryTargets.map((target) => target.category),
-    customerIds: promotion.customerTargets.map((target) => target.customerId),
-    routeIds: promotion.routeTargets.map((target) => target.routeId),
-    priceListIds: promotion.priceListTargets.map((target) => target.priceListId),
-  }));
 
   return {
     vatRatePercent: vatRate.ratePercent,
-    customers: customers
-      .filter((customer) => customer.route.isActive)
-      .map((customer) => {
-        const pricedCatalog = resolveCatalogPricing({
-          customer: {
-            id: customer.id,
-            routeId: customer.routeId,
-            priceListId: customer.priceListId,
-          },
-          route: {
-            id: customer.route.id,
-          },
-          products: customer.priceList.items.map((item) => ({
-            id: item.product.id,
-            name: item.product.name,
-            category: item.product.category,
-            basePrice: Number(item.product.basePrice),
-            isActive: item.product.isActive,
-            minQty: item.product.minQty,
-          })),
-          priceListItems: customer.priceList.items.map((item) => ({
-            productId: item.productId,
-            price: Number(item.price),
-          })),
-          promotions,
-          now: at,
-        });
-        const pricedProductsById = new Map(pricedCatalog.products.map((product) => [product.id, product]));
-
-        return {
-          id: customer.id,
-          name: customer.name,
-          contact: customer.contact,
-          phone: customer.phone,
-          routeId: customer.routeId,
-          routeName: customer.route.name,
-          priceListName: customer.priceList.name,
-          nextDeliveryAt: customer.route.nextDeliveryAt.toISOString(),
-          nextCutoffAt: customer.route.nextCutoffAt.toISOString(),
-          products: customer.priceList.items
-            .filter((item) => item.product.isActive)
-            .map((item) => {
-              const priced = pricedProductsById.get(item.productId);
-
-              return {
-                id: item.productId,
-                sku: item.product.sku,
-                name: item.product.name,
-                category: item.product.category,
-                listPrice: priced?.listPrice ?? Number(item.price),
-                price: priced?.price ?? Number(item.price),
-            minQty: item.product.minQty,
-            orderMultiple: item.product.orderMultiple,
-            unit: item.product.unit,
-                caseSize: item.product.caseSize,
-                imageUrl: item.product.imageUrl,
-                assetImage: item.product.assetImage,
-                promoLabel: priced?.promoLabel,
-                promotion: priced?.promotion ?? null,
-              };
-            }),
-        };
-      }),
+    customers: customers.map((customer) => ({
+      id: customer.id,
+      name: customer.name,
+      contact: customer.contact,
+      phone: customer.phone,
+      routeName: customer.route.name,
+      priceListName: customer.priceList.name,
+      deliveryAt: resolveRouteSchedule(customer.route, now).deliveryAt.toISOString(),
+      products: priceCustomerCatalog(customer, promotions, now),
+    })),
   };
 }
 
-function summarizePromotionTargets({
-  products,
-  categories,
-  customers,
-  routes,
-  priceLists,
-}: {
-  products: string[];
-  categories: string[];
-  customers: string[];
-  routes: string[];
-  priceLists: string[];
-}): string {
-  const parts = [
-    products.length > 0 ? `${products.length} מוצרים` : null,
-    categories.length > 0 ? `${categories.length} קטגוריות` : null,
-    customers.length > 0 ? `${customers.length} לקוחות` : null,
-    routes.length > 0 ? `${routes.length} קווים` : null,
-    priceLists.length > 0 ? `${priceLists.length} מחירונים` : null,
-  ].filter(Boolean);
-
-  return parts.length > 0 ? parts.join(' · ') : 'כל הלקוחות והמחירונים';
-}
+export type CustomerManagementData = Awaited<ReturnType<typeof getCustomerManagementData>>;
+export type ProductManagementData = Awaited<ReturnType<typeof getProductManagementData>>;
+export type PriceListManagementData = Awaited<ReturnType<typeof getPriceListManagementData>>;
+export type RouteManagementData = Awaited<ReturnType<typeof getRouteManagementData>>;
+export type PromotionManagementData = Awaited<ReturnType<typeof getPromotionManagementData>>;
+export type RecommendationManagementData = Awaited<ReturnType<typeof getRecommendationManagementData>>;
+export type ManualOrderData = Awaited<ReturnType<typeof getManualOrderData>>;

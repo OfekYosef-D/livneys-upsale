@@ -5,9 +5,18 @@
     "date": "2026-06-11",
     "status": "סופק",
     "items": [
-      { "productId": "prod-eggplant", "qty": 12 },
-      { "productId": "prod-pesto", "qty": 8 },
-      { "productId": "prod-chili", "qty": 6 }
+      {
+        "productId": "prod-eggplant",
+        "qty": 12
+      },
+      {
+        "productId": "prod-pesto",
+        "qty": 8
+      },
+      {
+        "productId": "prod-chili",
+        "qty": 6
+      }
     ]
   },
   {
@@ -16,8 +25,14 @@
     "date": "2026-06-10",
     "status": "התקבל",
     "items": [
-      { "productId": "prod-artichoke", "qty": 10 },
-      { "productId": "prod-herb", "qty": 12 }
+      {
+        "productId": "prod-artichoke",
+        "qty": 10
+      },
+      {
+        "productId": "prod-herb",
+        "qty": 12
+      }
     ]
   },
   {
@@ -26,8 +41,14 @@
     "date": "2026-06-09",
     "status": "סופק",
     "items": [
-      { "productId": "prod-berry-jam", "qty": 6 },
-      { "productId": "prod-tasting-kit", "qty": 4 }
+      {
+        "productId": "prod-berry-jam",
+        "qty": 6
+      },
+      {
+        "productId": "prod-eggplant",
+        "qty": 4
+      }
     ]
   },
   {
@@ -36,8 +57,14 @@
     "date": "2026-06-12",
     "status": "טיוטה",
     "items": [
-      { "productId": "prod-herb", "qty": 8 },
-      { "productId": "prod-hosting-box", "qty": 3 }
+      {
+        "productId": "prod-herb",
+        "qty": 8
+      },
+      {
+        "productId": "prod-pesto",
+        "qty": 3
+      }
     ]
   },
   {
@@ -46,8 +73,14 @@
     "date": "2026-06-13",
     "status": "מאושר",
     "items": [
-      { "productId": "prod-pesto", "qty": 6 },
-      { "productId": "prod-berry-jam", "qty": 6 }
+      {
+        "productId": "prod-pesto",
+        "qty": 6
+      },
+      {
+        "productId": "prod-berry-jam",
+        "qty": 6
+      }
     ]
   }
 ]

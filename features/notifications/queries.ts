@@ -1,131 +1,77 @@
 import { prisma } from '@/lib/db';
-import {
-  getWhatsAppConfig,
-  hasWhatsAppProviderCredentials,
-  whatsappTemplateKeys,
-} from './config';
+import { hasWhatsAppProviderCredentials, notificationTemplateKeys } from './config';
+import { loadNotificationConfig } from './channels';
+import { isEmailConfigured } from './email';
 
 export async function getNotificationManagementData() {
-  const [jobs, webhookEvents, reminderRules] = await Promise.all([
+  const [jobs, reminderRules, routes, webhookEvents] = await Promise.all([
     prisma.notificationJob.findMany({
       include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            contact: true,
-            phone: true,
-          },
-        },
-        order: {
-          select: {
-            id: true,
-            orderNumber: true,
-            status: true,
-            total: true,
-            totalIncludingVat: true,
-          },
-        },
-        reminderJob: {
-          select: {
-            id: true,
-            status: true,
-          },
-        },
+        customer: { select: { name: true, contact: true, phone: true, email: true } },
+        order: { select: { orderNumber: true } },
       },
       orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }],
-      take: 100,
-    }),
-    prisma.whatsAppWebhookEvent.findMany({
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-      orderBy: { receivedAt: 'desc' },
-      take: 50,
+      take: 150,
     }),
     prisma.reminderRule.findMany({
-      where: { channel: 'WHATSAPP' },
-      include: {
-        route: {
-          select: {
-            id: true,
-            name: true,
-            region: true,
-          },
-        },
-      },
+      include: { route: { select: { name: true } } },
       orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
     }),
+    prisma.route.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    prisma.whatsAppWebhookEvent.findMany({
+      include: { customer: { select: { name: true } } },
+      orderBy: { receivedAt: 'desc' },
+      take: 30,
+    }),
   ]);
-  const config = getWhatsAppConfig();
+  const config = loadNotificationConfig();
 
   return {
-    config: {
-      sendEnabled: config.sendEnabled,
-      providerConfigured: hasWhatsAppProviderCredentials(config),
-      webhookConfigured: Boolean(config.webhookVerifyToken),
-      missingTemplates: whatsappTemplateKeys.filter((key) => !config.templates[key]),
-    },
-    summary: {
-      total: jobs.length,
-      pending: jobs.filter((job) => job.status === 'PENDING').length,
-      processing: jobs.filter((job) => job.status === 'PROCESSING').length,
-      dryRun: jobs.filter((job) => job.status === 'DRY_RUN').length,
-      sent: jobs.filter((job) => job.status === 'SENT').length,
-      failed: jobs.filter((job) => job.status === 'FAILED').length,
+    channels: {
+      email: { configured: isEmailConfigured(config.email), from: config.email.from },
+      whatsapp: {
+        enabled: config.whatsapp.sendEnabled,
+        providerConfigured: hasWhatsAppProviderCredentials(config.whatsapp),
+        webhookConfigured: Boolean(config.whatsapp.webhookVerifyToken && config.whatsapp.appSecret),
+        missingTemplates: notificationTemplateKeys.filter((key) => !config.whatsapp.templates[key]),
+      },
     },
     jobs: jobs.map((job) => ({
       id: job.id,
-      customerId: job.customerId,
+      channel: job.channel,
       customerName: job.customer.name,
-      customerContact: job.customer.contact,
-      customerPhone: job.customer.phone,
+      recipient: job.channel === 'EMAIL' ? job.customer.email : job.customer.phone,
       orderId: job.orderId,
       orderNumber: job.order?.orderNumber ?? null,
-      orderStatus: job.order?.status ?? null,
-      orderTotal: job.order ? Number(job.order.totalIncludingVat) : null,
-      reminderJobId: job.reminderJobId,
-      reminderStatus: job.reminderJob?.status ?? null,
-      channel: job.channel,
       templateKey: job.templateKey,
-      templateName: job.templateName,
       status: job.status,
       dryRun: job.dryRun,
       message: job.message,
       scheduledAt: job.scheduledAt.toISOString(),
-      nextAttemptAt: job.nextAttemptAt?.toISOString() ?? null,
-      lastAttemptAt: job.lastAttemptAt?.toISOString() ?? null,
       processedAt: job.processedAt?.toISOString() ?? null,
       attempts: job.attempts,
       maxAttempts: job.maxAttempts,
-      providerMessageId: job.providerMessageId,
       errorMessage: job.errorMessage,
-    })),
-    webhookEvents: webhookEvents.map((event) => ({
-      id: event.id,
-      kind: event.kind,
-      providerStatus: event.providerStatus,
-      providerMessageId: event.providerMessageId,
-      fromPhone: event.fromPhone,
-      customerId: event.customerId,
-      customerName: event.customer?.name ?? null,
-      errorMessage: event.errorMessage,
-      receivedAt: event.receivedAt.toISOString(),
     })),
     reminderRules: reminderRules.map((rule) => ({
       id: rule.id,
       name: rule.name,
       routeId: rule.routeId,
       routeName: rule.route?.name ?? null,
-      routeRegion: rule.route?.region ?? null,
       channel: rule.channel,
       hoursBeforeDelivery: rule.hoursBeforeDelivery,
       isActive: rule.isActive,
     })),
+    routes,
+    webhookEvents: webhookEvents.map((event) => ({
+      id: event.id,
+      kind: event.kind,
+      providerStatus: event.providerStatus,
+      customerName: event.customer?.name ?? event.fromPhone ?? null,
+      errorMessage: event.errorMessage,
+      receivedAt: event.receivedAt.toISOString(),
+    })),
   };
 }
+
+export type NotificationManagementData = Awaited<ReturnType<typeof getNotificationManagementData>>;

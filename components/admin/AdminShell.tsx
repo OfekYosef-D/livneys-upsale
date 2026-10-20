@@ -1,84 +1,162 @@
+'use client';
+
 import Image from 'next/image';
-import Link from 'next/link';
-import type React from 'react';
-import { AdminLogoutButton } from '@/components/admin/AdminLogoutButton';
+import Link, { useLinkStatus } from 'next/link';
+import { Menu, X } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { LogoutButton } from '@/features/auth/components/LogoutButton';
+import { Spinner } from '@/components/ui/Spinner';
 import { brandLogo } from '@/lib/product-assets';
 
-const navItems = [
-  { href: '/admin', label: 'לוח עבודה' },
-  { href: '/admin/manual-order', label: 'הזמנה ידנית' },
-  { href: '/admin/customers', label: 'לקוחות' },
-  { href: '/admin/registrations', label: 'הרשמות' },
-  { href: '/admin/routes', label: 'קווים' },
-  { href: '/admin/notifications', label: 'הודעות' },
-  { href: '/admin/products', label: 'מוצרים' },
-  { href: '/admin/price-lists', label: 'מחירונים' },
-  { href: '/admin/promotions', label: 'מבצעים' },
-  { href: '/admin/recommendations', label: 'המלצות' },
-  { href: '/admin/audit', label: 'יומן ביקורת' },
-  { href: '/admin/security/mfa', label: 'אבטחה' },
+const navGroups = [
+  {
+    label: 'תפעול',
+    items: [
+      { href: '/admin', label: 'לוח עבודה' },
+      { href: '/admin/manual-order', label: 'הזמנה ידנית' },
+      { href: '/admin/customers', label: 'לקוחות' },
+      { href: '/admin/registrations', label: 'בקשות הצטרפות' },
+      { href: '/admin/routes', label: 'קווי חלוקה' },
+      { href: '/admin/notifications', label: 'הודעות ותזכורות' },
+    ],
+  },
+  {
+    label: 'קטלוג',
+    items: [
+      { href: '/admin/products', label: 'מוצרים' },
+      { href: '/admin/price-lists', label: 'מחירונים' },
+      { href: '/admin/promotions', label: 'מבצעים' },
+      { href: '/admin/recommendations', label: 'המלצות ללקוחות' },
+    ],
+  },
+  {
+    label: 'מערכת',
+    items: [
+      { href: '/admin/audit', label: 'יומן פעולות' },
+      { href: '/admin/security/mfa', label: 'אבטחת החשבון' },
+    ],
+  },
 ];
 
-export function AdminShell({ children, title, subtitle, activeHref }: { children: React.ReactNode; title: string; subtitle?: string; activeHref?: string }) {
-  const isActive = (href: string) => activeHref === href || (href !== '/admin' && Boolean(activeHref?.startsWith(`${href}/`)));
+function isActiveHref(activeHref: string | undefined, href: string) {
+  return activeHref === href || (href !== '/admin' && Boolean(activeHref?.startsWith(`${href}/`)));
+}
 
+function NavLinks({ activeHref, onNavigate }: { activeHref?: string; onNavigate?: () => void }) {
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#f7f5f1] text-black">
-      <header className="sticky top-0 z-30 border-b border-black/10 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-3 sm:px-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e6e1d8]">
-              <Image src={brandLogo} alt="Livney's" className="w-8" priority />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-black">CRM Livney&apos;s</p>
-              <p className="truncate text-xs font-bold text-black/50">הזמנות B2B, לקוחות, קווי חלוקה והמלצות מכירה</p>
-            </div>
-          </div>
-          <nav className="no-scrollbar hidden max-w-[52rem] items-center gap-1 overflow-x-auto lg:flex">
-            {navItems.map((item) => {
-              const active = isActive(item.href);
+    <nav className="flex flex-col gap-5" aria-label="Admin navigation">
+      {navGroups.map((group) => (
+        <div key={group.label}>
+          <p className="px-3 text-[11px] font-medium text-black/38">{group.label}</p>
+          <ul className="mt-1 space-y-0.5">
+            {group.items.map((item) => {
+              const active = isActiveHref(activeHref, item.href);
 
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={active ? 'page' : undefined}
-                  className={`shrink-0 rounded-full px-3 py-2 text-xs font-black focus-visible:ring-2 focus-visible:ring-black/25 ${active ? 'bg-black text-white' : 'text-black/65 hover:bg-[#e6e1d8]'}`}
-                >
-                  {item.label}
-                </Link>
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    aria-current={active ? 'page' : undefined}
+                    onClick={onNavigate}
+                    className={`block rounded px-3 py-1.5 text-[13px] focus-visible:ring-2 focus-visible:ring-black/20 ${
+                      active ? 'bg-[var(--pantry)] font-medium text-black' : 'font-medium text-black/62 hover:bg-[var(--pantry-soft)] hover:text-black'
+                    }`}
+                  >
+                    <NavItemLabel>{item.label}</NavItemLabel>
+                  </Link>
+                </li>
               );
             })}
-          </nav>
-          <AdminLogoutButton />
+          </ul>
         </div>
-        <nav className="mx-auto flex max-w-7xl flex-wrap gap-1 border-t border-black/10 px-3 py-2 lg:hidden" aria-label="Admin navigation">
-          {navItems.map((item) => {
-            const active = isActive(item.href);
+      ))}
+    </nav>
+  );
+}
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? 'page' : undefined}
-                className={`shrink-0 rounded-full px-3 py-2 text-xs font-black focus-visible:ring-2 focus-visible:ring-black/25 ${active ? 'bg-black text-white' : 'bg-[#f7f5f1] text-black/70 hover:bg-[#e6e1d8]'}`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </header>
+function NavItemLabel({ children }: { children: ReactNode }) {
+  const { pending } = useLinkStatus();
 
-      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-5">
-        <div className="mb-4 flex flex-col gap-1 border-b border-black/10 pb-4">
-          <p className="text-xs font-black text-black/45">אזור צוות</p>
-          <h1 className="text-2xl font-black md:text-3xl">{title}</h1>
-          {subtitle && <p className="max-w-2xl text-sm font-bold leading-6 text-black/58">{subtitle}</p>}
+  return (
+    <span className="flex items-center justify-between gap-2">
+      <span>{children}</span>
+      {pending ? <Spinner size={12} /> : null}
+    </span>
+  );
+}
+
+export function AdminShell({ children, title, subtitle, activeHref }: { children: ReactNode; title: string; subtitle?: string; activeHref?: string }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-[var(--pantry-soft)] text-black">
+      <div className="flex min-h-screen">
+        <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-e border-[var(--pantry-line)] bg-white lg:flex">
+          <div className="flex items-center gap-2.5 border-b border-[var(--pantry-line)] px-3 py-3">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded bg-[var(--pantry)]">
+              <Image src={brandLogo} alt="Livney's" className="w-6" priority />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-[13px] font-semibold">CRM Livney&apos;s</p>
+              <p className="truncate text-[11px] text-black/45">הזמנות B2B</p>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto px-2 py-3">
+            <NavLinks activeHref={activeHref} />
+          </div>
+          <div className="border-t border-[var(--pantry-line)] p-2.5">
+            <LogoutButton />
+          </div>
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--pantry-line)] bg-white px-3 py-2.5 lg:hidden">
+            <button
+              type="button"
+              className="grid h-10 w-10 place-items-center rounded-md hover:bg-[var(--pantry)] focus-visible:ring-2 focus-visible:ring-black/20"
+              onClick={() => setOpen(true)}
+              aria-label="פתיחת תפריט"
+            >
+              <Menu size={18} />
+            </button>
+            <p className="min-w-0 truncate text-sm font-semibold">{title}</p>
+            <LogoutButton compact />
+          </header>
+
+          {open && (
+            <div className="fixed inset-0 z-40 lg:hidden">
+              <button type="button" className="absolute inset-0 bg-black/35" aria-label="סגירת תפריט" onClick={() => setOpen(false)} />
+              <aside className="absolute inset-y-0 right-0 flex w-72 flex-col bg-white shadow-[var(--shadow-dialog)]">
+                <div className="flex items-center justify-between border-b border-[var(--pantry-line)] px-4 py-3">
+                  <p className="text-sm font-semibold">CRM Livney&apos;s</p>
+                  <button
+                    type="button"
+                    className="grid h-9 w-9 place-items-center rounded-md hover:bg-[var(--pantry)]"
+                    onClick={() => setOpen(false)}
+                    aria-label="סגירה"
+                  >
+                    <X size={17} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto px-2 py-4">
+                  <NavLinks activeHref={activeHref} onNavigate={() => setOpen(false)} />
+                </div>
+                <div className="border-t border-[var(--pantry-line)] p-3">
+                  <LogoutButton />
+                </div>
+              </aside>
+            </div>
+          )}
+
+          <div className="mx-auto w-full max-w-[90rem] px-4 py-4">
+            <div className="mb-3">
+              <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+              {subtitle && <p className="mt-0.5 max-w-3xl text-xs leading-5 text-black/50">{subtitle}</p>}
+            </div>
+            {children}
+          </div>
         </div>
-        {children}
       </div>
-    </main>
+    </div>
   );
 }

@@ -1,18 +1,19 @@
 import { AdminShell } from '@/components/admin/AdminShell';
 import { AdminRegistrationsClient } from '@/features/registration/components/AdminRegistrationsClient';
 import { getRegistrationManagementData } from '@/features/registration/queries';
-import { requireAdmin } from '@/lib/admin-guard';
+import { getAppBaseUrl } from '@/features/notifications/config';
+import { requireAdminPage } from '@/lib/authorization';
+import { paths } from '@/lib/paths';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminRegistrationsPage() {
-  await requireAdmin('/admin/registrations');
+export default async function Page() {
+  await requireAdminPage(paths.admin.registrations);
   const data = await getRegistrationManagementData();
-  const appOrigin = process.env.NEXTAUTH_URL?.trim().replace(/\/$/, '') || null;
 
   return (
-    <AdminShell title="הרשמות חדשות" subtitle="בקשות מחברות חדשות, בדיקה תפעולית והמרה ללקוח פעיל." activeHref="/admin/registrations">
-      <AdminRegistrationsClient data={data} appOrigin={appOrigin} />
+    <AdminShell title="בקשות הצטרפות" activeHref={paths.admin.registrations}>
+      <AdminRegistrationsClient data={data} appOrigin={getAppBaseUrl()} />
     </AdminShell>
   );
 }

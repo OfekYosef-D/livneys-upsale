@@ -17,3 +17,8 @@ next-start*.log
 .ux-audit-chrome-profiles/
 .env*
 .vercel
+
+# Local tool artifacts
+.playwright-cli/
+.tmp-screenshots/
+.test-users.local.txt

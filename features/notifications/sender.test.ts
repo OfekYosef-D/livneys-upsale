@@ -1,9 +1,31 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getWhatsAppConfig } from './config';
-import { buildWhatsAppTemplateRequest, PermanentWhatsAppError, sendWhatsAppTemplate } from './sender';
+import { PermanentDeliveryError } from './delivery';
+import { buildWhatsAppTemplateRequest, sendWhatsAppTemplate } from './sender';
 
-describe('WhatsApp sender', () => {
-  it('builds Meta template payloads with named body parameters', () => {
+const liveConfig = getWhatsAppConfig({
+  WHATSAPP_SEND_ENABLED: 'true',
+  WHATSAPP_ACCESS_TOKEN: 'token',
+  WHATSAPP_PHONE_NUMBER_ID: 'phone-id',
+});
+
+const message: { to: string; templateName: string | null; languageCode: string; bodyParameters: Array<{ name: string; text: string }> } = {
+  to: '+972501234567',
+  templateName: 'livneys_order_received_he',
+  languageCode: 'he',
+  bodyParameters: [{ name: 'customer_name', text: 'דנה' }],
+};
+
+function metaResponse(status: number, body: unknown) {
+  return { ok: status >= 200 && status < 300, status, json: async () => body };
+}
+
+async function sendWith(fetchImpl: ReturnType<typeof vi.fn>, overrides: Partial<typeof message> = {}, config = liveConfig) {
+  return sendWhatsAppTemplate({ ...message, ...overrides }, { config, fetchImpl: fetchImpl as never });
+}
+
+describe('buildWhatsAppTemplateRequest', () => {
+  it('builds Meta template payloads with named body parameters and a bare recipient number', () => {
     expect(
       buildWhatsAppTemplateRequest({
         to: '+972501234567',
@@ -11,7 +33,7 @@ describe('WhatsApp sender', () => {
         languageCode: 'he',
         bodyParameters: [
           { name: 'customer_name', text: 'Dana' },
-          { name: 'order_id', text: 'ORD-1' },
+          { name: 'order_id', text: '#1' },
         ],
       }),
     ).toEqual({
@@ -26,7 +48,7 @@ describe('WhatsApp sender', () => {
             type: 'body',
             parameters: [
               { type: 'text', parameter_name: 'customer_name', text: 'Dana' },
-              { type: 'text', parameter_name: 'order_id', text: 'ORD-1' },
+              { type: 'text', parameter_name: 'order_id', text: '#1' },
             ],
           },
         ],
@@ -34,170 +56,97 @@ describe('WhatsApp sender', () => {
     });
   });
 
-  it('keeps legacy positional body parameters compatible with existing queued jobs', () => {
+  it('supports positional body parameters', () => {
     expect(
-      buildWhatsAppTemplateRequest({
-        to: '+972501234567',
-        templateName: 'legacy_template',
-        languageCode: 'he',
-        bodyParameters: ['Dana', 'ORD-1'],
-      }).template.components[0].parameters,
+      buildWhatsAppTemplateRequest({ ...message, templateName: 'positional_template', bodyParameters: ['Dana', '#1'] }).template.components[0].parameters,
     ).toEqual([
       { type: 'text', text: 'Dana' },
-      { type: 'text', text: 'ORD-1' },
+      { type: 'text', text: '#1' },
     ]);
   });
+});
 
-  it('does not call Meta in dry-run mode', async () => {
-    const fetchMock = vi.fn();
-    const result = await sendWhatsAppTemplate(
-      {
-        to: '+972501234567',
-        templateName: null,
-        templateKey: 'ORDER_RECEIVED',
-        languageCode: 'he',
-        bodyParameters: ['Cafe South'],
-      },
-      {
-        config: getWhatsAppConfig({ WHATSAPP_SEND_ENABLED: 'false' }),
-        fetchImpl: fetchMock,
-      },
-    );
-
-    expect(result).toEqual({
-      mode: 'dry-run',
-      providerMessageId: null,
-    });
-    expect(fetchMock).not.toHaveBeenCalled();
+describe('sendWhatsAppTemplate', () => {
+  it('does not call Meta when sending is disabled', async () => {
+    const fetchImpl = vi.fn();
+    await expect(sendWith(fetchImpl, { templateName: null }, getWhatsAppConfig({})))
+      .resolves.toEqual({ mode: 'dry-run', providerMessageId: null });
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('sends template requests to the configured Meta phone number id when enabled', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ messages: [{ id: 'wamid.123' }] }),
-    });
+  it('fails permanently when enabled without provider credentials', async () => {
+    const fetchImpl = vi.fn();
+    await expect(sendWith(fetchImpl, {}, getWhatsAppConfig({ WHATSAPP_SEND_ENABLED: 'true', WHATSAPP_ACCESS_TOKEN: 'token' })))
+      .rejects.toBeInstanceOf(PermanentDeliveryError);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
 
-    const result = await sendWhatsAppTemplate(
-      {
-        to: '+972501234567',
-        templateName: 'livneys_order_received_he',
-        templateKey: 'ORDER_RECEIVED',
-        languageCode: 'he',
-        bodyParameters: ['Cafe South'],
-      },
-      {
-        config: getWhatsAppConfig({
-          WHATSAPP_SEND_ENABLED: 'true',
-          WHATSAPP_ACCESS_TOKEN: 'token',
-          WHATSAPP_PHONE_NUMBER_ID: 'phone-id',
-        }),
-        fetchImpl: fetchMock,
-      },
-    );
+  it('fails permanently when no template is configured for the message', async () => {
+    const fetchImpl = vi.fn();
+    await expect(sendWith(fetchImpl, { templateName: null })).rejects.toBeInstanceOf(PermanentDeliveryError);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
 
-    expect(result).toEqual({
-      mode: 'live',
-      providerMessageId: 'wamid.123',
+  it('posts the template to the configured phone number id and returns the message id', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(metaResponse(200, { messages: [{ id: 'wamid.123' }] }));
+
+    await expect(sendWith(fetchImpl)).resolves.toEqual({ mode: 'live', providerMessageId: 'wamid.123' });
+
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe('https://graph.facebook.com/v25.0/phone-id/messages');
+    expect(init.method).toBe('POST');
+    expect(init.headers.Authorization).toBe('Bearer token');
+    expect(JSON.parse(init.body)).toMatchObject({
+      to: '972501234567',
+      template: { name: 'livneys_order_received_he', language: { code: 'he' } },
     });
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://graph.facebook.com/v25.0/phone-id/messages',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          Authorization: 'Bearer token',
-        }),
-      }),
+  });
+
+  it('treats a success response without a message id as retryable', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(metaResponse(200, { messages: [] }));
+    const error = await sendWith(fetchImpl).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(PermanentDeliveryError);
+  });
+
+  it('keeps 5xx Meta errors retryable and includes provider diagnostics', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(metaResponse(500, {
+      error: {
+        message: 'Service temporarily unavailable',
+        code: 2,
+        error_subcode: 99,
+        fbtrace_id: 'trace-1',
+        error_data: { details: ' try later ' },
+      },
+    }));
+
+    const error = await sendWith(fetchImpl).catch((e: unknown) => e) as Error;
+    expect(error).not.toBeInstanceOf(PermanentDeliveryError);
+    expect(error.message).toBe(
+      'Meta WhatsApp API error (HTTP 500, code 2, subcode 99, trace trace-1): Service temporarily unavailable Details: try later',
     );
   });
 
-  it('keeps transient Meta errors retryable and includes provider diagnostics', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-      json: async () => ({
-        error: {
-          message: '(#131000) Something went wrong',
-          type: 'OAuthException',
-          code: 131000,
-          is_transient: true,
-          fbtrace_id: 'trace-123',
-        },
-      }),
-    });
-
-    await expect(
-      sendWhatsAppTemplate(
-        {
-          to: '+972501234567',
-          templateName: 'jaspers_market_order_confirmation_v1',
-          templateKey: 'ORDER_RECEIVED',
-          languageCode: 'en_US',
-          bodyParameters: ['Dana', 'ord-1', '01/07/2026'],
-        },
-        {
-          config: getWhatsAppConfig({
-            WHATSAPP_SEND_ENABLED: 'true',
-            WHATSAPP_ACCESS_TOKEN: 'token',
-            WHATSAPP_PHONE_NUMBER_ID: 'phone-id',
-          }),
-          fetchImpl: fetchMock,
-        },
-      ),
-    ).rejects.toThrow('Meta WhatsApp API error 131000');
-
-    await expect(
-      sendWhatsAppTemplate(
-        {
-          to: '+972501234567',
-          templateName: 'jaspers_market_order_confirmation_v1',
-          templateKey: 'ORDER_RECEIVED',
-          languageCode: 'en_US',
-          bodyParameters: ['Dana', 'ord-1', '01/07/2026'],
-        },
-        {
-          config: getWhatsAppConfig({
-            WHATSAPP_SEND_ENABLED: 'true',
-            WHATSAPP_ACCESS_TOKEN: 'token',
-            WHATSAPP_PHONE_NUMBER_ID: 'phone-id',
-          }),
-          fetchImpl: fetchMock,
-        },
-      ),
-    ).rejects.not.toBeInstanceOf(PermanentWhatsAppError);
+  it('retries 4xx errors flagged transient or with code 131000', async () => {
+    for (const error of [{ code: 100, is_transient: true }, { code: 131000 }]) {
+      const fetchImpl = vi.fn().mockResolvedValue(metaResponse(400, { error }));
+      const failure = await sendWith(fetchImpl).catch((e: unknown) => e);
+      expect(failure).toBeInstanceOf(Error);
+      expect(failure).not.toBeInstanceOf(PermanentDeliveryError);
+    }
   });
 
-  it('keeps permanent Meta request errors from retrying', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 400,
-      json: async () => ({
-        error: {
-          message: '(#131030) Recipient phone number not in allowed list',
-          type: 'OAuthException',
-          code: 131030,
-          fbtrace_id: 'trace-456',
-        },
-      }),
-    });
+  it('does not retry other 4xx errors', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(metaResponse(400, { error: { message: 'Template name does not exist', code: 132001 } }));
+    const failure = await sendWith(fetchImpl).catch((e: unknown) => e) as Error;
+    expect(failure).toBeInstanceOf(PermanentDeliveryError);
+    expect(failure.message).toContain('code 132001');
+  });
 
-    await expect(
-      sendWhatsAppTemplate(
-        {
-          to: '+972501234567',
-          templateName: 'jaspers_market_order_confirmation_v1',
-          templateKey: 'ORDER_RECEIVED',
-          languageCode: 'en_US',
-          bodyParameters: ['Dana', 'ord-1', '01/07/2026'],
-        },
-        {
-          config: getWhatsAppConfig({
-            WHATSAPP_SEND_ENABLED: 'true',
-            WHATSAPP_ACCESS_TOKEN: 'token',
-            WHATSAPP_PHONE_NUMBER_ID: 'phone-id',
-          }),
-          fetchImpl: fetchMock,
-        },
-      ),
-    ).rejects.toBeInstanceOf(PermanentWhatsAppError);
+  it('describes non-JSON failures by HTTP status', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => { throw new Error('not json'); } });
+    const failure = await sendWith(fetchImpl).catch((e: unknown) => e) as Error;
+    expect(failure).toBeInstanceOf(PermanentDeliveryError);
+    expect(failure.message).toBe('Meta WhatsApp API request failed with HTTP 401');
   });
 });
