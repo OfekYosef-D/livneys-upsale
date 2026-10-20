@@ -55,6 +55,12 @@ describe('getAppBaseUrl', () => {
     expect(getAppBaseUrl({ NEXTAUTH_URL: 'https://orders.example.com' })).toBe('https://orders.example.com');
   });
 
+  it('falls back to the Vercel branch address, then the deployment address', () => {
+    expect(getAppBaseUrl({ VERCEL_BRANCH_URL: 'app-git-feature.vercel.app', VERCEL_URL: 'app-abc123.vercel.app' })).toBe('https://app-git-feature.vercel.app');
+    expect(getAppBaseUrl({ VERCEL_URL: 'app-abc123.vercel.app' })).toBe('https://app-abc123.vercel.app');
+    expect(getAppBaseUrl({ NEXTAUTH_URL: 'https://orders.example.com', VERCEL_URL: 'app-abc123.vercel.app' })).toBe('https://orders.example.com');
+  });
+
   it('falls back to localhost when unset or blank', () => {
     expect(getAppBaseUrl({})).toBe('http://localhost:3000');
     expect(getAppBaseUrl({ NEXTAUTH_URL: '  ' })).toBe('http://localhost:3000');

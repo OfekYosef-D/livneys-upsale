@@ -47,7 +47,12 @@ export function hasWhatsAppProviderCredentials(config: WhatsAppConfig): boolean 
   return Boolean(config.accessToken && config.phoneNumberId);
 }
 
-/** Public base URL used in links inside messages. */
+/**
+ * Public base URL used in links inside messages. Previews leave NEXTAUTH_URL unset and use the
+ * branch's stable Vercel address, so links never point at another (stale) deployment.
+ */
 export function getAppBaseUrl(env: EnvLike = process.env): string {
-  return (readEnvText(env.NEXTAUTH_URL) ?? 'http://localhost:3000').replace(/\/+$/, '');
+  const vercelHost = readEnvText(env.VERCEL_BRANCH_URL) ?? readEnvText(env.VERCEL_URL);
+  const url = readEnvText(env.NEXTAUTH_URL) ?? (vercelHost ? `https://${vercelHost}` : 'http://localhost:3000');
+  return url.replace(/\/+$/, '');
 }

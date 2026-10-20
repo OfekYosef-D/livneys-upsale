@@ -10,7 +10,7 @@ Target: Vercel (Frankfurt, `fra1`) + Neon PostgreSQL (Frankfurt), email via Rese
 | --- | --- | --- |
 | `DATABASE_URL` | yes | Neon **pooled** connection string |
 | `DIRECT_URL` | yes | Neon **direct** connection string (migrations) |
-| `NEXTAUTH_URL` | yes | Public URL, e.g. `https://orders.livneys.co.il`. Used in every email link |
+| `NEXTAUTH_URL` | production only | Public URL, e.g. `https://orders.livneys.co.il`. Used in every email link. **Leave it unset for Preview**: each preview then uses its own address (a fixed value sends logins and links to a stale deployment) |
 | `NEXTAUTH_SECRET` | yes | ≥ 48 random bytes |
 | `CRON_SECRET` | yes | ≥ 32 random bytes; Vercel cron sends it as a bearer token |
 | `MFA_ENCRYPTION_KEY` | yes | exactly 32 random bytes, base64 (`openssl rand -base64 32`) |
