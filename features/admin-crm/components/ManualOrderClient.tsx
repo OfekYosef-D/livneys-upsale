@@ -20,6 +20,8 @@ import { calculateOrderTotals } from '../../orders/totals';
 import { createManualOrderAction } from '../actions/orders';
 import type { ManualOrderData } from '../queries';
 
+const FORM_ID = 'manual-order-form';
+
 const intakeOptions = [
   { value: 'PHONE', label: 'טלפון' },
   { value: 'WHATSAPP', label: 'וואטסאפ' },
@@ -70,6 +72,7 @@ export function ManualOrderClient({ data, initialCustomerId }: { data: ManualOrd
     <div className="grid gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
       <Panel className="h-fit xl:sticky xl:top-4">
         <form
+          id={FORM_ID}
           className="space-y-3 p-4"
           onSubmit={(event) => {
             event.preventDefault();
@@ -144,6 +147,17 @@ export function ManualOrderClient({ data, initialCustomerId }: { data: ManualOrd
           ))}
         </ul>
       </Panel>
+
+      {/* Below xl the form sits above the product list: keep the total and submit within reach. */}
+      <div className="sticky bottom-2 z-20 flex items-center justify-between gap-3 rounded-md border border-black/10 bg-white/95 px-3 py-2.5 shadow-lg backdrop-blur xl:hidden">
+        <p className="text-sm">
+          <span className="font-semibold tabular-nums">{formatMoney(totals.totalIncludingVat)}</span>
+          <span className="block text-[11px] text-black/50">כולל מע״מ · {pricing.lines.length} שורות</span>
+        </p>
+        <Button type="submit" form={FORM_ID} disabled={pricing.lines.length === 0} pending={action.pending} pendingLabel="יוצרים…" icon={<ShoppingCart size={16} />}>
+          יצירת הזמנה
+        </Button>
+      </div>
     </div>
   );
 }

@@ -31,7 +31,8 @@ export function AdminOrderDetail({ order }: { order: AdminOrderDetailData }) {
         <AdminPaymentReceipts orderId={order.id} total={order.totalIncludingVat} summary={order.paymentSummary} receipts={order.paymentReceipts} />
       </div>
 
-      <aside className="space-y-4">
+      {/* On phones the status actions come first: approving is the most common task. */}
+      <aside className="order-first space-y-4 lg:order-none">
         <Panel className="space-y-4 p-4">
           <div className="flex items-center justify-between gap-2">
             <OrderStatusBadge status={order.status} />

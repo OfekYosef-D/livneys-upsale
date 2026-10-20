@@ -41,9 +41,9 @@ export function AdminAuditLog({ entries, query }: { entries: Entries; query: str
                       </details>
                     )}
                   </Td>
-                  <Td className="text-xs">{entry.actorName}{entry.actorRole ? ` (${entry.actorRole})` : ''}</Td>
-                  <Td className="text-xs">{entry.customerName ?? '—'}</Td>
-                  <Td className="whitespace-nowrap text-xs text-black/50">{formatDate(entry.createdAt)}</Td>
+                  <Td label="מבצע" className="text-xs">{entry.actorName}{entry.actorRole ? ` (${entry.actorRole})` : ''}</Td>
+                  <Td label="לקוח" className="text-xs">{entry.customerName ?? '—'}</Td>
+                  <Td label="זמן" className="whitespace-nowrap text-xs text-black/50">{formatDate(entry.createdAt)}</Td>
                 </tr>
               ))}
             </tbody>

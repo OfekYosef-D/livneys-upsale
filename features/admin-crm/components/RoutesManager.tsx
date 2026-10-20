@@ -57,11 +57,11 @@ export function RoutesManager({ data }: { data: RouteManagementData }) {
                     <p className="font-medium">{route.name}</p>
                     <p className="text-xs text-black/55">{route.region}{route.driver ? ` · ${route.driver}` : ''}</p>
                   </Td>
-                  <Td className="text-xs">{formatWeekdayDate(route.deliveryAt)}</Td>
-                  <Td className="text-xs">{formatShortDateTime(route.cutoffAt)}</Td>
-                  <Td className="tabular-nums">{route.customerCount}</Td>
-                  <Td><ActiveBadge active={route.isActive} /></Td>
-                  <Td>
+                  <Td label="חלוקה קרובה" className="text-xs">{formatWeekdayDate(route.deliveryAt)}</Td>
+                  <Td label="סגירת הזמנות" className="text-xs">{formatShortDateTime(route.cutoffAt)}</Td>
+                  <Td label="לקוחות" className="tabular-nums">{route.customerCount}</Td>
+                  <Td label="סטטוס"><ActiveBadge active={route.isActive} /></Td>
+                  <Td actions>
                     <RowActions
                       viewHref={paths.admin.route(route.id)}
                       onEdit={() => dialog.openEdit(route.id)}

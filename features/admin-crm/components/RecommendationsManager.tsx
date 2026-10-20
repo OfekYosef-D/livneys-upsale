@@ -51,10 +51,10 @@ export function RecommendationsManager({ data }: { data: RecommendationManagemen
               {view.visible.map((item) => (
                 <tr key={item.id} className="hover:bg-[var(--pantry-soft)]">
                   <Td className="font-medium">{item.customerName}</Td>
-                  <Td>{item.productName}</Td>
-                  <Td className="text-xs text-black/60">{item.reason ?? '—'}</Td>
-                  <Td><ActiveBadge active={item.isActive} /></Td>
-                  <Td>
+                  <Td label="מוצר">{item.productName}</Td>
+                  <Td label="סיבה" className="text-xs text-black/60">{item.reason ?? '—'}</Td>
+                  <Td label="סטטוס"><ActiveBadge active={item.isActive} /></Td>
+                  <Td actions>
                     <RowActions
                       onEdit={() => dialog.openEdit(item.id)}
                       active={item.isActive}

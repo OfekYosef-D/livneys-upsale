@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Mail, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Mail, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
@@ -37,7 +37,11 @@ export function CustomerOrderView({
 
   return (
     <main className="app-surface min-h-screen pb-12 text-black">
-      <CustomerHeader title={customer.name} subtitle={`הזמנה ${formatOrderNumber(order.orderNumber)}`} />
+      <CustomerHeader
+        title={customer.name}
+        subtitle={`הזמנה ${formatOrderNumber(order.orderNumber)}`}
+        actions={<Button href={paths.customer.home(customer.id)} variant="outline" size="sm" icon={<ArrowRight size={14} />}>לקטלוג</Button>}
+      />
 
       <div className="mx-auto mt-4 max-w-5xl space-y-4 px-3 md:px-6">
         {justPlaced && (
@@ -66,32 +70,34 @@ export function CustomerOrderView({
               {order.notes && <p className="mt-3 rounded-md bg-[var(--pantry-soft)] p-2.5 text-xs">הערה: {order.notes}</p>}
             </section>
 
-            <section className="ui-panel space-y-3 p-4">
-              <div className="flex items-start gap-2">
-                <Plus size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-                <div>
-                  <h2 className="text-sm font-semibold">שכחתם משהו?</h2>
-                  <p className="mt-1 text-xs leading-5 text-black/55">אפשר לבקש תוספת עד שההזמנה נארזת. התוספת מצטרפת להזמנה אחרי אישור הצוות.</p>
-                </div>
-              </div>
-              {latestAddition && presentation && (
-                <div className="rounded-md bg-[var(--pantry-soft)] p-3 text-xs">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold">בקשת תוספת</span>
-                    <Badge tone={presentation.tone}>{presentation.label}</Badge>
+            {(canAddItems || latestAddition) && (
+              <section className="ui-panel space-y-3 p-4">
+                <div className="flex items-start gap-2">
+                  <Plus size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+                  <div>
+                    <h2 className="text-sm font-semibold">שכחתם משהו?</h2>
+                    <p className="mt-1 text-xs leading-5 text-black/55">אפשר לבקש תוספת עד שההזמנה נארזת. התוספת מצטרפת להזמנה אחרי אישור הצוות.</p>
                   </div>
-                  <p className="mt-1 text-black/60">{latestAddition.lines.length} מוצרים · {formatMoney(latestAddition.totalIncludingVat)} כולל מע״מ · {formatDateTime(latestAddition.submittedAt)}</p>
-                  {latestAddition.rejectionReason && <p className="mt-1 text-red-800">סיבה: {latestAddition.rejectionReason}</p>}
                 </div>
-              )}
-              {canAddItems ? (
-                <Button href={paths.customer.orderAddition(customer.id, order.orderNumber)} fullWidth>
-                  {presentation?.actionLabel ?? 'הוספת פריטים'} <ArrowLeft size={16} aria-hidden="true" />
-                </Button>
-              ) : (
-                <p className="text-xs font-medium text-black/55">ההזמנה כבר נארזה ולא ניתן להוסיף לה פריטים.</p>
-              )}
-            </section>
+                {latestAddition && presentation && (
+                  <div className="rounded-md bg-[var(--pantry-soft)] p-3 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold">בקשת תוספת</span>
+                      <Badge tone={presentation.tone}>{presentation.label}</Badge>
+                    </div>
+                    <p className="mt-1 text-black/60">{latestAddition.lines.length} מוצרים · {formatMoney(latestAddition.totalIncludingVat)} כולל מע״מ · {formatDateTime(latestAddition.submittedAt)}</p>
+                    {latestAddition.rejectionReason && <p className="mt-1 text-red-800">סיבה: {latestAddition.rejectionReason}</p>}
+                  </div>
+                )}
+                {canAddItems ? (
+                  <Button href={paths.customer.orderAddition(customer.id, order.orderNumber)} fullWidth>
+                    {presentation?.actionLabel ?? 'הוספת פריטים'} <ArrowLeft size={16} aria-hidden="true" />
+                  </Button>
+                ) : (
+                  <p className="text-xs font-medium text-black/55">ההזמנה כבר נארזה ולא ניתן להוסיף לה פריטים.</p>
+                )}
+              </section>
+            )}
 
             <p className="text-[11px] leading-5 text-black/50">{COMMERCIAL_ORDER_NOTICE}</p>
           </aside>

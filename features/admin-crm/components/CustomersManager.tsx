@@ -80,14 +80,14 @@ export function CustomersManager({ data }: { data: CustomerManagementData }) {
                     <p className="font-medium">{customer.name}</p>
                     <p className="text-xs text-black/55">{customer.contact} · <span dir="ltr">{customer.phone}</span></p>
                   </Td>
-                  <Td className="text-xs">{customer.routeName}<br /><span className="text-black/50">{customer.priceListName}</span></Td>
-                  <Td className="text-xs text-black/60">
+                  <Td label="קו · מחירון" className="text-xs">{customer.routeName}<br /><span className="text-black/50">{customer.priceListName}</span></Td>
+                  <Td label="הזמנה אחרונה" className="text-xs text-black/60">
                     {customer.latestOrder
                       ? `${orderStatusLabels[customer.latestOrder.status]} · ${formatMoney(customer.latestOrder.totalIncludingVat)}${customer.latestOrder.submittedAt ? ` · ${formatDate(customer.latestOrder.submittedAt)}` : ''}`
                       : 'אין הזמנות'}
                   </Td>
-                  <Td><ActiveBadge active={customer.isActive} /></Td>
-                  <Td>
+                  <Td label="סטטוס"><ActiveBadge active={customer.isActive} /></Td>
+                  <Td actions>
                     <RowActions
                       viewHref={paths.admin.customer(customer.id)}
                       onEdit={() => dialog.openEdit(customer.id)}

@@ -169,3 +169,52 @@ button {
     @apply mb-1.5 block text-xs font-medium text-black/55;
   }
 }
+
+/*
+ * DataTable on phones: each row becomes a card. The first cell (the row's identity) spans the
+ * card; every other cell shows its column name from `data-label`.
+ */
+@media (max-width: 639px) {
+  .ui-table-stack {
+    min-width: 0 !important;
+  }
+
+  .ui-table-stack thead {
+    display: none;
+  }
+
+  .ui-table-stack tr {
+    display: block;
+    border-top: 1px solid var(--pantry-line);
+    padding: 0.625rem 0.75rem;
+  }
+
+  .ui-table-stack tr:first-child {
+    border-top: 0;
+  }
+
+  .ui-table-stack td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 0;
+    padding: 0.2rem 0;
+  }
+
+  .ui-table-stack td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: 11px;
+    color: rgb(0 0 0 / 0.5);
+  }
+
+  .ui-table-stack td:not([data-label]) {
+    display: block;
+  }
+
+  .ui-table-stack td[data-actions] {
+    justify-content: flex-end;
+    padding-top: 0.5rem;
+  }
+}

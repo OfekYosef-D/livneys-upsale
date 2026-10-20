@@ -74,8 +74,8 @@ export function AdminCustomerDetail({ customer }: { customer: AdminCustomerDetai
                     <Link href={paths.admin.order(order.id)} className="font-medium hover:underline">{formatOrderNumber(order.orderNumber)}</Link>
                     <p className="text-xs text-black/50">חלוקה {formatDate(order.deliveryWindowStart)}</p>
                   </Td>
-                  <Td><OrderStatusBadge status={order.status} /></Td>
-                  <Td className="tabular-nums">{formatMoney(order.totalIncludingVat)}</Td>
+                  <Td label="סטטוס"><OrderStatusBadge status={order.status} /></Td>
+                  <Td label="סכום כולל מע״מ" className="tabular-nums">{formatMoney(order.totalIncludingVat)}</Td>
                 </tr>
               ))}
             </tbody>

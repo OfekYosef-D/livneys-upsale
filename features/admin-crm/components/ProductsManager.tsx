@@ -96,8 +96,8 @@ export function ProductsManager({ data, imageUploadEnabled }: { data: ProductMan
                       </div>
                     </div>
                   </Td>
-                  <Td>{product.category}</Td>
-                  <Td>
+                  <Td label="קטגוריה">{product.category}</Td>
+                  <Td label="מחיר (₪)">
                     <InlineNumberField
                       label={`מחיר ${product.name}`}
                       value={product.price}
@@ -107,7 +107,7 @@ export function ProductsManager({ data, imageUploadEnabled }: { data: ProductMan
                       onCommit={(basePrice) => action.run(() => updateProductQuickAction({ id: product.id, basePrice }), { success: `המחיר של ${product.name} עודכן ל-${formatMoney(basePrice)} בכל המחירונים.` })}
                     />
                   </Td>
-                  <Td>
+                  <Td label="מינימום">
                     <InlineNumberField
                       label={`כמות מינימום ${product.name}`}
                       value={product.minQty}
@@ -117,8 +117,8 @@ export function ProductsManager({ data, imageUploadEnabled }: { data: ProductMan
                       onCommit={(minQty) => action.run(() => updateProductQuickAction({ id: product.id, minQty }), { success: `המינימום של ${product.name} עודכן.` })}
                     />
                   </Td>
-                  <Td><ActiveBadge active={product.isActive} /></Td>
-                  <Td>
+                  <Td label="סטטוס"><ActiveBadge active={product.isActive} /></Td>
+                  <Td actions>
                     <RowActions
                       onEdit={() => dialog.openEdit(product.id)}
                       active={product.isActive}

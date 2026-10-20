@@ -88,11 +88,11 @@ export function PromotionsManager({ data }: { data: PromotionManagementData }) {
                     <p className="font-medium">{promotion.title}</p>
                     <p className="text-xs text-black/55">{promotion.tag} · {promotion.productName}</p>
                   </Td>
-                  <Td className="text-xs">{describeEffect(promotion)}</Td>
-                  <Td className="text-xs text-black/60">{promotion.targetSummary}</Td>
-                  <Td className="text-xs">{describeWindow(promotion)}</Td>
-                  <Td><ActiveBadge active={promotion.isActive} /></Td>
-                  <Td>
+                  <Td label="הטבה" className="text-xs">{describeEffect(promotion)}</Td>
+                  <Td label="למי" className="text-xs text-black/60">{promotion.targetSummary}</Td>
+                  <Td label="תוקף" className="text-xs">{describeWindow(promotion)}</Td>
+                  <Td label="סטטוס"><ActiveBadge active={promotion.isActive} /></Td>
+                  <Td actions>
                     <RowActions
                       onEdit={() => dialog.openEdit(promotion.id)}
                       active={promotion.isActive}

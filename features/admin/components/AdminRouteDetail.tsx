@@ -44,7 +44,7 @@ export function AdminRouteDetail({ route }: { route: AdminRouteDetailData }) {
                     <Link href={paths.admin.customer(customer.id)} className="font-medium hover:underline">{customer.name}</Link>
                     <p className="text-xs text-black/50">{customer.contact} · <span dir="ltr">{customer.phone}</span></p>
                   </Td>
-                  <Td>
+                  <Td label="הזמנה לחלוקה הקרובה">
                     {customer.order ? (
                       <span className="flex items-center gap-2">
                         <OrderStatusBadge status={customer.order.status} />
@@ -54,7 +54,7 @@ export function AdminRouteDetail({ route }: { route: AdminRouteDetailData }) {
                       <Badge tone="warning">טרם הזמין</Badge>
                     )}
                   </Td>
-                  <Td>
+                  <Td actions>
                     {customer.order ? (
                       <Link href={paths.admin.order(customer.order.id)} className="text-xs font-medium hover:underline">הזמנה {formatOrderNumber(customer.order.orderNumber)}</Link>
                     ) : (

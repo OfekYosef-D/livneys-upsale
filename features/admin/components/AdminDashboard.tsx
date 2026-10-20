@@ -21,6 +21,8 @@ import { AdminOrderStatusActions } from './AdminOrderStatusActions';
 
 type StatusFilter = 'all' | OrderStatus;
 
+const QUICK_VIEW_ID = 'order-quick-view';
+
 const statusFilters: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: 'כל ההזמנות הפתוחות' },
   { value: 'SUBMITTED', label: 'ממתינות לאישור' },
@@ -44,6 +46,14 @@ export function AdminDashboard({ data, appOrigin }: { data: AdminDashboardData; 
         .some((value) => value?.toLowerCase().includes(needle))));
   }, [data.orders, routeId, search, status]);
   const selected = filtered.find((order) => order.id === selectedId) ?? filtered[0] ?? null;
+
+  function select(orderId: string) {
+    setSelectedId(orderId);
+    // Below xl the preview sits under the list, out of view on a phone.
+    if (!window.matchMedia('(min-width: 1280px)').matches) {
+      requestAnimationFrame(() => document.getElementById(QUICK_VIEW_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -88,13 +98,13 @@ export function AdminDashboard({ data, appOrigin }: { data: AdminDashboardData; 
               </thead>
               <tbody>
                 {filtered.map((order) => (
-                  <Tr key={order.id} selected={selected?.id === order.id} onClick={() => setSelectedId(order.id)}>
+                  <Tr key={order.id} selected={selected?.id === order.id} onClick={() => select(order.id)}>
                     <Td>
                       <p className="font-medium">{order.customerName}</p>
                       <p className="text-xs text-black/50">{formatOrderNumber(order.orderNumber)} · {order.routeName} · חלוקה {formatDate(order.deliveryWindowStart)}</p>
                     </Td>
-                    <Td><OrderStatusBadge status={order.status} /></Td>
-                    <Td className="tabular-nums">{formatMoney(order.totalIncludingVat)}</Td>
+                    <Td label="סטטוס"><OrderStatusBadge status={order.status} /></Td>
+                    <Td label="סכום" className="tabular-nums">{formatMoney(order.totalIncludingVat)}</Td>
                   </Tr>
                 ))}
               </tbody>
@@ -112,7 +122,7 @@ export function AdminDashboard({ data, appOrigin }: { data: AdminDashboardData; 
 
 function OrderQuickView({ order }: { order: AdminOrderView }) {
   return (
-    <Panel className="h-fit xl:sticky xl:top-4">
+    <Panel id={QUICK_VIEW_ID} className="h-fit scroll-mt-16 xl:sticky xl:top-4">
       <PanelHeader
         title={`${order.customerName} · ${formatOrderNumber(order.orderNumber)}`}
         actions={<OrderStatusBadge status={order.status} />}

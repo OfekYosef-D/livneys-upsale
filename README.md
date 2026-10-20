@@ -25,6 +25,7 @@ Demo logins (local seed only): `admin@example.com` / `livneys-admin`, `south@exa
 | `npm run build` | Prisma generate + production build (type check + lint) |
 | `npm run deploy:check` | Validates production environment variables |
 | `npm run db:bootstrap-admin` | Creates the first real administrator |
+| `npm run db:test-users` | Test admin + test customer on a preview database (passwords → `.test-users.local.txt`) |
 | `npm run db:audit:critical` | Read-only data integrity report |
 
 Production setup, first-run checklist and WhatsApp activation: [docs/deployment.md](docs/deployment.md).

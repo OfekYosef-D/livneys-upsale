@@ -1,5 +1,10 @@
 import type React from 'react';
 
+/**
+ * Admin list table. On wide screens it is a regular table (scrolling sideways if needed); on
+ * phones each row stacks into a card – give every cell after the first a `label` (or
+ * `actions`) so its value stays identifiable.
+ */
 export function DataTable({
   children,
   minWidth = '40rem',
@@ -11,7 +16,7 @@ export function DataTable({
 }) {
   return (
     <div className={`overflow-x-auto ${className}`}>
-      <table className="w-full border-collapse text-sm" style={{ minWidth }}>
+      <table className="ui-table-stack w-full border-collapse text-sm" style={{ minWidth }}>
         {children}
       </table>
     </div>
@@ -26,8 +31,28 @@ export function Th({ children, className = '' }: { children: React.ReactNode; cl
   );
 }
 
-export function Td({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <td className={`border-t border-[var(--pantry-line)] px-3 py-2 align-middle ${className}`}>{children}</td>;
+export function Td({
+  children,
+  className = '',
+  label,
+  actions = false,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  /** Column name shown beside the value when the row is stacked on a phone. */
+  label?: string;
+  /** Row actions: aligned to the end of the stacked card. */
+  actions?: boolean;
+}) {
+  return (
+    <td
+      className={`border-t border-[var(--pantry-line)] px-3 py-2 align-middle ${className}`}
+      data-label={label}
+      data-actions={actions || undefined}
+    >
+      {children}
+    </td>
+  );
 }
 
 export function Tr({

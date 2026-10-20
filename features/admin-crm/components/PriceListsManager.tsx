@@ -54,10 +54,10 @@ export function PriceListsManager({ data }: { data: PriceListManagementData }) {
                       <p className="flex items-center gap-2 font-medium">{list.name}{list.isDefault && <Badge>ברירת מחדל</Badge>}</p>
                       {list.description && <p className="text-xs text-black/55">{list.description}</p>}
                     </Td>
-                    <Td className="tabular-nums">{list.items.length}</Td>
-                    <Td className="tabular-nums">{list.customerCount}</Td>
-                    <Td className="text-xs tabular-nums">{prices.length ? `${formatMoney(Math.min(...prices))} – ${formatMoney(Math.max(...prices))}` : '—'}</Td>
-                    <Td>
+                    <Td label="מוצרים" className="tabular-nums">{list.items.length}</Td>
+                    <Td label="לקוחות" className="tabular-nums">{list.customerCount}</Td>
+                    <Td label="טווח מחירים" className="text-xs tabular-nums">{prices.length ? `${formatMoney(Math.min(...prices))} – ${formatMoney(Math.max(...prices))}` : '—'}</Td>
+                    <Td actions>
                       <div className="flex justify-end gap-1">
                         <RowActions onEdit={() => dialog.openEdit(list.id)} />
                         <button type="button" onClick={() => setCloneSource(list)} className="rounded-md px-2 text-xs font-medium text-black/70 hover:bg-[var(--pantry)]">שכפול</button>

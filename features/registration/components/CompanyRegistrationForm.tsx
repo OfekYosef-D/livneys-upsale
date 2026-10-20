@@ -1,12 +1,12 @@
 'use client';
 
 import Image from 'next/image';
-import Script from 'next/script';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/Button';
 import { formValue, SelectField, TextAreaField, TextField } from '@/components/ui/Field';
 import { Notice } from '@/components/ui/Notice';
+import { Turnstile } from '@/components/ui/Turnstile';
 import { formatMoney } from '@/lib/money';
 import { brandLogo } from '@/lib/product-assets';
 import { institutionalBusinessTypes, MINIMUM_INSTITUTIONAL_ORDER_TOTAL } from '../../owner-rules/constants';
@@ -14,13 +14,14 @@ import { createCompanyRegistrationAction } from '../actions';
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
-type TurnstileWindow = Window & { turnstile?: { reset: () => void } };
-
 /** Public "open a business account" form. The team reviews each request before access is granted. */
 export function CompanyRegistrationForm() {
   const [submitted, setSubmitted] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [challengeReset, setChallengeReset] = useState(0);
+  const waitingForChallenge = Boolean(TURNSTILE_SITE_KEY) && !challengeToken;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,7 +44,7 @@ export function CompanyRegistrationForm() {
       deliveryNotes: text('deliveryNotes'),
       openingOrderNotes: text('openingOrderNotes'),
       website: text('website'),
-      challengeToken: text('cf-turnstile-response'),
+      challengeToken: challengeToken ?? '',
     });
 
     setPending(false);
@@ -52,7 +53,7 @@ export function CompanyRegistrationForm() {
       return;
     }
     setError(result.error);
-    (window as TurnstileWindow).turnstile?.reset();
+    setChallengeReset((value) => value + 1); // tokens are single-use
   }
 
   return (
@@ -102,16 +103,12 @@ export function CompanyRegistrationForm() {
             </div>
 
             {/* Honeypot for bots: hidden from people and assistive technology. */}
-            <input name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="absolute -left-[9999px] h-px w-px opacity-0" />
-            {TURNSTILE_SITE_KEY && (
-              <>
-                <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" />
-                <div className="cf-turnstile" data-sitekey={TURNSTILE_SITE_KEY} data-language="he" />
-              </>
-            )}
+            {/* Never offset it off-screen: in RTL a far-left element makes the whole page scroll sideways on phones. */}
+            <input name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="sr-only" />
+            {TURNSTILE_SITE_KEY && <Turnstile siteKey={TURNSTILE_SITE_KEY} onToken={setChallengeToken} resetSignal={challengeReset} />}
 
             {error && <Notice tone="danger">{error}</Notice>}
-            <Button type="submit" size="lg" pending={pending} pendingLabel="שולחים…">
+            <Button type="submit" size="lg" fullWidth className="sm:w-auto" pending={pending} pendingLabel="שולחים…" disabled={waitingForChallenge}>
               שליחת הבקשה <ArrowLeft size={16} aria-hidden="true" />
             </Button>
           </form>
