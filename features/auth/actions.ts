@@ -7,7 +7,7 @@ import { prisma } from '@/lib/db';
 import { AppError, AuthorizationError, NotFoundError, StaleVersionError } from '@/lib/errors';
 import { adminAction, publicAction } from '@/lib/server-action';
 import { decryptMfaSecret, encryptMfaSecret, generateMfaSecret, generateRecoveryCodes, hashRecoveryCode, verifyTotpCode } from './mfa';
-import { assertAccountAccessDeliveryConfigured, sendAccountAccessEmail } from './notifications';
+import { assertAccountAccessDeliveryConfigured, deliverAccountAccessLink, sendAccountAccessEmail } from './notifications';
 import { consumeRateLimit } from './rate-limit';
 import { getRequestBaseUrl, getRequestIp } from './request';
 import {
@@ -57,7 +57,6 @@ export const setPasswordWithTokenAction = publicAction(passwordTokenSchema, asyn
 });
 
 export const inviteCustomerUserAction = adminAction(inviteCustomerUserSchema, async (input, ctx) => {
-  assertAccountAccessDeliveryConfigured();
   const baseUrl = await getRequestBaseUrl();
 
   const { user, token } = await prisma.$transaction(async (tx) => {
@@ -78,8 +77,8 @@ export const inviteCustomerUserAction = adminAction(inviteCustomerUserSchema, as
     return { user: created, token: issued };
   });
 
-  await sendAccountAccessEmail({ userId: user.id, type: AuthTokenType.PASSWORD_SETUP, url: token.url });
-  return { userId: user.id };
+  const link = await deliverAccountAccessLink({ userId: user.id, type: AuthTokenType.PASSWORD_SETUP, url: token.url });
+  return { userId: user.id, link };
 });
 
 export const setCustomerUserActiveAction = adminAction(setCustomerUserActiveSchema, async (input, ctx) => {
@@ -100,16 +99,25 @@ export const setCustomerUserActiveAction = adminAction(setCustomerUserActiveSche
   return { userId: input.userId };
 });
 
-export const resendCustomerUserSetupAction = adminAction(customerUserSchema, async ({ customerId, userId }) => {
-  assertAccountAccessDeliveryConfigured();
+/**
+ * A fresh one-time link for a customer user: password setup if they never chose one, otherwise a
+ * password reset (customers without email have no other way back in).
+ */
+export const issueCustomerAccessLinkAction = adminAction(customerUserSchema, async ({ customerId, userId }, ctx) => {
   const user = await prisma.user.findFirst({
     where: { id: userId, customerId, role: 'CUSTOMER', isActive: true, customer: { is: { isActive: true } } },
   });
-  if (!user || user.passwordHash) throw new AppError('INVALID_STATE', 'ניתן לשלוח קישור רק למשתמש פעיל שטרם הגדיר סיסמה.');
+  if (!user) throw new AppError('INVALID_STATE', 'ניתן לשלוח קישור רק למשתמש פעיל של לקוח פעיל.');
 
-  const token = await issueAuthToken({ userId: user.id, type: AuthTokenType.PASSWORD_SETUP, baseUrl: await getRequestBaseUrl() });
-  await sendAccountAccessEmail({ userId: user.id, type: AuthTokenType.PASSWORD_SETUP, url: token.url });
-  return { userId: user.id };
+  const type = user.passwordHash ? AuthTokenType.PASSWORD_RESET : AuthTokenType.PASSWORD_SETUP;
+  const baseUrl = await getRequestBaseUrl();
+  const token = await prisma.$transaction(async (tx) => {
+    const issued = await issueAuthTokenInTransaction(tx, { userId: user.id, type, baseUrl });
+    await ctx.audit(tx, { customerId, entityType: 'User', entityId: user.id, action: 'CUSTOMER_ACCESS_LINK_ISSUED', after: { type } });
+    return issued;
+  });
+  const link = await deliverAccountAccessLink({ userId: user.id, type, url: token.url });
+  return { userId: user.id, link };
 });
 
 /** Starts (or replaces) authenticator-app MFA for the signed-in admin. Replacing requires the current password. */

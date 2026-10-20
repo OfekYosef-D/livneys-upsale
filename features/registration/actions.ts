@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db';
 import { AppError, NotFoundError, ValidationError } from '@/lib/errors';
 import { adminAction, publicAction } from '@/lib/server-action';
 import { verifyRegistrationChallenge } from '../auth/captcha';
-import { assertAccountAccessDeliveryConfigured, sendAccountAccessEmail } from '../auth/notifications';
+import { deliverAccountAccessLink } from '../auth/notifications';
 import { consumeRateLimit } from '../auth/rate-limit';
 import { getRequestBaseUrl, getRequestIp } from '../auth/request';
 import { issueAuthTokenInTransaction } from '../auth/tokens';
@@ -40,9 +40,8 @@ export const updateRegistrationStatusAction = adminAction(updateRegistrationStat
   return { requestId: input.id };
 });
 
-/** Opens the customer account and emails the contact a one-time link to choose a password. */
+/** Opens the customer account and hands back (and emails, if configured) a one-time link to choose a password. */
 export const convertRegistrationToCustomerAction = adminAction(convertRegistrationSchema, async (input, ctx) => {
-  assertAccountAccessDeliveryConfigured();
   const baseUrl = await getRequestBaseUrl();
 
   const converted = await prisma.$transaction(async (tx) => {
@@ -90,6 +89,6 @@ export const convertRegistrationToCustomerAction = adminAction(convertRegistrati
     return { customerId, userId: user.id, setupUrl: token.url };
   });
 
-  await sendAccountAccessEmail({ userId: converted.userId, type: AuthTokenType.PASSWORD_SETUP, url: converted.setupUrl });
-  return { customerId: converted.customerId };
+  const link = await deliverAccountAccessLink({ userId: converted.userId, type: AuthTokenType.PASSWORD_SETUP, url: converted.setupUrl });
+  return { customerId: converted.customerId, link };
 });

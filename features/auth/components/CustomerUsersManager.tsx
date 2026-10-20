@@ -1,23 +1,31 @@
 'use client';
 
-import { UserPlus } from 'lucide-react';
+import { Link2, UserPlus } from 'lucide-react';
+import { useState } from 'react';
 import { useServerAction } from '@/components/hooks/useServerAction';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { formValue, TextField } from '@/components/ui/Field';
 import { ActionFeedback } from '@/components/ui/Notice';
 import { Panel, PanelHeader } from '@/components/ui/Panel';
-import { inviteCustomerUserAction, resendCustomerUserSetupAction, setCustomerUserActiveAction } from '../actions';
+import { issueCustomerAccessLinkAction, inviteCustomerUserAction, setCustomerUserActiveAction } from '../actions';
+import type { AccountAccessLink } from '../notifications';
+import { AccessLinkShare } from './AccessLinkShare';
 
 type Account = { id: string; name: string; email: string; isActive: boolean; setupComplete: boolean };
 
-/** Login accounts of one company. Invites are emailed as one-time links; the team never sees passwords. */
-export function CustomerUsersManager({ customerId, accounts }: { customerId: string; accounts: Account[] }) {
+/**
+ * Login accounts of one company. Access goes by one-time links the team sends (WhatsApp, and email
+ * when configured); the team never sees passwords.
+ */
+export function CustomerUsersManager({ customerId, phone, accounts }: { customerId: string; phone: string | null; accounts: Account[] }) {
   const action = useServerAction();
+  const [shared, setShared] = useState<{ userId: string; link: AccountAccessLink } | null>(null);
+  const share = (data: { userId: string; link: AccountAccessLink }) => setShared(data);
 
   return (
     <Panel>
-      <PanelHeader title="משתמשים עם גישה" description="כל משתמש מקבל קישור אישי להגדרת סיסמה במייל." />
+      <PanelHeader title="משתמשים עם גישה" description="כל משתמש מקבל קישור אישי להגדרת סיסמה, שאתם שולחים לו בוואטסאפ." />
       <ul className="divide-y divide-[var(--pantry-line)]">
         {accounts.length === 0 && <li className="p-4 text-xs text-black/50">עדיין אין משתמשים. הוסיפו משתמש כדי שהלקוח יוכל להזמין באתר.</li>}
         {accounts.map((account) => (
@@ -30,15 +38,16 @@ export function CustomerUsersManager({ customerId, accounts }: { customerId: str
             </div>
             <p className="break-all text-xs text-black/60" dir="ltr">{account.email}</p>
             <div className="flex flex-wrap gap-1">
-              {account.isActive && !account.setupComplete && (
+              {account.isActive && (
                 <Button
                   size="sm"
                   variant="outline"
-                  pending={action.isPending(`resend:${account.id}`)}
+                  icon={<Link2 size={14} />}
+                  pending={action.isPending(`link:${account.id}`)}
                   disabled={action.pending}
-                  onClick={() => action.run(() => resendCustomerUserSetupAction({ customerId, userId: account.id }), { success: 'נשלח קישור חדש במייל.' }, `resend:${account.id}`)}
+                  onClick={() => action.run(() => issueCustomerAccessLinkAction({ customerId, userId: account.id }), { onSuccess: share }, `link:${account.id}`)}
                 >
-                  שליחת קישור מחדש
+                  {account.setupComplete ? 'קישור לאיפוס סיסמה' : 'קישור כניסה'}
                 </Button>
               )}
               <Button
@@ -58,6 +67,7 @@ export function CustomerUsersManager({ customerId, accounts }: { customerId: str
                 {account.isActive ? 'השבתה' : 'הפעלה'}
               </Button>
             </div>
+            {shared?.userId === account.id && <AccessLinkShare link={shared.link} contact={account.name} phone={phone} />}
           </li>
         ))}
       </ul>
@@ -70,15 +80,15 @@ export function CustomerUsersManager({ customerId, accounts }: { customerId: str
           const values = new FormData(form);
           action.run(
             () => inviteCustomerUserAction({ customerId, name: formValue.text(values, 'name'), email: formValue.text(values, 'email') }),
-            { success: 'המשתמש נוסף ונשלח אליו קישור להגדרת סיסמה.', onSuccess: () => form.reset() },
+            { success: 'המשתמש נוסף. שלחו לו את קישור הכניסה מהשורה שלו.', onSuccess: (data) => { share(data); form.reset(); } },
             'invite',
           );
         }}
       >
         <p className="text-xs font-semibold">הוספת משתמש</p>
         <TextField name="name" label="שם מלא" required autoComplete="off" />
-        <TextField name="email" label="אימייל" type="email" required autoComplete="off" dir="ltr" />
-        <Button type="submit" fullWidth pending={action.isPending('invite')} disabled={action.pending} icon={<UserPlus size={15} />}>הוספה ושליחת קישור</Button>
+        <TextField name="email" label="אימייל (שם המשתמש לכניסה)" type="email" required autoComplete="off" dir="ltr" />
+        <Button type="submit" fullWidth pending={action.isPending('invite')} disabled={action.pending} icon={<UserPlus size={15} />}>הוספה ויצירת קישור כניסה</Button>
         <ActionFeedback feedback={action.feedback} />
       </form>
     </Panel>

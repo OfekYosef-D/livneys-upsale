@@ -35,7 +35,7 @@ export function AdminCustomerDetail({ customer }: { customer: AdminCustomerDetai
           <Button href={paths.admin.manualOrder(customer.id)} fullWidth>הזמנה ידנית ללקוח</Button>
         </Panel>
 
-        <CustomerUsersManager customerId={customer.id} accounts={customer.users} />
+        <CustomerUsersManager customerId={customer.id} phone={customer.phone} accounts={customer.users} />
 
         <Panel>
           <PanelHeader title="מוצרים מומלצים" actions={<Link href={paths.admin.recommendations} className="text-xs hover:underline">ניהול</Link>} />

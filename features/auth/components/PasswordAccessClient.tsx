@@ -9,9 +9,18 @@ import { Notice } from '@/components/ui/Notice';
 import { requestPasswordResetAction, setPasswordWithTokenAction } from '../actions';
 import { PASSWORD_HINT } from '../password-policy';
 
-export function ForgotPasswordClient() {
+/** Without email delivery the team sends reset links by WhatsApp, so the page says whom to ask. */
+export function ForgotPasswordClient({ emailEnabled }: { emailEnabled: boolean }) {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
+
+  if (!emailEnabled) {
+    return (
+      <AuthCard title="שכחתי סיסמה" description="פנו לצוות ליבני'ס (בוואטסאפ או בטלפון) ונשלח אליכם קישור אישי לבחירת סיסמה חדשה.">
+        <Link href="/login" className="text-sm font-semibold underline underline-offset-4">חזרה לכניסה</Link>
+      </AuthCard>
+    );
+  }
 
   return (
     <AuthCard title="שכחתי סיסמה" description="נשלח אליכם במייל קישור לבחירת סיסמה חדשה.">

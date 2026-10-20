@@ -4,8 +4,7 @@ import { asMock } from '@/test/prisma-mock';
 const consumeRateLimit = vi.hoisted(() => vi.fn());
 const verifyChallenge = vi.hoisted(() => vi.fn());
 const issueAuthTokenInTransaction = vi.hoisted(() => vi.fn());
-const assertDeliveryConfigured = vi.hoisted(() => vi.fn());
-const sendAccountAccessEmail = vi.hoisted(() => vi.fn());
+const deliverAccountAccessLink = vi.hoisted(() => vi.fn());
 const assertAdminAction = vi.hoisted(() => vi.fn());
 const revalidatePath = vi.hoisted(() => vi.fn());
 
@@ -27,14 +26,12 @@ vi.mock('../auth/tokens', async (importOriginal) => ({
 }));
 vi.mock('../auth/notifications', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../auth/notifications')>()),
-  assertAccountAccessDeliveryConfigured: assertDeliveryConfigured,
-  sendAccountAccessEmail,
+  deliverAccountAccessLink,
 }));
 
 const { prisma } = await import('@/lib/db');
 const db = asMock(prisma);
 const { RateLimitError } = await import('../auth/rate-limit');
-const { AccountAccessDeliveryError } = await import('../auth/notifications');
 const {
   convertRegistrationToCustomerAction,
   createCompanyRegistrationAction,
@@ -77,11 +74,11 @@ const lead = {
 beforeEach(() => {
   vi.clearAllMocks();
   db.$reset();
-  [consumeRateLimit, verifyChallenge, issueAuthTokenInTransaction, assertDeliveryConfigured, sendAccountAccessEmail, assertAdminAction]
+  [consumeRateLimit, verifyChallenge, issueAuthTokenInTransaction, deliverAccountAccessLink, assertAdminAction]
     .forEach((mock) => mock.mockReset());
   consumeRateLimit.mockResolvedValue({ remaining: 2 });
   verifyChallenge.mockResolvedValue(true);
-  sendAccountAccessEmail.mockResolvedValue(undefined);
+  deliverAccountAccessLink.mockImplementation(async ({ url, type }) => ({ url, type, emailed: false }));
   assertAdminAction.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
   issueAuthTokenInTransaction.mockResolvedValue({ url: 'https://example.com/setup-password?token=raw' });
   db.auditLog.create.mockResolvedValue({});
@@ -205,16 +202,11 @@ describe('registration conversion', () => {
       userId: 'user-cafe-south', type: 'PASSWORD_SETUP', baseUrl: 'https://example.com',
     }));
     expect(db.auditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({ action: 'REGISTRATION_CONVERTED', customerId }) });
-    expect(sendAccountAccessEmail).toHaveBeenCalledWith({
+    expect(deliverAccountAccessLink).toHaveBeenCalledWith({
       userId: 'user-cafe-south', type: 'PASSWORD_SETUP', url: 'https://example.com/setup-password?token=raw',
     });
-    expect(JSON.stringify(result)).not.toContain('token=raw');
-  });
-
-  it('refuses before any write when account email delivery is not configured', async () => {
-    assertDeliveryConfigured.mockImplementation(() => { throw new AccountAccessDeliveryError('not configured'); });
-    await expect(convertRegistrationToCustomerAction(convertInput)).resolves.toMatchObject({ ok: false, code: 'DELIVERY_UNAVAILABLE' });
-    expect(db.customer.create).not.toHaveBeenCalled();
+    // Without email the admin sends the one-time link by WhatsApp, so it comes back to them.
+    expect(result).toMatchObject({ ok: true, data: { link: { url: 'https://example.com/setup-password?token=raw', emailed: false } } });
   });
 
   it('does not convert the same request twice', async () => {
@@ -227,15 +219,5 @@ describe('registration conversion', () => {
     db.route.findUnique.mockResolvedValue({ isActive: false, region: 'דרום' });
     await expect(convertRegistrationToCustomerAction(convertInput)).resolves.toMatchObject({ ok: false, code: 'NOT_FOUND' });
     expect(db.customer.create).not.toHaveBeenCalled();
-  });
-
-  it('does not report a successful conversion when the setup link was not delivered', async () => {
-    sendAccountAccessEmail.mockRejectedValueOnce(new AccountAccessDeliveryError());
-
-    const result = await convertRegistrationToCustomerAction(convertInput);
-
-    expect(result).toMatchObject({ ok: false, code: 'DELIVERY_UNAVAILABLE' });
-    // The customer was committed before delivery; the admin can resend the link from the customer card.
-    expect(db.customer.create).toHaveBeenCalled();
   });
 });
