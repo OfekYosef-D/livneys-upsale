@@ -65,6 +65,21 @@ Sign in at `/login` and (recommended) enable two-factor authentication under **�
 1. Connect a number to the WhatsApp Business Platform (Meta Cloud API). The number must receive one SMS or voice call for verification — a landline or virtual number works — and must not be active in the regular WhatsApp app.
 2. Create and get approval for message templates (one per message type listed on the notifications screen).
 3. Set `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `WHATSAPP_TEMPLATE_<KEY>` for each template, then `WHATSAPP_SEND_ENABLED=true`.
+   Templates live in the WABA *Test WhatsApp Business Account* (business *Livneys B2B*), language Hebrew (`he`), category Utility:
+
+   | Variable | Template | Parameters |
+   | --- | --- | --- |
+   | `WHATSAPP_TEMPLATE_ORDER_REMINDER` | `livneys_order_reminder_heb` | named |
+   | `WHATSAPP_TEMPLATE_ORDER_RECEIVED` | `livneys_order_received_heb` | named |
+   | `WHATSAPP_TEMPLATE_ORDER_SPECIAL_REQUEST` | `livneys_order_special_request_heb` | named |
+   | `WHATSAPP_TEMPLATE_ORDER_APPROVED` | `livneys_order_approved_heb` | named |
+   | `WHATSAPP_TEMPLATE_ORDER_PACKED` | `livneys_order_packed_heb` | named |
+   | `WHATSAPP_TEMPLATE_ORDER_DELIVERED` | `livneys_order_delivered_heb` | named |
+   | `WHATSAPP_TEMPLATE_ORDER_CANCELLED` | `livneys_order_cancelled_heb` | named |
+   | `WHATSAPP_TEMPLATE_ORDER_ADDITION_APPROVED` | `livneys_order_addition_approved_heb` | `{{1}}` `{{2}}` |
+   | `WHATSAPP_TEMPLATE_ORDER_ADDITION_REJECTED` | `livneys_order_addition_rejected_heb` | `{{1}}` `{{2}}` `{{3}}` |
+
+   Parameter names must match `features/notifications/templates.ts`.
 4. Point the Meta webhook to `https://<host>/api/webhooks/whatsapp`.
 5. Tick *עדכונים בוואטסאפ* on customers who agreed to receive WhatsApp messages.
 
