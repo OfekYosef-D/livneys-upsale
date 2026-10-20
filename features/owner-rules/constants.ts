@@ -48,7 +48,7 @@ export const productPricePresets = [
   },
   {
     id: 'institutional-500',
-    label: 'מוסדי 500 גרם',
+    label: 'ממרחים וריבות 500 גרם',
     unit: 'צנצנת 500 גרם',
     caseSize: '4 יחידות בארגז',
     minQty: 4,
@@ -57,7 +57,7 @@ export const productPricePresets = [
   },
   {
     id: 'herb-institutional-500',
-    label: 'זעתר וטימין מוסדי 500 גרם',
+    label: 'זעתר וטימין 500 גרם',
     unit: 'צנצנת 500 גרם',
     caseSize: '4 יחידות בארגז',
     minQty: 4,
