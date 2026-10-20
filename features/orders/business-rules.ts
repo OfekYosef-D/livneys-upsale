@@ -8,7 +8,7 @@ export { MINIMUM_INSTITUTIONAL_ORDER_TOTAL };
 /** Customers must reach the institutional minimum (after promotions, before VAT). Admin orders are exempt. */
 export function assertMinimumOrderTotal(source: OrderSource, totalAfterPromotions: number): void {
   if (source === 'CUSTOMER' && totalAfterPromotions < MINIMUM_INSTITUTIONAL_ORDER_TOTAL) {
-    throw new ValidationError(`מינימום הזמנה מוסדית הוא ${formatMoney(MINIMUM_INSTITUTIONAL_ORDER_TOTAL)} לפני מע״מ.`);
+    throw new ValidationError(`מינימום הזמנה הוא ${formatMoney(MINIMUM_INSTITUTIONAL_ORDER_TOTAL)} לפני מע״מ.`);
   }
 }
 

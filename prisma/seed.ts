@@ -131,8 +131,8 @@ async function seedProductsAndPricing() {
     data: [
       {
         id: 'price-list-standard',
-        name: 'מחירון מוסדי סטנדרטי',
-        description: 'מחירי בסיס ללקוחות מוסדיים',
+        name: 'מחירון סטנדרטי',
+        description: 'מחירי בסיס',
         isDefault: true,
       },
       {
