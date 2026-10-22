@@ -62,11 +62,11 @@ export function AdditionCatalogClient({
   }
 
   return (
-    <main className="app-surface min-h-screen pb-16 text-black">
+    <main id="main-content" tabIndex={-1} className="app-surface min-h-screen pb-16 text-black">
       <header className="sticky top-0 z-30 border-b border-black/10 bg-white/95 px-3 py-3 backdrop-blur md:px-6">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <div>
-            <p className="text-xs text-black/55">{mode === 'admin' ? 'תוספת שאושרה בטלפון' : 'בקשת תוספת'} · הזמנה {formatOrderNumber(order.orderNumber)}</p>
+            <p className="text-xs text-black/60">{mode === 'admin' ? 'תוספת שאושרה בטלפון' : 'בקשת תוספת'} · הזמנה {formatOrderNumber(order.orderNumber)}</p>
             <h1 className="text-xl font-semibold">הוספת פריטים להזמנה</h1>
           </div>
           <Button href={returnHref} variant="secondary" size="sm" icon={<ArrowRight size={14} />}>חזרה להזמנה</Button>
@@ -94,7 +94,7 @@ export function AdditionCatalogClient({
                   <ProductImage product={product} />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{product.name}</p>
-                    <p className="text-xs text-black/55">{formatMoney(product.price)} · {product.unit}</p>
+                    <p className="text-xs text-black/60">{formatMoney(product.price)} · {product.unit}</p>
                   </div>
                   <div className="col-span-2 sm:col-span-1">
                     <QuantityStepper

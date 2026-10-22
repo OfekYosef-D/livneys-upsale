@@ -101,7 +101,7 @@ export function AdminPaymentReceipts({
         )}
 
         {receipts.length === 0 ? (
-          <p className="text-center text-xs text-black/50">טרם נרשמו תקבולים.</p>
+          <p className="text-center text-xs text-black/60">טרם נרשמו תקבולים.</p>
         ) : (
           <ul className="space-y-2">
             {receipts.map((receipt) => <ReceiptRow key={receipt.id} receipt={receipt} action={action} />)}
@@ -118,11 +118,11 @@ function ReceiptRow({ receipt, action }: { receipt: Receipt; action: ReturnType<
   const voided = receipt.status === 'VOIDED';
 
   return (
-    <li className={`rounded-md border p-3 text-xs ${voided ? 'border-red-200 bg-red-50/50 text-black/55' : 'border-[var(--pantry-line)]'}`}>
+    <li className={`rounded-md border p-3 text-xs ${voided ? 'border-red-200 bg-red-50/50 text-black/60' : 'border-[var(--pantry-line)]'}`}>
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-sm font-semibold">{formatMoney(receipt.amount)} · {paymentMethodLabels[receipt.method]}</p>
-          <p className="mt-0.5 text-black/55">{formatDateTime(receipt.receivedAt)} · {receipt.recordedByName}{receipt.reference ? ` · אסמכתא ${receipt.reference}` : ''}</p>
+          <p className="mt-0.5 text-black/60">{formatDateTime(receipt.receivedAt)} · {receipt.recordedByName}{receipt.reference ? ` · אסמכתא ${receipt.reference}` : ''}</p>
           {receipt.note && <p className="mt-1 text-black/60">{receipt.note}</p>}
         </div>
         <Badge tone={voided ? 'danger' : 'success'}>{voided ? 'בוטל' : 'פעיל'}</Badge>
@@ -153,7 +153,7 @@ function ReceiptRow({ receipt, action }: { receipt: Receipt; action: ReturnType<
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="px-2 py-2.5">
-      <p className="text-black/50">{label}</p>
+      <p className="text-black/60">{label}</p>
       <p className="mt-0.5 text-sm font-semibold tabular-nums">{value}</p>
     </div>
   );

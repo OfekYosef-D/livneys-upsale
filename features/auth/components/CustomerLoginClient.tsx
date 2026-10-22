@@ -44,7 +44,7 @@ export function CustomerLoginClient() {
   }
 
   return (
-    <main className="app-surface grid min-h-screen place-items-center px-3 py-6 text-black">
+    <main id="main-content" tabIndex={-1} className="app-surface grid min-h-screen place-items-center px-3 py-6 text-black">
       <section className="ui-panel w-full max-w-sm p-5">
         <Image src={brandLogo} alt="ליבני'ס" className="w-24" priority />
         <h1 className="mt-5 text-xl font-semibold">כניסה להזמנות</h1>
@@ -54,7 +54,7 @@ export function CustomerLoginClient() {
           <TextField name="email" label="אימייל" type="email" dir="ltr" autoComplete="username" required />
           <TextField name="password" label="סיסמה" type="password" autoComplete="current-password" required />
           <details>
-            <summary className="cursor-pointer text-xs text-black/55">יש לי קוד אימות (מנהלים)</summary>
+            <summary className="cursor-pointer text-xs text-black/60">יש לי קוד אימות (מנהלים)</summary>
             <TextField name="mfaCode" label="קוד מאפליקציית האימות או קוד שחזור" dir="ltr" autoComplete="one-time-code" className="mt-2" />
           </details>
           {error && <Notice tone="danger">{error}</Notice>}

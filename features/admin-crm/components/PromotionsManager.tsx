@@ -86,7 +86,7 @@ export function PromotionsManager({ data }: { data: PromotionManagementData }) {
                 <tr key={promotion.id} className="hover:bg-[var(--pantry-soft)]">
                   <Td>
                     <p className="font-medium">{promotion.title}</p>
-                    <p className="text-xs text-black/55">{promotion.tag} · {promotion.productName}</p>
+                    <p className="text-xs text-black/60">{promotion.tag} · {promotion.productName}</p>
                   </Td>
                   <Td label="הטבה" className="text-xs">{describeEffect(promotion)}</Td>
                   <Td label="למי" className="text-xs text-black/60">{promotion.targetSummary}</Td>

@@ -15,9 +15,9 @@ export function AdminAuditLog({ entries, query }: { entries: Entries; query: str
             <button className="min-h-10 rounded-md bg-black px-4 text-sm font-semibold text-white">חיפוש</button>
           </form>
         </Toolbar>
-        <p className="px-4 py-2 text-xs text-black/50">מוצגות עד 200 הפעולות האחרונות. הרשומות מוגנות משינוי ומחיקה ברמת מסד הנתונים.</p>
+        <p className="px-4 py-2 text-xs text-black/60">מוצגות עד 200 הפעולות האחרונות. הרשומות מוגנות משינוי ומחיקה ברמת מסד הנתונים.</p>
         {entries.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-black/55">לא נמצאו רשומות מתאימות.</p>
+          <p className="px-4 py-8 text-center text-sm text-black/60">לא נמצאו רשומות מתאימות.</p>
         ) : (
           <DataTable minWidth="48rem">
             <thead>
@@ -33,7 +33,7 @@ export function AdminAuditLog({ entries, query }: { entries: Entries; query: str
                 <tr key={entry.id} className="align-top hover:bg-[var(--pantry-soft)]">
                   <Td>
                     <p className="font-medium">{entry.action}</p>
-                    <p className="mt-0.5 text-xs text-black/50">{entry.entityType} · {entry.entityId}</p>
+                    <p className="mt-0.5 text-xs text-black/60">{entry.entityType} · {entry.entityId}</p>
                     {(entry.before || entry.after || entry.metadata) && (
                       <details className="mt-2 text-xs">
                         <summary className="cursor-pointer font-medium">פרטי שינוי</summary>
@@ -43,7 +43,7 @@ export function AdminAuditLog({ entries, query }: { entries: Entries; query: str
                   </Td>
                   <Td label="מבצע" className="text-xs">{entry.actorName}{entry.actorRole ? ` (${entry.actorRole})` : ''}</Td>
                   <Td label="לקוח" className="text-xs">{entry.customerName ?? '—'}</Td>
-                  <Td label="זמן" className="whitespace-nowrap text-xs text-black/50">{formatDate(entry.createdAt)}</Td>
+                  <Td label="זמן" className="whitespace-nowrap text-xs text-black/60">{formatDate(entry.createdAt)}</Td>
                 </tr>
               ))}
             </tbody>

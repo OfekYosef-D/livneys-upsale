@@ -36,7 +36,7 @@ export function CustomerOrderView({
   const presentation = latestAddition ? getAdditionRequestPresentation(latestAddition.status) : null;
 
   return (
-    <main className="app-surface min-h-screen pb-12 text-black">
+    <main id="main-content" tabIndex={-1} className="app-surface min-h-screen pb-12 text-black">
       <CustomerHeader
         title={customer.name}
         subtitle={`הזמנה ${formatOrderNumber(order.orderNumber)}`}
@@ -52,7 +52,7 @@ export function CustomerOrderView({
 
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-xs text-black/55">חלוקה ב{formatWeekdayDate(order.deliveryWindowStart)}</p>
+            <p className="text-xs text-black/60">חלוקה ב{formatWeekdayDate(order.deliveryWindowStart)}</p>
             <h1 className="text-2xl font-semibold">הזמנה {formatOrderNumber(order.orderNumber)}</h1>
           </div>
           <OrderStatusBadge status={order.status} />
@@ -65,7 +65,7 @@ export function CustomerOrderView({
 
           <aside className="space-y-4">
             <section className="ui-panel p-4">
-              <p className="text-xs text-black/55">תנאי תשלום: <span className="font-semibold text-black">{paymentTermLabels[order.paymentTerm]}</span></p>
+              <p className="text-xs text-black/60">תנאי תשלום: <span className="font-semibold text-black">{paymentTermLabels[order.paymentTerm]}</span></p>
               <OrderFinancialSummary totals={order} className="mt-3" />
               {order.notes && <p className="mt-3 rounded-md bg-[var(--pantry-soft)] p-2.5 text-xs">הערה: {order.notes}</p>}
             </section>
@@ -76,7 +76,7 @@ export function CustomerOrderView({
                   <Plus size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
                   <div>
                     <h2 className="text-sm font-semibold">שכחתם משהו?</h2>
-                    <p className="mt-1 text-xs leading-5 text-black/55">אפשר לבקש תוספת עד שההזמנה נארזת. התוספת מצטרפת להזמנה אחרי אישור הצוות.</p>
+                    <p className="mt-1 text-xs leading-5 text-black/60">אפשר לבקש תוספת עד שההזמנה נארזת. התוספת מצטרפת להזמנה אחרי אישור הצוות.</p>
                   </div>
                 </div>
                 {latestAddition && presentation && (
@@ -94,12 +94,12 @@ export function CustomerOrderView({
                     {presentation?.actionLabel ?? 'הוספת פריטים'} <ArrowLeft size={16} aria-hidden="true" />
                   </Button>
                 ) : (
-                  <p className="text-xs font-medium text-black/55">ההזמנה כבר נארזה ולא ניתן להוסיף לה פריטים.</p>
+                  <p className="text-xs font-medium text-black/60">ההזמנה כבר נארזה ולא ניתן להוסיף לה פריטים.</p>
                 )}
               </section>
             )}
 
-            <p className="text-[11px] leading-5 text-black/50">{COMMERCIAL_ORDER_NOTICE}</p>
+            <p className="text-[11px] leading-5 text-black/60">{COMMERCIAL_ORDER_NOTICE}</p>
           </aside>
         </div>
       </div>

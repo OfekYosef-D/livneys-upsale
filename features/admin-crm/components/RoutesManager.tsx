@@ -55,7 +55,7 @@ export function RoutesManager({ data }: { data: RouteManagementData }) {
                 <tr key={route.id} className="hover:bg-[var(--pantry-soft)]">
                   <Td>
                     <p className="font-medium">{route.name}</p>
-                    <p className="text-xs text-black/55">{route.region}{route.driver ? ` · ${route.driver}` : ''}</p>
+                    <p className="text-xs text-black/60">{route.region}{route.driver ? ` · ${route.driver}` : ''}</p>
                   </Td>
                   <Td label="חלוקה קרובה" className="text-xs">{formatWeekdayDate(route.deliveryAt)}</Td>
                   <Td label="סגירת הזמנות" className="text-xs">{formatShortDateTime(route.cutoffAt)}</Td>

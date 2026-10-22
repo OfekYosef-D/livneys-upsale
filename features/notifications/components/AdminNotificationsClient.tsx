@@ -33,7 +33,7 @@ export function AdminNotificationsClient({ data, initialSearch }: { data: Notifi
             {data.webhookEvents.map((event) => (
               <li key={event.id} className="flex flex-wrap justify-between gap-2 px-4 py-2">
                 <span>{event.kind}{event.providerStatus ? ` · ${event.providerStatus}` : ''} · {event.customerName ?? 'לא משויך'}</span>
-                <span className="text-black/50">{formatDateTime(event.receivedAt)}</span>
+                <span className="text-black/60">{formatDateTime(event.receivedAt)}</span>
                 {event.errorMessage && <span className="w-full text-red-700">{event.errorMessage}</span>}
               </li>
             ))}
@@ -150,7 +150,7 @@ function JobQueue({ jobs, initialSearch }: { jobs: Job[]; initialSearch: string 
             <option value="all">כל הסטטוסים</option>
             {(['FAILED', 'PENDING', 'SENT', 'DRY_RUN'] as const).map((value) => <option key={value} value={value}>{notificationStatusLabels[value]}</option>)}
           </select>
-          <span className="ms-auto text-[11px] tabular-nums text-black/45">{visible.length}/{jobs.length}</span>
+          <span className="ms-auto text-[11px] tabular-nums text-black/60">{visible.length}/{jobs.length}</span>
         </div>
       </Toolbar>
       <ActionFeedback feedback={action.feedback} className="m-3" />
@@ -166,7 +166,7 @@ function JobQueue({ jobs, initialSearch }: { jobs: Job[]; initialSearch: string 
                   <Badge tone={statusTone[job.status]}>{notificationStatusLabels[job.status]}</Badge>
                   <Badge tone="muted">{notificationChannelLabels[job.channel]}</Badge>
                 </p>
-                <p className="text-xs text-black/55">
+                <p className="text-xs text-black/60">
                   {notificationTemplateLabels[job.templateKey] ?? job.templateKey}
                   {job.orderNumber !== null ? ` · ${formatOrderNumber(job.orderNumber)}` : ''}
                   {' · '}{formatDateTime(job.processedAt ?? job.scheduledAt)}

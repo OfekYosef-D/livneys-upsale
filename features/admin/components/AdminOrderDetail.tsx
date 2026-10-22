@@ -36,7 +36,7 @@ export function AdminOrderDetail({ order }: { order: AdminOrderDetailData }) {
         <Panel className="space-y-4 p-4">
           <div className="flex items-center justify-between gap-2">
             <OrderStatusBadge status={order.status} />
-            <span className="text-xs text-black/55">{order.source === 'ADMIN' ? 'הזמנה ידנית' : 'הוזמן בפורטל'}</span>
+            <span className="text-xs text-black/60">{order.source === 'ADMIN' ? 'הזמנה ידנית' : 'הוזמן בפורטל'}</span>
           </div>
           <DefinitionList>
             <DefinitionItem label="לקוח"><Link href={paths.admin.customer(order.customerId)} className="underline-offset-2 hover:underline">{order.customerName}</Link></DefinitionItem>

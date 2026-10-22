@@ -65,7 +65,7 @@ export function CatalogClient({ data }: { data: CustomerPortalData }) {
   }
 
   return (
-    <main className="app-surface min-h-screen pb-40 text-black">
+    <main id="main-content" tabIndex={-1} className="app-surface min-h-screen pb-40 text-black">
       <CustomerHeader
         title={customer.name}
         subtitle={`חלוקה ב${formatWeekdayDate(schedule.deliveryAt)} · הזמנה עד ${formatShortDateTime(schedule.cutoffAt)}`}
@@ -84,7 +84,7 @@ export function CatalogClient({ data }: { data: CustomerPortalData }) {
           <label className="flex h-10 items-center gap-2 rounded-md border border-[var(--pantry-line)] bg-white px-3 focus-within:ring-2 focus-within:ring-black/20">
             <Search size={16} aria-hidden="true" />
             <span className="sr-only">חיפוש מוצר</span>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="חיפוש מוצר…" className="w-full bg-transparent text-sm outline-none placeholder:text-black/45" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="חיפוש מוצר…" className="w-full bg-transparent text-sm outline-none placeholder:text-black/60" />
           </label>
           {availableSegments.length > 1 && (
             <ChipRow label="סינון" options={availableSegments} value={segment} onChange={setSegment} />
@@ -99,7 +99,7 @@ export function CatalogClient({ data }: { data: CustomerPortalData }) {
           )}
         </div>
 
-        <p className="text-xs text-black/55">{INSTITUTIONAL_PRICING_NOTICE}</p>
+        <p className="text-xs text-black/60">{INSTITUTIONAL_PRICING_NOTICE}</p>
 
         {visibleProducts.length === 0 ? (
           <section className="ui-panel">
@@ -120,9 +120,9 @@ export function CatalogClient({ data }: { data: CustomerPortalData }) {
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold tabular-nums">
-                {formatMoney(cart.pricing.total)} <span className="text-xs font-medium text-black/50">לפני מע״מ · {cart.units} יח׳</span>
+                {formatMoney(cart.pricing.total)} <span className="text-xs font-medium text-black/60">לפני מע״מ · {cart.units} יח׳</span>
               </p>
-              <p className="text-[11px] text-black/55">
+              <p className="text-[11px] text-black/60">
                 כולל מע״מ: <span className="font-semibold tabular-nums">{formatMoney(vat.totalIncludingVat)}</span>
                 {cart.pricing.discountTotal > 0 && <span className="ms-2 font-semibold text-emerald-700">חיסכון {formatMoney(cart.pricing.discountTotal)}</span>}
               </p>
@@ -165,17 +165,17 @@ function ProductRow({ product, quantity, onQuantity }: { product: PortalProduct;
     <article className="grid grid-cols-[4.75rem_1fr] gap-3 p-3 md:grid-cols-[5.5rem_1fr_11rem] md:items-center">
       <ProductImage product={product} />
       <div className="min-w-0">
-        <p className="truncate text-[11px] font-semibold text-black/45">{product.category}</p>
+        <p className="truncate text-[11px] font-semibold text-black/60">{product.category}</p>
         <h2 className="truncate text-base font-semibold leading-tight">{product.name}</h2>
-        <p className="mt-0.5 text-xs text-black/55">{product.unit} · {product.caseSize}</p>
+        <p className="mt-0.5 text-xs text-black/60">{product.unit} · {product.caseSize}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <span className="text-sm font-semibold tabular-nums">{formatMoney(product.price)}</span>
-          {product.listPrice > product.price && <span className="text-xs text-black/40 line-through">{formatMoney(product.listPrice)}</span>}
+          {product.listPrice > product.price && <span className="text-xs text-black/60 line-through">{formatMoney(product.listPrice)}</span>}
           {product.promoLabel && <Badge tone="inverse">{product.promoLabel}</Badge>}
           {product.isRecommended && <Badge tone="info"><Sparkles size={11} className="me-1" aria-hidden="true" />מומלץ</Badge>}
           {product.stockLabel && <Badge tone="warning">{product.stockLabel}</Badge>}
         </div>
-        <p className="mt-1 text-[11px] text-black/45">
+        <p className="mt-1 text-[11px] text-black/60">
           {multiple > 1 ? `בכפולות של ${multiple}` : `מינימום ${minimum}`}
           {product.promotion?.description ? ` · ${product.promotion.description}` : ''}
         </p>

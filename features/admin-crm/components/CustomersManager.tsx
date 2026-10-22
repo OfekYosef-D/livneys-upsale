@@ -78,9 +78,9 @@ export function CustomersManager({ data }: { data: CustomerManagementData }) {
                 <tr key={customer.id} className="hover:bg-[var(--pantry-soft)]">
                   <Td>
                     <p className="font-medium">{customer.name}</p>
-                    <p className="text-xs text-black/55">{customer.contact} · <span dir="ltr">{customer.phone}</span></p>
+                    <p className="text-xs text-black/60">{customer.contact} · <span dir="ltr">{customer.phone}</span></p>
                   </Td>
-                  <Td label="קו · מחירון" className="text-xs">{customer.routeName}<br /><span className="text-black/50">{customer.priceListName}</span></Td>
+                  <Td label="קו · מחירון" className="text-xs">{customer.routeName}<br /><span className="text-black/60">{customer.priceListName}</span></Td>
                   <Td label="הזמנה אחרונה" className="text-xs text-black/60">
                     {customer.latestOrder
                       ? `${orderStatusLabels[customer.latestOrder.status]} · ${formatMoney(customer.latestOrder.totalIncludingVat)}${customer.latestOrder.submittedAt ? ` · ${formatDate(customer.latestOrder.submittedAt)}` : ''}`

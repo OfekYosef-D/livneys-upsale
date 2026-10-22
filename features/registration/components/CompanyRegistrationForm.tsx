@@ -57,14 +57,14 @@ export function CompanyRegistrationForm() {
   }
 
   return (
-    <main className="app-surface min-h-screen px-3 py-6 text-black md:px-6">
+    <main id="main-content" tabIndex={-1} className="app-surface min-h-screen px-3 py-6 text-black md:px-6">
       <section className="ui-panel mx-auto max-w-2xl p-5">
         <Image src={brandLogo} alt="ליבני'ס" className="w-24" priority />
         <h1 className="mt-5 text-xl font-semibold">פתיחת חשבון לעסקים</h1>
         <p className="mt-1 text-sm leading-6 text-black/60">
-          משאירים פרטים, ואנחנו חוזרים אליכם לתיאום קו חלוקה ומחירון. לאחר האישור יישלח אליכם במייל קישור לכניסה.
+          משאירים פרטים, ואנחנו חוזרים אליכם לתיאום קו חלוקה ומחירון. לאחר האישור יישלח אליכם קישור לכניסה.
         </p>
-        <p className="mt-2 text-xs text-black/50">מינימום הזמנה {formatMoney(MINIMUM_INSTITUTIONAL_ORDER_TOTAL)} לפני מע״מ.</p>
+        <p className="mt-2 text-xs text-black/60">מינימום הזמנה {formatMoney(MINIMUM_INSTITUTIONAL_ORDER_TOTAL)} לפני מע״מ.</p>
 
         {submitted ? (
           <Notice tone="success" icon={<CheckCircle2 size={18} />} title="הבקשה התקבלה!" className="mt-5">
@@ -72,6 +72,7 @@ export function CompanyRegistrationForm() {
           </Notice>
         ) : (
           <form className="mt-5 space-y-4" onSubmit={submit}>
+            <p className="text-xs text-black/60">שדות המסומנים ב-<span className="text-red-700">*</span> הם שדות חובה.</p>
             <div className="grid gap-3 md:grid-cols-2">
               <TextField name="businessName" label="שם העסק" required autoComplete="organization" />
               <SelectField
