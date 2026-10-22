@@ -14,7 +14,7 @@ export function CustomerHeader({ title, subtitle, actions }: { title: string; su
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{title}</p>
-            {subtitle && <p className="truncate text-xs text-black/55">{subtitle}</p>}
+            {subtitle && <p className="truncate text-xs text-black/60">{subtitle}</p>}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">

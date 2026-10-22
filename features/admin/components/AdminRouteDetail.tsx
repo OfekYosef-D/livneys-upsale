@@ -27,7 +27,7 @@ export function AdminRouteDetail({ route }: { route: AdminRouteDetailData }) {
       <Panel>
         <PanelHeader title={`לקוחות בקו ${route.name}`} description={route.driver ? `נהג: ${route.driver}` : undefined} />
         {route.customers.length === 0 ? (
-          <p className="p-4 text-sm text-black/50">אין לקוחות פעילים בקו הזה.</p>
+          <p className="p-4 text-sm text-black/60">אין לקוחות פעילים בקו הזה.</p>
         ) : (
           <DataTable minWidth="34rem">
             <thead>
@@ -42,7 +42,7 @@ export function AdminRouteDetail({ route }: { route: AdminRouteDetailData }) {
                 <tr key={customer.id} className="hover:bg-[var(--pantry-soft)]">
                   <Td>
                     <Link href={paths.admin.customer(customer.id)} className="font-medium hover:underline">{customer.name}</Link>
-                    <p className="text-xs text-black/50">{customer.contact} · <span dir="ltr">{customer.phone}</span></p>
+                    <p className="text-xs text-black/60">{customer.contact} · <span dir="ltr">{customer.phone}</span></p>
                   </Td>
                   <Td label="הזמנה לחלוקה הקרובה">
                     {customer.order ? (

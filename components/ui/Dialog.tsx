@@ -55,7 +55,7 @@ export function Dialog({
         <header className="flex items-start justify-between gap-3 border-b border-[var(--pantry-line)] px-4 py-3">
           <div>
             <h2 id={titleId} className="text-base font-semibold">{title}</h2>
-            {description && <p className="mt-1 text-sm leading-6 text-black/55">{description}</p>}
+            {description && <p className="mt-1 text-sm leading-6 text-black/60">{description}</p>}
           </div>
           <button type="button" onClick={onClose} aria-label="סגירה" className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-[var(--pantry)] hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-black/25">
             <X aria-hidden="true" size={16} />

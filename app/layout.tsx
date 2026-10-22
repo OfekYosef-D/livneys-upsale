@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import './globals.css';
 import type { Metadata } from 'next';
 import { Heebo } from 'next/font/google';
+import Link from 'next/link';
 import { NavigationProgress } from '@/components/ui/NavigationProgress';
 
 const heebo = Heebo({
@@ -25,10 +26,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="he" dir="rtl" className={heebo.variable}>
       <body>
+        <a href="#main-content" className="skip-link">דילוג לתוכן הראשי</a>
         <Suspense fallback={null}>
           <NavigationProgress />
         </Suspense>
         {children}
+        <footer className="app-surface px-4 pb-6 pt-2 text-center text-xs">
+          <Link href="/accessibility" className="font-medium text-black/70 underline underline-offset-4">הצהרת נגישות</Link>
+        </footer>
       </body>
     </html>
   );

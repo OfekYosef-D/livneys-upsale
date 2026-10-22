@@ -72,7 +72,7 @@ export function ListToolbar({
           </div>
         )}
         {children}
-        <span className="ms-auto text-[11px] tabular-nums text-black/45">{view.visible.length}/{view.total}</span>
+        <span className="ms-auto text-[11px] tabular-nums text-black/60">{view.visible.length}/{view.total}</span>
         {createLabel && onCreate && <Button size="sm" onClick={onCreate} icon={<Plus size={15} />}>{createLabel}</Button>}
       </div>
     </Toolbar>
@@ -81,7 +81,7 @@ export function ListToolbar({
 
 export function ToolbarSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
   return (
-    <label className="flex min-h-9 items-center gap-2 rounded-md border border-[var(--pantry-line)] bg-[var(--pantry-soft)] px-2.5 text-[11px] text-black/55">
+    <label className="flex min-h-9 items-center gap-2 rounded-md border border-[var(--pantry-line)] bg-[var(--pantry-soft)] px-2.5 text-[11px] text-black/60">
       {label}
       <select value={value} onChange={(event) => onChange(event.target.value)} className="min-w-0 bg-transparent text-sm font-medium text-black outline-none">
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}

@@ -104,7 +104,7 @@ export function ManualOrderClient({ data, initialCustomerId }: { data: ManualOrd
           <TextAreaField name="notes" label="הערה (תוצג ללקוח)" rows={2} />
           <TextAreaField name="internalNote" label="הערה פנימית" rows={2} />
           <OrderFinancialSummary totals={totals} />
-          <p className="text-[11px] text-black/50">הזמנה ידנית אינה כפופה למינימום ההזמנה. הלקוח יקבל אישור במייל.</p>
+          <p className="text-[11px] text-black/60">הזמנה ידנית אינה כפופה למינימום ההזמנה. הלקוח יקבל אישור במייל.</p>
           <ActionFeedback feedback={action.feedback} />
           <Button type="submit" fullWidth disabled={pricing.lines.length === 0} pending={action.pending} pendingLabel="יוצרים הזמנה…" icon={<ShoppingCart size={16} />}>
             יצירת הזמנה ({pricing.lines.length} שורות)
@@ -129,7 +129,7 @@ export function ManualOrderClient({ data, initialCustomerId }: { data: ManualOrd
               <ProductImage product={product} size="sm" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{product.name}</p>
-                <p className="text-xs text-black/55">
+                <p className="text-xs text-black/60">
                   {formatMoney(product.price)}
                   {product.promoLabel ? ` · ${product.promoLabel}` : ''} · מינימום {getMinimumQuantity(product)}
                   {getOrderMultiple(product) > 1 ? ` · בכפולות ${getOrderMultiple(product)}` : ''}
@@ -152,7 +152,7 @@ export function ManualOrderClient({ data, initialCustomerId }: { data: ManualOrd
       <div className="sticky bottom-2 z-20 flex items-center justify-between gap-3 rounded-md border border-black/10 bg-white/95 px-3 py-2.5 shadow-lg backdrop-blur xl:hidden">
         <p className="text-sm">
           <span className="font-semibold tabular-nums">{formatMoney(totals.totalIncludingVat)}</span>
-          <span className="block text-[11px] text-black/50">כולל מע״מ · {pricing.lines.length} שורות</span>
+          <span className="block text-[11px] text-black/60">כולל מע״מ · {pricing.lines.length} שורות</span>
         </p>
         <Button type="submit" form={FORM_ID} disabled={pricing.lines.length === 0} pending={action.pending} pendingLabel="יוצרים…" icon={<ShoppingCart size={16} />}>
           יצירת הזמנה

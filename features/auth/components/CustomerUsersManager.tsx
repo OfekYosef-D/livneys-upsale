@@ -27,7 +27,7 @@ export function CustomerUsersManager({ customerId, phone, accounts }: { customer
     <Panel>
       <PanelHeader title="משתמשים עם גישה" description="כל משתמש מקבל קישור אישי להגדרת סיסמה, שאתם שולחים לו בוואטסאפ." />
       <ul className="divide-y divide-[var(--pantry-line)]">
-        {accounts.length === 0 && <li className="p-4 text-xs text-black/50">עדיין אין משתמשים. הוסיפו משתמש כדי שהלקוח יוכל להזמין באתר.</li>}
+        {accounts.length === 0 && <li className="p-4 text-xs text-black/60">עדיין אין משתמשים. הוסיפו משתמש כדי שהלקוח יוכל להזמין באתר.</li>}
         {accounts.map((account) => (
           <li key={account.id} className="space-y-1.5 px-4 py-3 text-sm">
             <div className="flex items-center justify-between gap-2">

@@ -9,7 +9,7 @@
   --pantry-soft: #f5f2ed;
   --pantry-line: rgba(0, 0, 0, 0.1);
   --ink-soft: rgba(0, 0, 0, 0.62);
-  --ink-muted: rgba(0, 0, 0, 0.46);
+  --ink-muted: rgba(0, 0, 0, 0.6);
   --success: #16a34a;
   --warning: #d97706;
   --danger: #dc2626;
@@ -48,6 +48,32 @@ textarea {
 
 button {
   cursor: pointer;
+}
+
+/* A clearly visible keyboard focus indicator everywhere (IS 5568 / WCAG 2.4.7). */
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+main:focus {
+  outline: none;
+}
+
+.skip-link {
+  position: absolute;
+  inset-inline-start: 0.75rem;
+  top: -4rem;
+  z-index: 100;
+  border-radius: var(--radius-md);
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0.6rem 1rem;
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  top: 0.75rem;
 }
 
 .app-surface {
@@ -162,11 +188,11 @@ button {
   }
 
   .ui-field {
-    @apply min-h-10 w-full rounded-md border border-[var(--pantry-line)] bg-[var(--paper)] px-3 text-sm font-normal outline-none transition focus:border-black focus:ring-2 focus:ring-black/10;
+    @apply min-h-10 w-full rounded-md border border-[var(--pantry-line)] bg-[var(--paper)] px-3 text-sm font-normal outline-none transition focus:border-black focus:ring-2 focus:ring-black/30;
   }
 
   .ui-label {
-    @apply mb-1.5 block text-xs font-medium text-black/55;
+    @apply mb-1.5 block text-xs font-medium text-black/60;
   }
 }
 
@@ -206,7 +232,7 @@ button {
     content: attr(data-label);
     flex-shrink: 0;
     font-size: 11px;
-    color: rgb(0 0 0 / 0.5);
+    color: rgb(0 0 0 / 0.6);
   }
 
   .ui-table-stack td:not([data-label]) {

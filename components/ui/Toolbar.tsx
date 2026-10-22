@@ -36,9 +36,9 @@ export function Kpi({
 
   return (
     <div className="px-3 py-2.5">
-      <p className="text-[11px] font-medium text-black/50">{label}</p>
+      <p className="text-[11px] font-medium text-black/60">{label}</p>
       <p className={`mt-1 text-xl font-semibold tabular-nums leading-none ${valueClass}`}>{value}</p>
-      {detail && <p className="mt-1 text-[11px] text-black/45">{detail}</p>}
+      {detail && <p className="mt-1 text-[11px] text-black/60">{detail}</p>}
     </div>
   );
 }
@@ -50,7 +50,7 @@ export function DefinitionList({ children }: { children: React.ReactNode }) {
 export function DefinitionItem({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs font-medium text-black/50">{label}</dt>
+      <dt className="text-xs font-medium text-black/60">{label}</dt>
       <dd className="mt-0.5 break-words text-sm font-medium">{children}</dd>
     </div>
   );

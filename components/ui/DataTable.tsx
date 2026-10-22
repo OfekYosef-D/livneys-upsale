@@ -25,7 +25,7 @@ export function DataTable({
 
 export function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <th className={`sticky top-0 z-10 whitespace-nowrap bg-[var(--pantry-soft)] px-3 py-1.5 text-right text-[11px] font-medium text-black/50 ${className}`}>
+    <th className={`sticky top-0 z-10 whitespace-nowrap bg-[var(--pantry-soft)] px-3 py-1.5 text-right text-[11px] font-medium text-black/60 ${className}`}>
       {children}
     </th>
   );

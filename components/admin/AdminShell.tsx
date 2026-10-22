@@ -47,7 +47,7 @@ function NavLinks({ activeHref, onNavigate }: { activeHref?: string; onNavigate?
     <nav className="flex flex-col gap-5" aria-label="Admin navigation">
       {navGroups.map((group) => (
         <div key={group.label}>
-          <p className="px-3 text-[11px] font-medium text-black/38">{group.label}</p>
+          <p className="px-3 text-[11px] font-medium text-black/60">{group.label}</p>
           <ul className="mt-1 space-y-0.5">
             {group.items.map((item) => {
               const active = isActiveHref(activeHref, item.href);
@@ -98,7 +98,7 @@ export function AdminShell({ children, title, subtitle, activeHref }: { children
             </div>
             <div className="min-w-0">
               <p className="truncate text-[13px] font-semibold">CRM Livney&apos;s</p>
-              <p className="truncate text-[11px] text-black/45">הזמנות B2B</p>
+              <p className="truncate text-[11px] text-black/60">הזמנות B2B</p>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-2 py-3">
@@ -148,13 +148,13 @@ export function AdminShell({ children, title, subtitle, activeHref }: { children
             </div>
           )}
 
-          <div className="mx-auto w-full max-w-[90rem] px-4 py-4">
+          <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[90rem] px-4 py-4">
             <div className="mb-3">
               <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
-              {subtitle && <p className="mt-0.5 max-w-3xl text-xs leading-5 text-black/50">{subtitle}</p>}
+              {subtitle && <p className="mt-0.5 max-w-3xl text-xs leading-5 text-black/60">{subtitle}</p>}
             </div>
             {children}
-          </div>
+          </main>
         </div>
       </div>
     </div>

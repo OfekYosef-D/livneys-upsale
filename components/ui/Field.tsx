@@ -2,14 +2,18 @@ import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTML
 
 /** Form primitives shared by every screen. Labels wrap their control, so no id plumbing is needed. */
 
-type FieldShellProps = { label: string; hint?: ReactNode; className?: string; children: ReactNode };
+type FieldShellProps = { label: string; hint?: ReactNode; className?: string; required?: boolean; children: ReactNode };
 
-export function FieldShell({ label, hint, className = '', children }: FieldShellProps) {
+export function FieldShell({ label, hint, className = '', required = false, children }: FieldShellProps) {
   return (
     <label className={`block min-w-0 ${className}`}>
-      <span className="ui-label">{label}</span>
+      <span className="ui-label">
+        {label}
+        {/* Screen readers already announce the native `required` state; the asterisk is for sighted users. */}
+        {required && <span aria-hidden="true" className="text-red-700"> *</span>}
+      </span>
       {children}
-      {hint && <span className="mt-1 block text-xs leading-5 text-black/45">{hint}</span>}
+      {hint && <span className="mt-1 block text-xs leading-5 text-black/60">{hint}</span>}
     </label>
   );
 }
@@ -22,7 +26,7 @@ type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'defaultValue'> & 
 
 export function TextField({ label, hint, className, defaultValue, ...props }: InputProps) {
   return (
-    <FieldShell label={label} hint={hint} className={className}>
+    <FieldShell label={label} hint={hint} className={className} required={props.required}>
       <input {...props} defaultValue={defaultValue ?? undefined} className="ui-field" />
     </FieldShell>
   );
@@ -36,7 +40,7 @@ type TextAreaProps = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'defaultV
 
 export function TextAreaField({ label, hint, className, defaultValue, rows = 3, ...props }: TextAreaProps) {
   return (
-    <FieldShell label={label} hint={hint} className={className}>
+    <FieldShell label={label} hint={hint} className={className} required={props.required}>
       <textarea {...props} rows={rows} defaultValue={defaultValue ?? undefined} className="ui-field min-h-20 resize-y py-2" />
     </FieldShell>
   );
@@ -53,7 +57,7 @@ type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'defaultValue'>
 
 export function SelectField({ label, hint, className, options, defaultValue, ...props }: SelectProps) {
   return (
-    <FieldShell label={label} hint={hint} className={className}>
+    <FieldShell label={label} hint={hint} className={className} required={props.required}>
       <select {...props} defaultValue={defaultValue === null || defaultValue === undefined ? undefined : String(defaultValue)} className="ui-field">
         {options.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
@@ -69,7 +73,7 @@ export function CheckboxField({ label, hint, ...props }: Omit<InputHTMLAttribute
       <input {...props} type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-black" />
       <span>
         {label}
-        {hint && <span className="block text-xs font-normal text-black/45">{hint}</span>}
+        {hint && <span className="block text-xs font-normal text-black/60">{hint}</span>}
       </span>
     </label>
   );
@@ -80,10 +84,10 @@ export function CheckboxGroup({ title, name, options, selected }: { title: strin
   return (
     <fieldset className="rounded-md border border-[var(--pantry-line)] p-3">
       <legend className="px-1 text-sm font-semibold">{title}</legend>
-      <p className="text-[11px] text-black/45">ללא בחירה = חל על כולם</p>
+      <p className="text-[11px] text-black/60">ללא בחירה = חל על כולם</p>
       <div className="mt-2 max-h-44 space-y-1 overflow-y-auto">
         {options.length === 0 ? (
-          <p className="text-xs text-black/45">אין אפשרויות</p>
+          <p className="text-xs text-black/60">אין אפשרויות</p>
         ) : (
           options.map((option) => (
             <label key={option.value} className="flex items-center gap-2 rounded px-2 py-1 text-xs font-medium hover:bg-[var(--pantry-soft)]">

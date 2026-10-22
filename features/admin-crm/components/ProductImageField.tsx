@@ -66,7 +66,7 @@ export function ProductImageField({
             <input type="file" accept={allowedTypes.join(',')} className="sr-only" disabled={uploading} onChange={upload} />
           </label>
         ) : (
-          <p className="text-xs text-black/50">העלאת קבצים לא הוגדרה (Cloudinary). אפשר להדביק קישור לתמונה.</p>
+          <p className="text-xs text-black/60">העלאת קבצים לא הוגדרה (Cloudinary). אפשר להדביק קישור לתמונה.</p>
         )}
         {message && <p className="text-xs text-black/65" role="status">{message}</p>}
       </div>

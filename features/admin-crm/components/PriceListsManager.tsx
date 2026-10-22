@@ -52,7 +52,7 @@ export function PriceListsManager({ data }: { data: PriceListManagementData }) {
                   <tr key={list.id} className="hover:bg-[var(--pantry-soft)]">
                     <Td>
                       <p className="flex items-center gap-2 font-medium">{list.name}{list.isDefault && <Badge>ברירת מחדל</Badge>}</p>
-                      {list.description && <p className="text-xs text-black/55">{list.description}</p>}
+                      {list.description && <p className="text-xs text-black/60">{list.description}</p>}
                     </Td>
                     <Td label="מוצרים" className="tabular-nums">{list.items.length}</Td>
                     <Td label="לקוחות" className="tabular-nums">{list.customerCount}</Td>
@@ -118,14 +118,14 @@ function PriceListFields({ priceList, products }: { priceList: PriceList | null;
       </div>
       <CheckboxField name="isDefault" label="מחירון ברירת מחדל" hint="לקוחות ומוצרים חדשים יקבלו אותו אוטומטית" defaultChecked={priceList?.isDefault ?? false} />
       <div className="overflow-hidden rounded-md border border-[var(--pantry-line)]">
-        <div className="grid grid-cols-[1fr_7rem] gap-2 bg-[var(--pantry)] px-3 py-2 text-xs font-medium text-black/55">
+        <div className="grid grid-cols-[1fr_7rem] gap-2 bg-[var(--pantry)] px-3 py-2 text-xs font-medium text-black/60">
           <span>מוצר</span>
           <span>מחיר (₪)</span>
         </div>
         <div className="max-h-[45vh] divide-y divide-[var(--pantry-line)] overflow-y-auto">
           {products.map((product) => (
             <label key={product.id} className="grid grid-cols-[1fr_7rem] items-center gap-2 px-3 py-1.5">
-              <span className="min-w-0 text-sm">{product.name}<span className="block text-[11px] text-black/45">{product.category}</span></span>
+              <span className="min-w-0 text-sm">{product.name}<span className="block text-[11px] text-black/60">{product.category}</span></span>
               <input name={`price:${product.id}`} type="number" min={0.01} step={0.01} inputMode="decimal" required defaultValue={prices.get(product.id) ?? product.basePrice} className="ui-field min-h-9 tabular-nums" />
             </label>
           ))}

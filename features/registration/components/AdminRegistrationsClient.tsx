@@ -92,9 +92,9 @@ function RequestCard({ request, data, action, onConverted }: {
       <summary className="grid cursor-pointer list-none gap-1 px-4 py-3 hover:bg-[var(--pantry-soft)] md:grid-cols-[1fr_10rem_7rem]">
         <span>
           <span className="block font-medium">{request.businessName}</span>
-          <span className="text-xs text-black/55">{request.contactName} · <span dir="ltr">{request.phone}</span> · {request.email}</span>
+          <span className="text-xs text-black/60">{request.contactName} · <span dir="ltr">{request.phone}</span> · {request.email}</span>
         </span>
-        <span className="text-xs text-black/55">{request.businessType} · {formatDateTime(request.createdAt)}</span>
+        <span className="text-xs text-black/60">{request.businessType} · {formatDateTime(request.createdAt)}</span>
         <Badge tone={status.tone}>{status.label}</Badge>
       </summary>
       <div className="space-y-3 border-t border-[var(--pantry-line)] bg-[var(--pantry-soft)] px-4 py-4 text-sm">
@@ -149,7 +149,7 @@ function ShareRow({ title, url, message }: { title: string; url: string; message
   return (
     <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
       <span className="w-14 text-xs font-semibold">{title}</span>
-      <span className="min-w-0 flex-1 truncate text-xs text-black/55" dir="ltr">{url}</span>
+      <span className="min-w-0 flex-1 truncate text-xs text-black/60" dir="ltr">{url}</span>
       <Button
         size="sm"
         variant="outline"
@@ -176,7 +176,7 @@ function ShareRow({ title, url, message }: { title: string; url: string; message
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-semibold text-black/45">{label}</dt>
+      <dt className="text-[11px] font-semibold text-black/60">{label}</dt>
       <dd className="break-words">{value}</dd>
     </div>
   );

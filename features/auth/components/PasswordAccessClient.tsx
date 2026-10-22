@@ -84,7 +84,7 @@ export function PasswordTokenClient({ token, type }: { token: string; type: 'set
 
 function AuthCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return (
-    <main className="app-surface grid min-h-screen place-items-center px-3 py-6 text-black">
+    <main id="main-content" tabIndex={-1} className="app-surface grid min-h-screen place-items-center px-3 py-6 text-black">
       <section className="ui-panel w-full max-w-md p-5">
         <h1 className="text-xl font-semibold">{title}</h1>
         <p className="mt-1 text-sm leading-6 text-black/60">{description}</p>
