@@ -82,7 +82,7 @@ export function AdminDashboard({ data, appOrigin }: { data: AdminDashboardData; 
                 <option value="all">כל הקווים</option>
                 {data.routes.map((route) => <option key={route.id} value={route.id}>{route.name}</option>)}
               </select>
-              <span className="ms-auto text-[11px] tabular-nums text-black/45">{filtered.length}/{data.orders.length}</span>
+              <span className="ms-auto text-[11px] tabular-nums text-black/60">{filtered.length}/{data.orders.length}</span>
             </div>
           </Toolbar>
           {filtered.length === 0 ? (
@@ -101,7 +101,7 @@ export function AdminDashboard({ data, appOrigin }: { data: AdminDashboardData; 
                   <Tr key={order.id} selected={selected?.id === order.id} onClick={() => select(order.id)}>
                     <Td>
                       <p className="font-medium">{order.customerName}</p>
-                      <p className="text-xs text-black/50">{formatOrderNumber(order.orderNumber)} · {order.routeName} · חלוקה {formatDate(order.deliveryWindowStart)}</p>
+                      <p className="text-xs text-black/60">{formatOrderNumber(order.orderNumber)} · {order.routeName} · חלוקה {formatDate(order.deliveryWindowStart)}</p>
                     </Td>
                     <Td label="סטטוס"><OrderStatusBadge status={order.status} /></Td>
                     <Td label="סכום" className="tabular-nums">{formatMoney(order.totalIncludingVat)}</Td>
@@ -154,7 +154,7 @@ function MissingOrdersPanel({ routes, appOrigin }: { routes: AdminDashboardData[
           <section key={route.id} className="px-4 py-3">
             <p className="text-sm font-semibold">
               <Link href={paths.admin.route(route.id)} className="hover:underline">{route.name}</Link>
-              <span className="ms-2 text-xs font-normal text-black/55">
+              <span className="ms-2 text-xs font-normal text-black/60">
                 {route.orderedCount}/{route.customerCount} הזמינו · חלוקה ב{formatWeekdayDate(route.deliveryAt)} · נסגר {formatShortDateTime(route.cutoffAt)}
               </span>
             </p>

@@ -92,7 +92,7 @@ export function ProductsManager({ data, imageUploadEnabled }: { data: ProductMan
                       <ProductImage product={product} size="sm" />
                       <div className="min-w-0">
                         <p className="font-medium">{product.name}</p>
-                        <p className="text-xs text-black/50" dir="ltr">{product.sku}</p>
+                        <p className="text-xs text-black/60" dir="ltr">{product.sku}</p>
                       </div>
                     </div>
                   </Td>

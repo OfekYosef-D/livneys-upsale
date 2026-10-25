@@ -9,7 +9,7 @@ export function PageLoading({
 }) {
   if (variant === 'portal') {
     return (
-      <main className="app-surface min-h-screen text-black" aria-busy="true" aria-live="polite">
+      <main id="main-content" tabIndex={-1} className="app-surface min-h-screen text-black" aria-busy="true" aria-live="polite">
         <span className="sr-only">{label}</span>
         <section className="sticky top-0 z-30 border-b border-[var(--pantry-line)] bg-white px-3 py-2.5 md:px-6">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
@@ -49,8 +49,8 @@ export function PageLoading({
   }
 
   return (
-    <main className="app-surface grid min-h-screen place-items-center px-4" aria-busy="true" aria-live="polite">
-      <p className="flex items-center gap-2 text-sm font-medium text-black/55">
+    <main id="main-content" tabIndex={-1} className="app-surface grid min-h-screen place-items-center px-4" aria-busy="true" aria-live="polite">
+      <p className="flex items-center gap-2 text-sm font-medium text-black/60">
         <Spinner size={18} />
         {label}
       </p>

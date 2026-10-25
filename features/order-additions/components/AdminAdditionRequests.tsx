@@ -43,19 +43,19 @@ function AdditionRequestCard({ request }: { request: AdditionRequestView }) {
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={presentation.tone}>{presentation.label}</Badge>
-          <span className="text-xs text-black/55">נשלחה {formatDateTime(request.submittedAt)}</span>
+          <span className="text-xs text-black/60">נשלחה {formatDateTime(request.submittedAt)}</span>
         </div>
         <ul className="mt-3 divide-y divide-[var(--pantry-line)] text-sm">
           {request.lines.map((line) => (
             <li key={line.id} className="flex justify-between gap-3 py-2">
-              <span>{line.productName} <span className="text-xs text-black/50">× {line.quantity}</span></span>
+              <span>{line.productName} <span className="text-xs text-black/60">× {line.quantity}</span></span>
               <span className="tabular-nums">{formatMoney(line.lineTotal)}</span>
             </li>
           ))}
         </ul>
         {request.rejectionReason && <p className="mt-2 text-sm text-red-800">סיבת דחייה: {request.rejectionReason}</p>}
         {request.reviewedAt && (
-          <p className="mt-2 text-xs text-black/50">טופלה {formatDateTime(request.reviewedAt)}{request.reviewedByName ? ` על ידי ${request.reviewedByName}` : ''}</p>
+          <p className="mt-2 text-xs text-black/60">טופלה {formatDateTime(request.reviewedAt)}{request.reviewedByName ? ` על ידי ${request.reviewedByName}` : ''}</p>
         )}
       </div>
 

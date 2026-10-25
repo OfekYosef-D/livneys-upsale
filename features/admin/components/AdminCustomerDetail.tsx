@@ -20,7 +20,7 @@ export function AdminCustomerDetail({ customer }: { customer: AdminCustomerDetai
         <Panel className="space-y-4 p-4">
           <div className="flex items-center justify-between">
             <ActiveBadge active={customer.isActive} />
-            <span className="text-xs text-black/55">{customer.priceListName}</span>
+            <span className="text-xs text-black/60">{customer.priceListName}</span>
           </div>
           <DefinitionList>
             <DefinitionItem label="איש קשר">{customer.contact}</DefinitionItem>
@@ -40,13 +40,13 @@ export function AdminCustomerDetail({ customer }: { customer: AdminCustomerDetai
         <Panel>
           <PanelHeader title="מוצרים מומלצים" actions={<Link href={paths.admin.recommendations} className="text-xs hover:underline">ניהול</Link>} />
           {customer.recommendations.length === 0 ? (
-            <p className="p-4 text-xs text-black/50">אין המלצות פעילות. המלצות מופיעות ללקוח בקטלוג תחת &quot;מומלץ עבורכם&quot;.</p>
+            <p className="p-4 text-xs text-black/60">אין המלצות פעילות. המלצות מופיעות ללקוח בקטלוג תחת &quot;מומלץ עבורכם&quot;.</p>
           ) : (
             <ul className="divide-y divide-[var(--pantry-line)]">
               {customer.recommendations.map((recommendation) => (
                 <li key={recommendation.productName} className="px-4 py-2 text-sm">
                   <p className="font-medium">{recommendation.productName}</p>
-                  {recommendation.reason && <p className="text-xs text-black/55">{recommendation.reason}</p>}
+                  {recommendation.reason && <p className="text-xs text-black/60">{recommendation.reason}</p>}
                 </li>
               ))}
             </ul>
@@ -72,7 +72,7 @@ export function AdminCustomerDetail({ customer }: { customer: AdminCustomerDetai
                 <tr key={order.id} className="hover:bg-[var(--pantry-soft)]">
                   <Td>
                     <Link href={paths.admin.order(order.id)} className="font-medium hover:underline">{formatOrderNumber(order.orderNumber)}</Link>
-                    <p className="text-xs text-black/50">חלוקה {formatDate(order.deliveryWindowStart)}</p>
+                    <p className="text-xs text-black/60">חלוקה {formatDate(order.deliveryWindowStart)}</p>
                   </Td>
                   <Td label="סטטוס"><OrderStatusBadge status={order.status} /></Td>
                   <Td label="סכום כולל מע״מ" className="tabular-nums">{formatMoney(order.totalIncludingVat)}</Td>

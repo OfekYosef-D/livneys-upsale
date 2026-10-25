@@ -63,7 +63,7 @@ export function ReviewOrderClient({ data }: { data: CustomerPortalData }) {
   }
 
   return (
-    <main className="app-surface min-h-screen pb-16 text-black">
+    <main id="main-content" tabIndex={-1} className="app-surface min-h-screen pb-16 text-black">
       <CustomerHeader
         title="סיכום ההזמנה"
         subtitle={`${customer.name} · חלוקה ב${formatWeekdayDate(schedule.deliveryAt)}`}
@@ -91,7 +91,7 @@ export function ReviewOrderClient({ data }: { data: CustomerPortalData }) {
                     <li key={line.productId} className="grid gap-2 px-3 py-3 sm:grid-cols-[1fr_9rem_6.5rem] sm:items-center sm:gap-3">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold">{line.productName}</p>
-                        <p className="text-xs text-black/55">{product.unit} · {formatMoney(line.unitPrice)} ליחידה</p>
+                        <p className="text-xs text-black/60">{product.unit} · {formatMoney(line.unitPrice)} ליחידה</p>
                       </div>
                       <QuantityStepper
                         value={line.quantity}
@@ -139,7 +139,7 @@ export function ReviewOrderClient({ data }: { data: CustomerPortalData }) {
           {cart.items.length > 0 && <MinimumOrderProgress totalBeforeVat={cart.pricing.total} />}
 
           <div className="space-y-2 border-t border-[var(--pantry-line)] pt-3">
-            <p className="flex items-start gap-2 text-[11px] leading-5 text-black/55">
+            <p className="flex items-start gap-2 text-[11px] leading-5 text-black/60">
               <ShieldCheck size={15} className="mt-0.5 shrink-0 text-black" aria-hidden="true" />
               {COMMERCIAL_ORDER_NOTICE}
             </p>
@@ -168,7 +168,7 @@ export function ReviewOrderClient({ data }: { data: CustomerPortalData }) {
           >
             שליחת ההזמנה <ArrowLeft size={16} aria-hidden="true" />
           </Button>
-          <p className="text-center text-[11px] text-black/50">ניתן לשלוח עד {formatShortDateTime(schedule.cutoffAt)}</p>
+          <p className="text-center text-[11px] text-black/60">ניתן לשלוח עד {formatShortDateTime(schedule.cutoffAt)}</p>
         </aside>
       </div>
     </main>

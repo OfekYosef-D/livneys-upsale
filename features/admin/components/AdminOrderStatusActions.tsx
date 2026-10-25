@@ -28,7 +28,7 @@ export function AdminOrderStatusActions({ orderId, status }: { orderId: string; 
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium text-black/55">השלב הבא</p>
+      <p className="text-xs font-medium text-black/60">השלב הבא</p>
       {nextStatuses.map((next) => (
         <Button
           key={next}

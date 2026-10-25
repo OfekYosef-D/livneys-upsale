@@ -11,9 +11,9 @@ export default async function LegalDocumentPage({ params }: { params: Promise<{ 
     && process.env.LEGAL_DOCUMENTS_APPROVED_VERSION === LEGAL_DOCUMENT_SET_VERSION;
 
   return (
-    <main className="app-surface min-h-screen px-4 py-8 text-black">
+    <main id="main-content" tabIndex={-1} className="app-surface min-h-screen px-4 py-8 text-black">
       <article className="ui-panel mx-auto max-w-3xl p-5 md:p-8">
-        <p className="text-xs font-medium text-black/45">גרסה {document.version}</p>
+        <p className="text-xs font-medium text-black/60">גרסה {document.version}</p>
         <h1 className="mt-1 text-2xl font-semibold">{document.title}</h1>
         {!isApprovedProductionVersion && (
           <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-900 ring-1 ring-amber-200">

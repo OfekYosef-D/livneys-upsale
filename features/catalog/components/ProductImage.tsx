@@ -35,7 +35,7 @@ export function ProductImage({
       {source.kind === 'static' && <Image src={source.src} alt={product.name} fill sizes={sizes} className="object-cover" />}
       {source.kind === 'remote' && <Image src={source.src} alt={product.name} fill sizes={sizes} unoptimized className="object-cover" />}
       {source.kind === 'none' && (
-        <span className="grid h-full w-full place-items-center text-xs font-semibold text-black/50" aria-label={product.name}>
+        <span className="grid h-full w-full place-items-center text-xs font-semibold text-black/60" aria-label={product.name}>
           {initials(product.name)}
         </span>
       )}

@@ -6,7 +6,7 @@ export const badgeTones = {
   warning: 'bg-amber-100 text-amber-900',
   danger: 'bg-red-100 text-red-800',
   info: 'bg-sky-100 text-sky-900',
-  muted: 'bg-black/5 text-black/45',
+  muted: 'bg-black/5 text-black/60',
   inverse: 'bg-black text-white',
 } as const;
 
